@@ -81,32 +81,125 @@ function erro(msg) {
   if (msg) box.innerHTML = `<h2 style="margin:0 0 8px">Ops</h2><p style="margin:0">${esc(msg)}</p>`;
 }
 
-function renderJornada(confirmados, marcos) {
+function renderJornada(confirmados, marcosRaw) {
   el("n-confirmados").textContent = confirmados;
-  const proximo = marcos.find((m) => confirmados < m.quantidade);
-  el("proximo-marco").textContent = proximo
-    ? `Faltam ${proximo.quantidade - confirmados} para "${proximo.titulo}".`
-    : marcos.length
-    ? "Todos os marcos desbloqueados! 🎉"
-    : "";
+  const marcos = [...marcosRaw].sort((a, b) => a.quantidade - b.quantidade);
 
-  el("trilha").innerHTML = marcos.length
-    ? marcos
-        .map((m) => {
-          const ok = confirmados >= m.quantidade;
-          const bloq = !ok;
-          const faltam = bloq ? `<div class="faltam">faltam ${m.quantidade - confirmados}</div>` : "";
-          return `<div class="marco ${ok ? "ok" : "bloqueado"}">
-            <div class="bolha">${ok ? "✓" : m.quantidade}</div>
-            <div class="conteudo">
-              <h4>${esc(m.titulo)}</h4>
-              <p>${esc(m.descricao || "")}</p>
-              ${faltam}
-            </div>
-          </div>`;
-        })
-        .join("")
-    : `<p class="pagina-sub" style="margin:14px 0 0">Nenhum marco configurado ainda.</p>`;
+  if (!marcos.length) {
+    el("proximo-marco").textContent = "";
+    el("tabuleiro").innerHTML = "";
+    el("fases").innerHTML =
+      `<p class="pagina-sub" style="margin:14px 0 0">Nenhuma fase configurada ainda.</p>`;
+    return;
+  }
+
+  const conquistados = marcos.filter((m) => confirmados >= m.quantidade).length;
+  const proximo = marcos[conquistados];
+  el("proximo-marco").textContent = proximo
+    ? `Faltam ${proximo.quantidade - confirmados} confirmados para a bandeira "${proximo.titulo}".`
+    : "Você chegou à última bandeira! 🏆";
+
+  desenharTabuleiro(confirmados, marcos, conquistados);
+  renderFases(confirmados, marcos, conquistados);
+}
+
+/* ---- Tabuleiro (jogo de tabuleiro) ------------------------------------- */
+function desenharTabuleiro(confirmados, marcos, conquistados) {
+  // nós: início + 1 por marco + meta final
+  const N = marcos.length + 2;
+  const W = 300;
+  const stepY = 124;
+  const padY = 44;
+  const H = padY * 2 + (N - 1) * stepY;
+  const xa = 56, xb = W - 56;
+  const X = (i) => (i % 2 === 0 ? xa : xb);
+  const Y = (i) => padY + i * stepY;
+
+  let d = `M ${X(0)} ${Y(0)}`;
+  for (let i = 1; i < N; i++) {
+    const ym = (Y(i - 1) + Y(i)) / 2;
+    d += ` C ${X(i - 1)} ${ym}, ${X(i)} ${ym}, ${X(i)} ${Y(i)}`;
+  }
+
+  // fração de progresso ao longo do caminho (0 = início, 1 = meta)
+  const nodeFrac = (i) => i / (N - 1);
+  let progresso;
+  if (conquistados >= marcos.length) {
+    progresso = 1;
+  } else {
+    const baixo = conquistados === 0 ? 0 : marcos[conquistados - 1].quantidade;
+    const alto = marcos[conquistados].quantidade;
+    const seg = alto > baixo ? Math.min(1, Math.max(0, (confirmados - baixo) / (alto - baixo))) : 0;
+    progresso = nodeFrac(conquistados) + seg * (nodeFrac(conquistados + 1) - nodeFrac(conquistados));
+  }
+
+  const nos = [];
+  for (let i = 0; i < N; i++) {
+    const cx = X(i), cy = Y(i);
+    if (i === 0) {
+      nos.push(`<g class="no-inicio"><circle cx="${cx}" cy="${cy}" r="13"/>
+        <text x="${cx}" y="${cy + 4}">▶</text></g>
+        <text class="rot" x="${cx}" y="${cy - 22}">Início</text>`);
+    } else if (i === N - 1) {
+      const ok = conquistados >= marcos.length;
+      nos.push(`<g class="no-meta ${ok ? "ok" : ""}"><circle cx="${cx}" cy="${cy}" r="18"/>
+        <text x="${cx}" y="${cy + 6}" class="emoji">🏆</text></g>
+        <text class="rot" x="${cx}" y="${cy + 38}">Meta</text>`);
+    } else {
+      const m = marcos[i - 1];
+      const ok = confirmados >= m.quantidade;
+      const atual = !ok && i - 1 === conquistados;
+      const cls = ok ? "ok" : atual ? "atual" : "";
+      // bandeira "plantada" no marco (mastro + galhardete)
+      const bandeira = `<line class="mastro" x1="${cx}" y1="${cy - 4}" x2="${cx}" y2="${cy - 34}"/>
+        <polygon class="bandeira" points="${cx},${cy - 34} ${cx + 22},${cy - 28} ${cx},${cy - 21}"/>`;
+      nos.push(`<g class="no ${cls}">
+        ${bandeira}
+        <circle cx="${cx}" cy="${cy}" r="17"/>
+        <text x="${cx}" y="${cy + 5}">${ok ? "✓" : m.quantidade}</text>
+      </g>`);
+    }
+  }
+
+  el("tabuleiro").innerHTML = `
+    <svg class="tab-svg" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Jornada">
+      <path class="via" d="${d}"/>
+      <path class="via-feita" d="${d}" pathLength="1" style="stroke-dashoffset:${(1 - progresso).toFixed(4)}"/>
+      ${nos.join("")}
+      <g class="peao" id="peao"><circle r="12"/><text y="4">📍</text></g>
+    </svg>`;
+
+  const via = el("tabuleiro").querySelector(".via");
+  const peao = el("tabuleiro").querySelector("#peao");
+  const pt = via.getPointAtLength(progresso * via.getTotalLength());
+  peao.setAttribute("transform", `translate(${pt.x} ${pt.y - 4})`);
+}
+
+/* ---- Fases (cards abaixo do tabuleiro) --------------------------------- */
+function renderFases(confirmados, marcos, conquistados) {
+  el("fases").innerHTML = marcos
+    .map((m, idx) => {
+      const ok = confirmados >= m.quantidade;
+      const atual = !ok && idx === conquistados;
+      const estado = ok ? "conquistada" : atual ? "atual" : "bloqueada";
+      const selo = ok
+        ? `<span class="fase-selo ok">Bandeira conquistada</span>`
+        : atual
+        ? `<span class="fase-selo atual">Você está aqui · faltam ${m.quantidade - confirmados}</span>`
+        : `<span class="fase-selo bloq">🔒 Bloqueada</span>`;
+      const corpo =
+        ok || atual
+          ? `<p>${esc(m.descricao || "")}</p>`
+          : `<p class="dim">Chegue à bandeira anterior para desbloquear.</p>`;
+      return `<div class="fase ${estado}">
+        <div class="fase-num">${m.quantidade}</div>
+        <div class="fase-txt">
+          <div class="fase-topo"><h4>${esc(m.titulo)}</h4>${selo}</div>
+          ${corpo}
+        </div>
+      </div>`;
+    })
+    .join("");
 }
 
 function renderConvites(convites, resumo) {
