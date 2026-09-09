@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script>try{var t=localStorage.getItem('tema');if(t==='dark'||t==='light')document.documentElement.dataset.theme=t;}catch(e){}</script>
+<title>Eventos — Programa Anfitrião</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../assets/css/theme.css" />
+</head>
+<body>
+  <div class="eventos-tela">
+    <div class="marca-grande">Programa <b>Anfitrião</b></div>
+    <h1 class="eventos-titulo">Seus eventos</h1>
+    <p class="eventos-sub">Escolha um evento para abrir ou crie um novo. Cada evento tem seus próprios anfitriões, convidados, participantes e configurações.</p>
+
+    <div id="carregando" class="vazio">Carregando…</div>
+    <div id="lista" class="eventos-grid" hidden></div>
+    <div id="vazio" class="vazio" hidden>Nenhum evento ainda. Crie o primeiro.</div>
+
+    <button class="btn btn-primario" id="btn-criar" style="margin-top:22px" hidden>+ Criar evento</button>
+  </div>
+<script type="module" src="../assets/js/eventos.js"></script>
+</body>
+</html>

@@ -3,13 +3,22 @@
 // =============================================================================
 import { esc, formatarData } from "./ui.js";
 import { APP } from "./config.js";
-import { getConvidadoStatus, listConvidadosPorEmail, getConfig } from "./supabase.js";
+import { getConvidadoStatus, listConvidadosPorEmail, getEvento } from "./supabase.js";
 
 const el = (id) => document.getElementById(id);
 const idConvidado = new URLSearchParams(location.search).get("c");
-let config = null;
+const cacheEvento = {};
 
 el("marca").innerHTML = APP.marcaHtml;
+
+async function textoStatus(c) {
+  const m = MAPA[c.status] || MAPA.Pendente;
+  if (c.evento_id && !(c.evento_id in cacheEvento)) {
+    cacheEvento[c.evento_id] = await getEvento(c.evento_id).catch(() => null);
+  }
+  const ev = cacheEvento[c.evento_id];
+  return { m, texto: (ev && ev[m.chave]) || m.fallback };
+}
 
 const MAPA = {
   Pendente: { rotulo: "Em análise", cls: "badge-alerta", chave: "texto_em_analise",
@@ -23,7 +32,6 @@ const MAPA = {
 };
 
 (async function iniciar() {
-  config = await getConfig().catch(() => null);
   if (idConvidado) {
     el("carregando").hidden = false;
     try {
@@ -81,26 +89,26 @@ function semResultado(msg) {
   el("busca-erro").textContent = msg;
 }
 
-function mostrarResultado(lista, email) {
+async function mostrarResultado(lista, email) {
   el("cartao-busca").hidden = true;
   el("cartao-resultado").hidden = false;
+  const linhas = await Promise.all(
+    lista.map(async (c) => {
+      const { m, texto } = await textoStatus(c);
+      return `<div style="padding:16px 0;border-bottom:1px solid var(--cinza-100)">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+          <strong style="font-size:1.05rem">${esc(c.nome || "Inscrição")}</strong>
+          <span class="badge ${m.cls}" style="font-size:.78rem">${m.rotulo}</span>
+        </div>
+        <p style="margin:8px 0 0;color:var(--texto-suave);line-height:1.5">${esc(texto)}</p>
+        <p class="pagina-sub" style="margin:8px 0 0;font-size:.75rem">
+          Convite de ${esc(c.anfitriao?.nome || "—")} · enviado em ${formatarData(c.created_at)}
+        </p>
+      </div>`;
+    })
+  );
   el("resultado").innerHTML =
     (email ? `<p class="pagina-sub" style="margin:0 0 14px">Inscrições de <b>${esc(email)}</b></p>` : "") +
-    lista
-      .map((c) => {
-        const m = MAPA[c.status] || MAPA.Pendente;
-        const texto = (config && config[m.chave]) || m.fallback;
-        return `<div style="padding:16px 0;border-bottom:1px solid var(--cinza-100)">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-            <strong style="font-size:1.05rem">${esc(c.nome || "Inscrição")}</strong>
-            <span class="badge ${m.cls}" style="font-size:.78rem">${m.rotulo}</span>
-          </div>
-          <p style="margin:8px 0 0;color:var(--texto-suave);line-height:1.5">${esc(texto)}</p>
-          <p class="pagina-sub" style="margin:8px 0 0;font-size:.75rem">
-            Convite de ${esc(c.anfitriao?.nome || "—")} · enviado em ${formatarData(c.created_at)}
-          </p>
-        </div>`;
-      })
-      .join("");
+    linhas.join("");
   el("resultado").lastElementChild?.style.setProperty("border-bottom", "none");
 }

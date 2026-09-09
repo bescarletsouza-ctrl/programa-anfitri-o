@@ -16,8 +16,8 @@
   <main class="conteudo">
     <div class="barra-topo">
       <div>
-        <h1 class="pagina-titulo">Configurações</h1>
-        <p class="pagina-sub">Grupos, responsáveis, estágios do funil e textos do sistema.</p>
+        <h1 class="pagina-titulo">Configurações do evento</h1>
+        <p class="pagina-sub">Dados do evento, grupos, responsáveis, etapas, marcos e textos. Tudo aqui vale só para o evento aberto.</p>
       </div>
     </div>
 
@@ -25,10 +25,14 @@
 
     <div id="conteudo" hidden class="grid grid-2">
       <section class="card">
-        <h3>Geral</h3>
+        <h3>Dados do evento</h3>
         <form id="form-config">
-          <label class="campo"><span>Nome do produto</span>
-            <input class="input" name="nome_produto" required /></label>
+          <label class="campo"><span>Nome do evento *</span>
+            <input class="input" name="nome" required /></label>
+          <label class="campo"><span>Data</span>
+            <input class="input" name="data_evento" type="date" /></label>
+          <label class="campo"><span>Local</span>
+            <input class="input" name="local" /></label>
           <label class="campo"><span>Meta de confirmados</span>
             <input class="input" name="meta_confirmados" type="number" min="0" /></label>
           <label class="campo"><span>Subtítulo do convite</span>
@@ -41,7 +45,7 @@
             <textarea class="input" name="texto_aprovado" rows="2"></textarea></label>
           <label class="campo"><span>Mensagem — inscrição não aprovada</span>
             <textarea class="input" name="texto_recusado" rows="2"></textarea></label>
-          <button class="btn btn-primario" type="submit">Salvar geral</button>
+          <button class="btn btn-primario" type="submit">Salvar dados do evento</button>
         </form>
       </section>
 

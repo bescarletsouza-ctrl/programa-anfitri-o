@@ -5,8 +5,7 @@
 import { esc, slugify, formatarData } from "./ui.js";
 import { APP } from "./config.js";
 import {
-  getAnfitriaoPorSlug, listConvidadosDoAnfitriao, listMarcos,
-  listRankingPublico, listGrupos,
+  getAnfitriaoPorSlug, listConvidadosDoAnfitriao, listMarcos, listRankingPublico,
 } from "./supabase.js";
 
 const el = (id) => document.getElementById(id);
@@ -23,16 +22,15 @@ const badgeStatus = (s) =>
     const anfitriao = await getAnfitriaoPorSlug(slug);
     if (!anfitriao) return erro();
 
-    const [convites, marcos, ranking, grupos] = await Promise.all([
+    const [convites, marcos, ranking] = await Promise.all([
       listConvidadosDoAnfitriao(anfitriao.id),
-      listMarcos().catch(() => []),
-      listRankingPublico().catch(() => []),
-      listGrupos().catch(() => []),
+      listMarcos(anfitriao.evento_id).catch(() => []),
+      listRankingPublico(anfitriao.evento_id).catch(() => []),
     ]);
 
     const confirmados = convites.filter((c) => c.status === "Confirmado").length;
     const aprovados = convites.filter((c) => c.status === "Aprovado" || c.status === "Confirmado").length;
-    const grupoNome = grupos.find((g) => g.id === anfitriao.grupo_id)?.nome;
+    const grupoNome = anfitriao.grupo?.nome;
 
     el("titulo").textContent = `Olá, ${anfitriao.nome.split(" ")[0]}`;
     el("subtitulo").textContent = grupoNome ? `Grupo ${grupoNome}` : "Seu painel de convites";

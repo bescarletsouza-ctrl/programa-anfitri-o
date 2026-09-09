@@ -5,7 +5,7 @@
 import { esc, slugify } from "./ui.js";
 import { APP } from "./config.js";
 import {
-  getAnfitriaoPorSlug, listFormPerguntas, getConfig, criarConvidado,
+  getAnfitriaoPorSlug, listFormPerguntas, getEvento, criarConvidado,
 } from "./supabase.js";
 
 const el = (id) => document.getElementById(id);
@@ -32,7 +32,10 @@ el("marca").innerHTML = APP.marcaHtml;
   try {
     anfitriao = await getAnfitriaoPorSlug(slug);
     if (!anfitriao) return mostrarErro();
-    [perguntas, config] = await Promise.all([listFormPerguntas(), getConfig().catch(() => null)]);
+    [perguntas, config] = await Promise.all([
+      listFormPerguntas(anfitriao.evento_id),
+      getEvento(anfitriao.evento_id).catch(() => null),
+    ]);
     perguntas = perguntas.filter((p) => p.ativo);
     if (!perguntas.length) return mostrarErro();
 
@@ -153,6 +156,7 @@ async function enviar() {
 
   const registro = {
     anfitriao_id: anfitriao.id,
+    evento_id: anfitriao.evento_id,
     status: "Pendente",
     respostas: {},
     utm_source: utm.utm_source || "anfitriao",

@@ -155,6 +155,18 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
   color: #fff; padding: 8px 10px 20px;
 }
 .sidebar .marca b { color: var(--cor-laranja); }
+
+.evento-box { padding: 0 4px 16px; display: grid; gap: 5px; }
+.evento-sel {
+  width: 100%; height: 34px; padding: 0 10px;
+  background: rgba(255, 255, 255, .05); border: 1px solid var(--side-borda);
+  color: var(--side-texto); border-radius: 8px; font: inherit; font-size: .82rem; font-weight: 550;
+  cursor: pointer;
+}
+.evento-sel:focus { outline: none; border-color: var(--cor-laranja); }
+.evento-gerenciar { font-size: .72rem; color: var(--side-muted); text-decoration: none; padding-left: 2px; }
+.evento-gerenciar:hover { color: var(--side-texto); text-decoration: underline; }
+
 .sidebar nav { display: flex; flex-direction: column; gap: 2px; }
 
 .nav-link {
@@ -387,6 +399,25 @@ table.tabela tbody tr:last-child td { border-bottom: none; }
 
 .skel { background: var(--cinza-100); border-radius: 6px; animation: pulsar 1.4s ease-in-out infinite; }
 @keyframes pulsar { 50% { opacity: .45; } }
+
+/* ---- Tela de eventos ---- */
+.eventos-tela { max-width: 620px; margin: 0 auto; padding: 56px 20px 72px; }
+.marca-grande { font-weight: 700; font-size: 1.05rem; letter-spacing: -.015em; margin-bottom: 40px; }
+.marca-grande b { color: var(--cor-laranja); }
+.eventos-titulo { font-size: 1.7rem; font-weight: 700; letter-spacing: -.025em; margin: 0 0 6px; }
+.eventos-sub { color: var(--texto-suave); margin: 0 0 24px; font-size: .92rem; line-height: 1.55; }
+.eventos-grid { display: grid; gap: 10px; }
+.evento-card {
+  display: grid; gap: 3px; text-align: left; width: 100%;
+  padding: 16px 18px; border: 1px solid var(--borda); border-radius: var(--raio-lg);
+  background: var(--superficie); cursor: pointer; font: inherit;
+  transition: border-color .12s, box-shadow .12s;
+}
+.evento-card:hover { border-color: var(--cor-laranja); box-shadow: var(--sombra-md); }
+.evento-card.atual { border-color: var(--cor-laranja); }
+.evento-card-nome { font-weight: 650; font-size: 1.02rem; letter-spacing: -.01em; }
+.evento-card-info { color: var(--texto-suave); font-size: .82rem; }
+.evento-card .badge { margin-top: 6px; justify-self: start; }
 
 /* ---- Kanban ---- */
 .kanban { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 10px; align-items: flex-start; }

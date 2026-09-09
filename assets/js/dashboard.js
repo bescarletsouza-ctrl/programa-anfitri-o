@@ -3,8 +3,9 @@
 // =============================================================================
 import { iniciarPagina, dataPorExtenso, esc, formatarData } from "./ui.js";
 import {
-  listEstagios, listGrupos, listResponsaveis, listAnfitrioes, listConvidados, getConfig,
+  listEstagios, listGrupos, listResponsaveis, listAnfitrioes, listConvidados, getEvento,
 } from "./supabase.js";
+import { eventoId } from "./evento.js";
 import { APP } from "./config.js";
 
 iniciarPagina("painel");
@@ -19,10 +20,10 @@ el("data-hoje").textContent =
 
 (async function () {
   try {
-    const [estagios, grupos, responsaveis, anfitrioes, convidados, config] = await Promise.all([
-      listEstagios(), listGrupos(), listResponsaveis(), listAnfitrioes(), listConvidados(), getConfig(),
+    const [estagios, grupos, responsaveis, anfitrioes, convidados, evento] = await Promise.all([
+      listEstagios(), listGrupos(), listResponsaveis(), listAnfitrioes(), listConvidados(), getEvento(eventoId()),
     ]);
-    dados = { estagios, grupos, responsaveis, anfitrioes, convidados, config };
+    dados = { estagios, grupos, responsaveis, anfitrioes, convidados, evento };
 
     const fg = el("filtro-grupo");
     grupos.forEach((g) => fg.add(new Option(g.nome, g.id)));
@@ -41,7 +42,9 @@ el("data-hoje").textContent =
     el("painel").hidden = false;
     render();
   } catch (e) {
-    el("carregando").textContent = "Erro ao carregar: " + e.message;
+    el("carregando").innerHTML = /evento_id|eventos|schema cache/.test(e.message || "")
+      ? "Rode a migração <code>supabase/migrations/0005_eventos.sql</code> no SQL Editor do Supabase."
+      : "Erro ao carregar: " + esc(e.message);
   }
 })();
 
@@ -103,7 +106,7 @@ function renderFunilConvidados() {
       <div class="qtd">${cont("Recusado")}</div></div>`;
   el("funil-convidados").innerHTML = html;
 
-  const meta = dados.config?.meta_confirmados || 0;
+  const meta = dados.evento?.meta_confirmados || 0;
   if (meta > 0) {
     const pct = Math.min(100, Math.round((conf / meta) * 100));
     el("meta-box").innerHTML = `

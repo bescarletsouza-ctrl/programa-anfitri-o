@@ -2,7 +2,8 @@
 // UI compartilhada: ícones, sidebar, tema, formatação, toast, modal, gaveta.
 // =============================================================================
 import { APP } from "./config.js";
-import { CONFIGURADO } from "./supabase.js";
+import { CONFIGURADO, listEventos } from "./supabase.js";
+import { eventoId, eventoNome, definirEvento, exigirEvento } from "./evento.js";
 
 /* ---- Ícones (feather-style, stroke currentColor) --------------------- */
 const PATHS = {
@@ -61,6 +62,12 @@ export function renderSidebar(ativo) {
   el.className = "sidebar";
   el.innerHTML = `
     <div class="marca">${APP.marcaHtml}</div>
+    <div class="evento-box">
+      <select class="evento-sel" data-evento-sel aria-label="Evento">
+        <option value="${esc(eventoId() || "")}">${esc(eventoNome() || "Selecionar evento")}</option>
+      </select>
+      <a class="evento-gerenciar" href="eventos.html">Gerenciar eventos</a>
+    </div>
     <nav>
       ${NAV.map(
         (n) => `<a class="nav-link ${n.chave === ativo ? "ativo" : ""}" href="${n.href}">${icone(n.ico)}<span>${n.rotulo}</span></a>`
@@ -73,6 +80,22 @@ export function renderSidebar(ativo) {
   aplicarTema(document.documentElement.dataset.theme === "dark" ? "dark" : "light");
   el.querySelector("[data-toggle-tema]").onclick = alternarTema;
   montarTopbarMobile(el);
+  popularSeletorEvento(el);
+}
+
+async function popularSeletorEvento(sidebar) {
+  const sel = sidebar.querySelector("[data-evento-sel]");
+  if (!sel) return;
+  let eventos;
+  try { eventos = await listEventos(); } catch { return; }
+  const atual = eventoId();
+  sel.innerHTML = eventos
+    .map((e) => `<option value="${esc(e.id)}" ${e.id === atual ? "selected" : ""}>${esc(e.nome)}</option>`)
+    .join("");
+  sel.onchange = () => {
+    definirEvento(sel.value, sel.options[sel.selectedIndex].text);
+    location.reload();
+  };
 }
 
 function montarTopbarMobile(sidebar) {
@@ -237,6 +260,7 @@ export function montarGaveta() {
 
 /* ---- Boilerplate de página ----------------------------------------- */
 export function iniciarPagina(chaveNav) {
+  exigirEvento();
   renderSidebar(chaveNav);
   montarGaveta();
   if (!CONFIGURADO) {

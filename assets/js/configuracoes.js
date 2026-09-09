@@ -4,8 +4,9 @@
 import { iniciarPagina, esc, abrirModal, toast, confirmar, icone } from "./ui.js";
 import {
   listGrupos, listResponsaveis, listEstagios, listEtapasParticipante, listMarcos,
-  getConfig, salvar, remover, salvarConfig,
+  getEvento, salvar, remover, salvarEvento,
 } from "./supabase.js";
+import { eventoId, definirEvento } from "./evento.js";
 
 iniciarPagina("config");
 const el = (id) => document.getElementById(id);
@@ -16,22 +17,27 @@ carregar();
 
 async function carregar() {
   try {
-    config = await getConfig();
+    config = await getEvento(eventoId());
     const form = el("form-config");
-    const campos = ["nome_produto", "subtitulo_convite", "texto_confirmacao",
+    const textos = ["nome", "local", "subtitulo_convite", "texto_confirmacao",
       "texto_em_analise", "texto_aprovado", "texto_recusado"];
-    campos.forEach((k) => { if (form[k]) form[k].value = config[k] || ""; });
+    textos.forEach((k) => { if (form[k]) form[k].value = config[k] || ""; });
+    if (form.data_evento) form.data_evento.value = config.data_evento || "";
     form.meta_confirmados.value = config.meta_confirmados ?? 0;
     form.onsubmit = async (e) => {
       e.preventDefault();
       try {
-        const patch = { meta_confirmados: Number(form.meta_confirmados.value) || 0 };
-        // só envia colunas que existem (as de texto_* dependem da migração 0003)
-        campos.forEach((k) => {
-          if (form[k] && k in config) patch[k] = form[k].value.trim() || null;
-        });
-        await salvarConfig(patch);
-        toast("Configurações salvas.", "ok");
+        const patch = {
+          nome: form.nome.value.trim(),
+          data_evento: form.data_evento.value || null,
+          local: form.local.value.trim() || null,
+          meta_confirmados: Number(form.meta_confirmados.value) || 0,
+        };
+        ["subtitulo_convite", "texto_confirmacao", "texto_em_analise", "texto_aprovado", "texto_recusado"]
+          .forEach((k) => { if (form[k]) patch[k] = form[k].value.trim() || null; });
+        const salvo = await salvarEvento(patch);
+        definirEvento(salvo.id, salvo.nome);
+        toast("Configurações do evento salvas.", "ok");
       } catch (err) {
         toast(err.message, "erro");
       }
@@ -46,7 +52,9 @@ async function carregar() {
     el("conteudo").hidden = false;
     await Promise.allSettled([renderGrupos(), renderResponsaveis(), renderEstagios(), renderEtapasPart(), renderMarcos()]);
   } catch (e) {
-    el("carregando").textContent = "Erro ao carregar: " + e.message;
+    el("carregando").innerHTML = /evento_id|eventos|schema cache/.test(e.message || "")
+      ? "Rode a migração <code>supabase/migrations/0005_eventos.sql</code> no SQL Editor do Supabase."
+      : "Erro ao carregar: " + esc(e.message);
   }
 }
 
