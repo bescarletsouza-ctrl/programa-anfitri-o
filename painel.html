@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Meu painel — Programa Anfitrião</title>
+<meta name="robots" content="noindex" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/css/theme.css" />
+<link rel="stylesheet" href="assets/css/publico.css" />
+</head>
+<body class="publico">
+  <div class="pub-wrap largo">
+    <div class="pub-marca" id="marca">Programa <b>Anfitrião</b></div>
+
+    <div id="carregando" class="pub-erro-central">Carregando…</div>
+    <div id="erro" class="pub-erro-central" hidden>
+      <h2 style="margin:0 0 8px">Painel não encontrado</h2>
+      <p style="margin:0">Confira o link.</p>
+    </div>
+
+    <div id="conteudo" hidden>
+      <h1 style="font-size:clamp(1.4rem,5vw,1.9rem);margin:0 0 4px" id="titulo"></h1>
+      <p style="color:var(--cinza-400);margin:0 0 20px" id="subtitulo"></p>
+
+      <button class="btn btn-primario botao-copiar-link" id="btn-link">Copiar meu link de convite</button>
+
+      <div class="pub-abas" id="abas" style="margin-top:24px">
+        <button data-aba="jornada" class="ativo">Jornada</button>
+        <button data-aba="convites">Convites</button>
+        <button data-aba="ranking">Ranking</button>
+      </div>
+
+      <section class="pub-secao ativa" data-secao="jornada">
+        <div class="pub-card">
+          <div><span class="destaque-numero" id="n-confirmados">0</span></div>
+          <div class="destaque-rotulo">convidados confirmados</div>
+          <p style="color:var(--texto-suave);margin:8px 0 0" id="proximo-marco"></p>
+          <div class="trilha" id="trilha"></div>
+        </div>
+      </section>
+
+      <section class="pub-secao" data-secao="convites">
+        <div class="pub-card">
+          <div class="grid grid-3" id="resumo-convites" style="margin-bottom:16px"></div>
+          <div class="lista-simples" id="lista-convites"></div>
+        </div>
+      </section>
+
+      <section class="pub-secao" data-secao="ranking">
+        <div class="pub-card">
+          <p style="color:var(--texto-suave);margin:0 0 12px" id="minha-posicao"></p>
+          <div class="lista-simples" id="lista-ranking"></div>
+        </div>
+      </section>
+    </div>
+  </div>
+<script type="module" src="assets/js/painel.js"></script>
+</body>
+</html>

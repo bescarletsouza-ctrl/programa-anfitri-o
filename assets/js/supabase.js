@@ -66,8 +66,30 @@ export const listConvidadosDoAnfitriao = (anfitriaoId) =>
 export const listFormPerguntas = () =>
   supabase.from("form_perguntas").select("*").order("ordem").then(ok);
 
+export const listMarcos = () =>
+  supabase.from("marcos").select("*").order("quantidade").then(ok);
+
 export const getConfig = () =>
   supabase.from("config").select("*").eq("id", 1).single().then(ok);
+
+/* ---- Páginas públicas (convite / painel) ------------------------------- */
+export const getAnfitriaoPorSlug = (slug) =>
+  supabase
+    .from("anfitrioes")
+    .select("id, nome, slug, grupo_id, vai")
+    .eq("slug", slug)
+    .maybeSingle()
+    .then(ok);
+
+export const listRankingPublico = () =>
+  supabase
+    .from("ranking_publico")
+    .select("*")
+    .order("confirmados", { ascending: false })
+    .then(ok);
+
+export const criarConvidado = (registro) =>
+  supabase.from("convidados").insert(registro).select().single().then(ok);
 
 /* ---- Escrita ----------------------------------------------------------- */
 // tabela: string; registro: objeto (com id => update, sem id => insert)

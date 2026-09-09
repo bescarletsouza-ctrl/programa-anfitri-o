@@ -3,7 +3,7 @@
 // =============================================================================
 import { iniciarPagina, esc, abrirModal, toast, confirmar } from "./ui.js";
 import {
-  listGrupos, listResponsaveis, listEstagios, getConfig,
+  listGrupos, listResponsaveis, listEstagios, listMarcos, getConfig,
   salvar, remover, salvarConfig,
 } from "./supabase.js";
 
@@ -40,10 +40,11 @@ async function carregar() {
     el("conteudo").querySelectorAll("[data-add]").forEach((b) => {
       b.onclick = () => editarItem(b.dataset.add, null);
     });
+    el("add-marco").onclick = () => editarMarco(null);
 
     el("carregando").hidden = true;
     el("conteudo").hidden = false;
-    await Promise.all([renderGrupos(), renderResponsaveis(), renderEstagios()]);
+    await Promise.all([renderGrupos(), renderResponsaveis(), renderEstagios(), renderMarcos()]);
   } catch (e) {
     el("carregando").textContent = "Erro ao carregar: " + e.message;
   }
@@ -96,6 +97,68 @@ async function renderEstagios() {
 }
 
 const vazio = () => `<p class="pagina-sub" style="margin:0">Nada cadastrado ainda.</p>`;
+
+/* ---- Marcos / Prêmios ---- */
+async function renderMarcos() {
+  const arr = await listMarcos();
+  const c = el("lista-marcos");
+  c.innerHTML = arr.length
+    ? arr
+        .map(
+          (m) => `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:11px 0;border-bottom:1px solid var(--cinza-100)" data-id="${m.id}">
+        <div>
+          <div style="font-weight:600;font-size:.9rem">
+            <span class="badge badge-laranja" style="margin-right:6px">${m.quantidade} confirmados</span>${esc(m.titulo)}
+          </div>
+          <div class="pagina-sub" style="margin:3px 0 0;font-size:.8rem">${esc(m.descricao || "—")}</div>
+        </div>
+        <span class="linha-acoes">
+          <button class="icone-btn" data-editar>✎</button>
+          <button class="icone-btn" data-excluir>🗑</button>
+        </span>
+      </div>`
+        )
+        .join("")
+    : vazio();
+  c.querySelectorAll("[data-id]").forEach((row) => {
+    const m = arr.find((x) => x.id === row.dataset.id);
+    row.querySelector("[data-editar]").onclick = () => editarMarco(m);
+    row.querySelector("[data-excluir]").onclick = async () => {
+      if (!confirmar(`Excluir o marco "${m.titulo}"?`)) return;
+      try {
+        await remover("marcos", m.id);
+        toast("Marco excluído.", "ok");
+        renderMarcos();
+      } catch (e) { toast(e.message, "erro"); }
+    };
+  });
+}
+
+function editarMarco(m) {
+  abrirModal({
+    titulo: m ? "Editar marco" : "Novo marco",
+    corpoHtml: `
+      <label class="campo"><span>Convidados confirmados para desbloquear *</span>
+        <input class="input" name="quantidade" type="number" min="1" required value="${m?.quantidade ?? ""}" /></label>
+      <label class="campo"><span>Título *</span>
+        <input class="input" name="titulo" required value="${esc(m?.titulo || "")}" /></label>
+      <label class="campo"><span>Descrição / prêmio</span>
+        <textarea class="input" name="descricao" rows="2">${esc(m?.descricao || "")}</textarea></label>`,
+    onConfirmar: async (form) => {
+      const f = Object.fromEntries(new FormData(form));
+      const registro = {
+        quantidade: Number(f.quantidade) || 1,
+        titulo: f.titulo.trim(),
+        descricao: f.descricao.trim() || null,
+        ordem: Number(f.quantidade) || 1,
+      };
+      if (m) registro.id = m.id;
+      await salvar("marcos", registro);
+      toast("Marco salvo.", "ok");
+      renderMarcos();
+    },
+  });
+}
 
 /* ---- editar / criar ---- */
 const RECARGA = { grupos: renderGrupos, responsaveis: renderResponsaveis, estagios: renderEstagios };

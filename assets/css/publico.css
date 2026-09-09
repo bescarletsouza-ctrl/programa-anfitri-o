@@ -1,0 +1,162 @@
+/* =============================================================================
+   Páginas públicas (convite / painel do anfitrião).
+   Usa os tokens de theme.css. Layout centrado, sem sidebar, mobile-first.
+   ========================================================================== */
+body.publico {
+  background: var(--cor-preto);
+  color: var(--cor-branco);
+  min-height: 100vh;
+}
+
+.pub-wrap {
+  max-width: 620px;
+  margin: 0 auto;
+  padding: 40px 20px 64px;
+}
+.pub-wrap.largo { max-width: 780px; }
+
+.pub-marca {
+  font-family: var(--fonte-titulo);
+  font-weight: 800;
+  font-size: 1rem;
+  letter-spacing: .02em;
+  color: var(--cor-branco);
+  margin-bottom: 32px;
+}
+.pub-marca b { color: var(--cor-laranja); }
+
+.pub-card {
+  background: var(--cor-branco);
+  color: var(--texto);
+  border-radius: 16px;
+  padding: 28px clamp(20px, 5vw, 36px);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .35);
+}
+
+.pub-hero h1 {
+  font-size: clamp(1.5rem, 5vw, 2rem);
+  margin: 0 0 8px;
+  line-height: 1.15;
+}
+.pub-hero h1 b { color: var(--cor-laranja); }
+.pub-hero p { color: var(--texto-suave); margin: 0 0 24px; font-size: 1rem; line-height: 1.5; }
+
+/* ---- Stepper do formulário ------------------------------------------------ */
+.stepper-barra {
+  height: 6px;
+  background: var(--cinza-200);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.stepper-barra > i {
+  display: block;
+  height: 100%;
+  background: var(--cor-laranja);
+  border-radius: 999px;
+  transition: width .25s ease;
+}
+.stepper-contagem { font-size: .78rem; color: var(--texto-suave); text-align: right; margin-bottom: 22px; }
+
+.pergunta-rotulo {
+  display: block;
+  font-family: var(--fonte-titulo);
+  font-size: 1.25rem;
+  margin-bottom: 16px;
+  line-height: 1.25;
+}
+.pergunta-obrig { color: var(--cor-laranja); }
+
+.pub-input, .pub-select, textarea.pub-input {
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid var(--borda);
+  border-radius: 12px;
+  font: inherit;
+  font-size: 1.05rem;
+  background: var(--cor-branco);
+  color: var(--texto);
+}
+.pub-input:focus, .pub-select:focus, textarea.pub-input:focus {
+  outline: none;
+  border-color: var(--cor-laranja);
+  box-shadow: 0 0 0 3px var(--cor-laranja-suave);
+}
+
+.opcoes-radio { display: grid; gap: 10px; }
+.opcoes-radio label {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 16px; border: 1px solid var(--borda); border-radius: 12px;
+  cursor: pointer; font-size: 1rem; transition: border-color .12s, background .12s;
+}
+.opcoes-radio label:hover { border-color: var(--cor-laranja); }
+.opcoes-radio label.marcado { border-color: var(--cor-laranja); background: var(--cor-laranja-suave); }
+.opcoes-radio input { accent-color: var(--cor-laranja); width: 18px; height: 18px; }
+
+.passo-erro { color: var(--erro); font-size: .85rem; margin-top: 10px; min-height: 1em; }
+
+.passo-acoes { display: flex; gap: 10px; margin-top: 24px; }
+.passo-acoes .btn { flex: 1; justify-content: center; padding: 14px; font-size: 1rem; }
+
+/* ---- Sucesso ------------------------------------------------------------- */
+.pub-sucesso { text-align: center; padding: 12px 0; }
+.pub-sucesso .marca-ok {
+  width: 56px; height: 56px; border-radius: 50%;
+  background: var(--cor-laranja-suave); color: var(--cor-laranja-forte);
+  display: grid; place-items: center; font-size: 1.6rem; margin: 0 auto 16px;
+}
+.pub-sucesso h2 { margin: 0 0 8px; font-size: 1.4rem; }
+.pub-sucesso p { color: var(--texto-suave); margin: 0; line-height: 1.55; }
+
+/* ---- Painel do anfitrião ---------------------------------------------- */
+.pub-abas { display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap; }
+.pub-abas button {
+  border: none; background: rgba(255,255,255,.08); color: var(--cinza-300);
+  padding: 9px 16px; border-radius: 999px; font: inherit; font-weight: 600;
+  font-size: .88rem; cursor: pointer;
+}
+.pub-abas button.ativo { background: var(--cor-laranja); color: #fff; }
+
+.pub-secao { display: none; }
+.pub-secao.ativa { display: block; }
+
+.destaque-numero {
+  font-family: var(--fonte-titulo);
+  font-size: 3rem; font-weight: 800; color: var(--cor-laranja); line-height: 1;
+}
+.destaque-rotulo { color: var(--texto-suave); font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; }
+
+/* trilha de marcos */
+.trilha { margin-top: 22px; display: grid; gap: 0; }
+.marco {
+  display: grid; grid-template-columns: 40px 1fr; gap: 14px;
+  padding-bottom: 22px; position: relative;
+}
+.marco:not(:last-child)::before {
+  content: ""; position: absolute; left: 19px; top: 40px; bottom: 0;
+  width: 2px; background: var(--cinza-200);
+}
+.marco.ok:not(:last-child)::before { background: var(--cor-laranja); }
+.marco .bolha {
+  width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center;
+  font-family: var(--fonte-titulo); font-weight: 800; font-size: .9rem;
+  background: var(--cinza-100); color: var(--cinza-500); border: 2px solid var(--cinza-200);
+}
+.marco.ok .bolha { background: var(--cor-laranja); color: #fff; border-color: var(--cor-laranja); }
+.marco .conteudo h4 { margin: 0 0 3px; font-size: 1rem; }
+.marco .conteudo p { margin: 0; font-size: .88rem; color: var(--texto-suave); line-height: 1.45; }
+.marco.bloqueado .conteudo { opacity: .7; }
+.marco .faltam { font-size: .78rem; color: var(--cor-laranja-forte); font-weight: 600; margin-top: 4px; }
+
+.lista-simples > div {
+  display: flex; justify-content: space-between; gap: 12px; align-items: center;
+  padding: 11px 0; border-bottom: 1px solid var(--cinza-100);
+}
+.lista-simples > div:last-child { border-bottom: none; }
+.rank-linha.eu { background: var(--cor-laranja-suave); margin: 0 -12px; padding-left: 12px; padding-right: 12px; border-radius: 8px; }
+
+.botao-copiar-link {
+  width: 100%; justify-content: center; padding: 15px; font-size: 1rem; margin-top: 4px;
+}
+
+.pub-erro-central { text-align: center; padding: 60px 20px; color: var(--cinza-300); }

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Convite — Programa Anfitrião</title>
+<meta name="robots" content="noindex" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/css/theme.css" />
+<link rel="stylesheet" href="assets/css/publico.css" />
+</head>
+<body class="publico">
+  <div class="pub-wrap">
+    <div class="pub-marca" id="marca">Programa <b>Anfitrião</b></div>
+
+    <div id="carregando" class="pub-erro-central">Carregando convite…</div>
+
+    <div id="erro" class="pub-erro-central" hidden>
+      <h2 style="margin:0 0 8px">Convite não encontrado</h2>
+      <p style="margin:0">Confira o link que você recebeu.</p>
+    </div>
+
+    <div class="pub-card" id="cartao" hidden>
+      <div class="pub-hero" id="hero"></div>
+
+      <form id="form" novalidate>
+        <div class="stepper-barra"><i id="barra" style="width:0%"></i></div>
+        <div class="stepper-contagem" id="contagem"></div>
+        <div id="passo"></div>
+        <div class="passo-erro" id="passo-erro"></div>
+        <div class="passo-acoes">
+          <button type="button" class="btn btn-secundario" id="btn-voltar" hidden>Voltar</button>
+          <button type="button" class="btn btn-primario" id="btn-proximo">Próximo</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="pub-card" id="sucesso" hidden>
+      <div class="pub-sucesso">
+        <div class="marca-ok">✓</div>
+        <h2>Aplicação enviada</h2>
+        <p id="sucesso-texto"></p>
+      </div>
+    </div>
+  </div>
+<script type="module" src="assets/js/convite.js"></script>
+</body>
+</html>

@@ -197,7 +197,6 @@ async function abrirGavetaDetalhe(id) {
       <h4>Links</h4>
       ${linkBox("Link de convite", linkConvite)}
       ${linkBox("Painel do anfitrião", linkPainel)}
-      <p class="pagina-sub" style="font-size:.75rem;margin:6px 0 0">As páginas públicas entram na próxima fase — os links já ficam prontos.</p>
     </div>
 
     <div class="secao">
