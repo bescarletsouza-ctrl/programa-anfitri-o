@@ -81,9 +81,13 @@ create unique index if not exists grupos_evento_nome_uidx         on public.grup
 create unique index if not exists form_perguntas_evento_chave_uidx on public.form_perguntas(evento_id, chave);
 
 -- -----------------------------------------------------------------------------
--- 5. Views
+-- 5. Views — DROP + CREATE (a nova coluna evento_id muda a ordem das colunas,
+--    então "create or replace" não serve).
 -- -----------------------------------------------------------------------------
-create or replace view public.anfitrioes_com_stats as
+drop view if exists public.anfitrioes_com_stats;
+drop view if exists public.ranking_publico;
+
+create view public.anfitrioes_com_stats as
 select
   a.*,
   coalesce(c.enviados, 0)    as enviados,
@@ -99,7 +103,7 @@ left join (
   group by anfitriao_id
 ) c on c.anfitriao_id = a.id;
 
-create or replace view public.ranking_publico as
+create view public.ranking_publico as
 select
   a.id, a.nome, a.slug, a.evento_id,
   g.nome as grupo,
