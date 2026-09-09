@@ -15,7 +15,7 @@ import { parsearTabela, gerarCSV, baixarCSV } from "./tabela.js";
 iniciarPagina("participantes");
 const el = (id) => document.getElementById(id);
 
-const TIPOS = ["Convidado", "Anfitrião", "Acompanhante", "Comprador", "Outro"];
+const TIPOS = ["Convidado", "Anfitrião", "Acompanhante", "Comprador", "Cliente", "Outro"];
 const PAGAMENTOS = ["Gratuito", "Pago", "Convidado", "Cancelado", "Reembolsado"];
 const FAIXAS = [
   "Não faturo ainda", "Até 50 mil/mês", "50 mil – 150 mil/mês", "150 mil – 500 mil/mês",

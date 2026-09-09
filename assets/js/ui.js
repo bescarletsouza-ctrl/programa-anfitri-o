@@ -48,12 +48,14 @@ function alternarTema() {
 
 /* ---- Navegação -------------------------------------------------------- */
 const NAV = [
+  { grupo: "Evento" },
   { chave: "painel",        rotulo: "Painel",                  href: "index.html",         ico: "painel" },
+  { chave: "participantes", rotulo: "Participantes",           href: "participantes.html", ico: "participantes" },
+  { chave: "config",        rotulo: "Configurações",           href: "configuracoes.html", ico: "config" },
+  { grupo: "Anfitriões" },
   { chave: "anfitrioes",    rotulo: APP.termoAnfitriaoPlural,  href: "anfitrioes.html",    ico: "anfitrioes" },
   { chave: "convidados",    rotulo: APP.termoConvidadoPlural,  href: "convidados.html",    ico: "convidados" },
-  { chave: "participantes", rotulo: "Participantes",           href: "participantes.html", ico: "participantes" },
   { chave: "formulario",    rotulo: "Formulário de inscrição", href: "formulario.html",    ico: "formulario" },
-  { chave: "config",        rotulo: "Configurações",           href: "configuracoes.html", ico: "config" },
 ];
 
 export function renderSidebar(ativo) {
@@ -69,8 +71,10 @@ export function renderSidebar(ativo) {
       <a class="evento-gerenciar" href="eventos.html">Gerenciar eventos</a>
     </div>
     <nav>
-      ${NAV.map(
-        (n) => `<a class="nav-link ${n.chave === ativo ? "ativo" : ""}" href="${n.href}">${icone(n.ico)}<span>${n.rotulo}</span></a>`
+      ${NAV.map((n) =>
+        n.grupo
+          ? `<div class="nav-grupo">${esc(n.grupo)}</div>`
+          : `<a class="nav-link ${n.chave === ativo ? "ativo" : ""}" href="${n.href}">${icone(n.ico)}<span>${n.rotulo}</span></a>`
       ).join("")}
     </nav>
     <div class="rodape">
