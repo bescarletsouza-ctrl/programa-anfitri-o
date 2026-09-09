@@ -7,7 +7,7 @@ import {
 } from "./ui.js";
 import {
   listEstagios, listGrupos, listResponsaveis, listAnfitrioes,
-  listConvidadosDoAnfitriao, salvar, remover,
+  listConvidadosDoAnfitriao, salvar, remover, inserirLote,
 } from "./supabase.js";
 import { APP, TIPOS_ANFITRIAO } from "./config.js";
 
@@ -15,7 +15,7 @@ iniciarPagina("anfitrioes");
 const el = (id) => document.getElementById(id);
 
 let estagios = [], grupos = [], responsaveis = [], lista = [];
-let aba = "ativos";
+let aba = "todos";
 const filtros = { busca: "", grupo: "", estagio: "", presenca: "" };
 
 carregar();
@@ -56,12 +56,14 @@ el("abas").querySelectorAll("button").forEach((b) => {
   };
 });
 el("btn-novo").onclick = modalNovo;
+el("btn-importar").onclick = modalImportar;
 
 /* ---- render ---- */
 function filtrar() {
   return lista.filter((a) => {
     if (aba === "ativos" && a.vai === false) return false;
     if (aba === "nao" && a.vai !== false) return false;
+    // aba "todos": sem filtro por "vai"
     if (filtros.grupo && a.grupo_id !== filtros.grupo) return false;
     if (filtros.estagio && a.estagio_id !== filtros.estagio) return false;
     if (filtros.presenca === "sim" && !a.presenca) return false;
@@ -143,6 +145,134 @@ function modalNovo() {
       lista = await listAnfitrioes();
       render();
       abrirGavetaDetalhe(novo.id);
+    },
+  });
+}
+
+/* ---- Importar lista ---- */
+const MODELO_CSV =
+  "nome,email,telefone,tipo,grupo,responsavel\n" +
+  "Maria Silva,maria@exemplo.com,11999990000,Titular,Turma 1,Ana\n" +
+  "João Souza,joao@exemplo.com,11988887777,Titular,Turma 1,Ana";
+
+function normalizarCab(h) {
+  return h.toLowerCase().trim().normalize("NFD").replace(/[̀-ͯ]/g, "");
+}
+const ALIAS = {
+  nome: "nome", "nome completo": "nome",
+  email: "email", "e-mail": "email",
+  telefone: "telefone", whatsapp: "telefone", celular: "telefone", fone: "telefone",
+  tipo: "tipo",
+  grupo: "grupo", turma: "grupo",
+  responsavel: "responsavel", "responsavel (cs)": "responsavel", cs: "responsavel",
+};
+
+function parsearTabela(texto) {
+  const linhas = texto.replace(/\r/g, "").split("\n").filter((l) => l.trim());
+  if (linhas.length < 2) return [];
+  const primeira = linhas[0];
+  const delim = primeira.includes("\t") ? "\t"
+    : (primeira.split(";").length > primeira.split(",").length ? ";" : ",");
+
+  const parseLinha = (l) => {
+    const out = []; let cur = "", dentro = false;
+    for (let i = 0; i < l.length; i++) {
+      const c = l[i];
+      if (c === '"') {
+        if (dentro && l[i + 1] === '"') { cur += '"'; i++; }
+        else dentro = !dentro;
+      } else if (c === delim && !dentro) { out.push(cur); cur = ""; }
+      else cur += c;
+    }
+    out.push(cur);
+    return out.map((s) => s.trim());
+  };
+
+  const cab = parseLinha(linhas[0]).map((h) => ALIAS[normalizarCab(h)] || normalizarCab(h));
+  return linhas.slice(1).map((l) => {
+    const cols = parseLinha(l);
+    const o = {};
+    cab.forEach((h, i) => (o[h] = (cols[i] || "").trim()));
+    return o;
+  });
+}
+
+function modalImportar() {
+  abrirModal({
+    titulo: "Importar lista de anfitriões",
+    textoConfirmar: "Importar",
+    corpoHtml: `
+      <p class="pagina-sub" style="margin:0 0 10px">
+        Cole uma tabela (do Excel/Sheets) ou selecione um arquivo CSV. Colunas
+        aceitas: <b>nome</b> (obrigatória), email, telefone, tipo, grupo, responsavel.
+        Grupo e responsável são criados automaticamente se ainda não existirem.
+      </p>
+      <a href="data:text/csv;charset=utf-8,${encodeURIComponent(MODELO_CSV)}" download="modelo-anfitrioes.csv"
+         style="font-size:.8rem;font-weight:600;color:var(--cor-laranja-forte)">↓ baixar modelo CSV</a>
+      <label class="campo" style="margin-top:12px"><span>Colar tabela</span>
+        <textarea class="input" name="texto" rows="7" placeholder="nome,email,telefone,tipo,grupo,responsavel&#10;Maria Silva,maria@exemplo.com,..."></textarea></label>
+      <label class="campo"><span>…ou arquivo CSV</span>
+        <input class="input" type="file" name="arquivo" accept=".csv,.txt,.tsv" /></label>
+      <div class="pagina-sub" id="imp-status" style="margin:0"></div>`,
+    aoMontar: (root) => {
+      const arq = root.querySelector('[name="arquivo"]');
+      const txt = root.querySelector('[name="texto"]');
+      arq.onchange = () => {
+        const f = arq.files[0];
+        if (!f) return;
+        const r = new FileReader();
+        r.onload = () => { txt.value = r.result; };
+        r.readAsText(f, "utf-8");
+      };
+    },
+    onConfirmar: async (form) => {
+      const texto = form.querySelector('[name="texto"]').value;
+      const linhas = parsearTabela(texto);
+      const validas = linhas.filter((l) => (l.nome || "").trim());
+      if (!validas.length) {
+        toast("Nenhuma linha com nome encontrada. Confira o cabeçalho.", "erro");
+        return false;
+      }
+
+      // resolve/cria grupos e responsáveis por nome
+      const mapaGrupo = new Map(grupos.map((g) => [g.nome.toLowerCase(), g.id]));
+      const mapaResp = new Map(responsaveis.map((r) => [r.nome.toLowerCase(), r.id]));
+      let criouAux = false;
+
+      for (const l of validas) {
+        if (l.grupo && !mapaGrupo.has(l.grupo.toLowerCase())) {
+          const g = await salvar("grupos", { nome: l.grupo.trim() });
+          mapaGrupo.set(g.nome.toLowerCase(), g.id);
+          criouAux = true;
+        }
+        if (l.responsavel && !mapaResp.has(l.responsavel.toLowerCase())) {
+          const r = await salvar("responsaveis", { nome: l.responsavel.trim() });
+          mapaResp.set(r.nome.toLowerCase(), r.id);
+          criouAux = true;
+        }
+      }
+
+      const registros = validas.map((l) => ({
+        nome: l.nome.trim(),
+        email: (l.email || "").trim() || null,
+        telefone: (l.telefone || "").trim() || null,
+        tipo: TIPOS_ANFITRIAO.includes((l.tipo || "").trim()) ? l.tipo.trim() : "Titular",
+        grupo_id: l.grupo ? mapaGrupo.get(l.grupo.toLowerCase()) || null : null,
+        responsavel_id: l.responsavel ? mapaResp.get(l.responsavel.toLowerCase()) || null : null,
+        estagio_id: estagios[0]?.id || null,
+      }));
+
+      await inserirLote("anfitrioes", registros);
+      const ignoradas = linhas.length - validas.length;
+      toast(
+        `${registros.length} anfitrião(ões) importado(s).` +
+          (ignoradas ? ` ${ignoradas} linha(s) sem nome ignorada(s).` : ""),
+        "ok"
+      );
+      if (criouAux) [grupos, responsaveis] = await Promise.all([listGrupos(), listResponsaveis()]);
+      preencherSelect(el("f-grupo"), grupos, "Todos os grupos", filtros.grupo);
+      lista = await listAnfitrioes();
+      render();
     },
   });
 }

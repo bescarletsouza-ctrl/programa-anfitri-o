@@ -104,6 +104,11 @@ export async function remover(tabela, id) {
   return ok(await supabase.from(tabela).delete().eq("id", id).select());
 }
 
+// Insere vários registros de uma vez (usado na importação de lista).
+export async function inserirLote(tabela, registros) {
+  return ok(await supabase.from(tabela).insert(registros).select());
+}
+
 export async function salvarConfig(patch) {
   return ok(
     await supabase
