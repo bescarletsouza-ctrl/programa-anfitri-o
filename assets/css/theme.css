@@ -540,7 +540,7 @@ table.tabela tbody tr:last-child td { border-bottom: none; }
 .cracha-linha { color: #333; }
 .cracha-tipo { display: inline-block; padding: 1mm 4mm; border-radius: 999px; background: #111; color: #fff; font-weight: 700; }
 .cracha-qr { margin: 1mm 0; }
-.cracha-qr img { width: 26mm; height: 26mm; }
+.cracha-qr img { width: 26mm; height: 26mm; image-rendering: pixelated; }
 .cracha-semqr { font-weight: 800; letter-spacing: .08em; padding: 4mm 0; }
 .cracha-codigo { font-weight: 700; letter-spacing: .1em; font-variant-numeric: tabular-nums; }
 

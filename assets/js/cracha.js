@@ -7,7 +7,7 @@ import { esc } from "./ui.js";
 import { getEvento } from "./supabase.js";
 import { eventoId } from "./evento.js";
 
-const QR_SRC = "https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js";
+const QR_SRC = "https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js";
 let qrPronto = null;
 let eventoCache = null;
 
@@ -41,22 +41,28 @@ export const snapTamanho = (px) =>
 function carregarQR() {
   if (qrPronto) return qrPronto;
   qrPronto = new Promise((resolve) => {
-    if (window.QRCode) return resolve(window.QRCode);
+    if (typeof window.qrcode === "function") return resolve(window.qrcode);
     const s = document.createElement("script");
     s.src = QR_SRC;
-    s.onload = () => resolve(window.QRCode || null);
+    s.onload = () => resolve(typeof window.qrcode === "function" ? window.qrcode : null);
     s.onerror = () => resolve(null);
     document.head.appendChild(s);
   });
   return qrPronto;
 }
 
-async function qrDataURL(texto) {
+// gera um data URI (GIF) do QR — qrcode-generator é síncrono
+export async function qrDataURL(texto) {
   try {
-    const QR = await carregarQR();
-    if (QR?.toDataURL) return await QR.toDataURL(texto, { width: 240, margin: 1 });
-  } catch {}
-  return null;
+    const qrcode = await carregarQR();
+    if (!qrcode || !texto) return null;
+    const qr = qrcode(0, "M");
+    qr.addData(String(texto));
+    qr.make();
+    return qr.createDataURL(6, 8);
+  } catch {
+    return null;
+  }
 }
 
 function garantirCaixa() {

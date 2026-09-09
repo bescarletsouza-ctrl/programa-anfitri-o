@@ -7,7 +7,7 @@ import {
   getEvento, salvar, remover, salvarEvento,
 } from "./supabase.js";
 import { eventoId, definirEvento } from "./evento.js";
-import { montarCrachaHtml, CRACHA_PADRAO, TAMANHOS_CRACHA, snapTamanho } from "./cracha.js";
+import { montarCrachaHtml, CRACHA_PADRAO, TAMANHOS_CRACHA, snapTamanho, qrDataURL } from "./cracha.js";
 
 iniciarPagina("config");
 const el = (id) => document.getElementById(id);
@@ -233,8 +233,11 @@ function montarCrachaConfig() {
     </div>`;
   }).join("");
 
+  let crUri = null;
+  qrDataURL(CR_FAKE.codigo).then((u) => { crUri = u; preview(); });
   const preview = () => {
-    el("cr-preview").innerHTML = montarCrachaHtml(CR_FAKE, config?.nome || "Nome do Evento", lerCrachaConfig());
+    const cfg = lerCrachaConfig();
+    el("cr-preview").innerHTML = montarCrachaHtml(CR_FAKE, config?.nome || "Nome do Evento", cfg, cfg.qr ? crUri : null);
   };
   el("conteudo").querySelectorAll("#cr-largura,#cr-altura,#cr-qr,#cr-linhas input,#cr-linhas select")
     .forEach((c) => { c.oninput = preview; c.onchange = preview; });
