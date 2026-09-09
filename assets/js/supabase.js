@@ -151,6 +151,16 @@ export async function remover(tabela, id) {
   return ok(await supabase.from(tabela).delete().eq("id", id).select());
 }
 
+export async function atualizarEmLote(tabela, ids, patch) {
+  if (!ids?.length) return [];
+  return ok(await supabase.from(tabela).update(patch).in("id", ids).select());
+}
+
+export async function removerEmLote(tabela, ids) {
+  if (!ids?.length) return [];
+  return ok(await supabase.from(tabela).delete().in("id", ids).select());
+}
+
 export async function inserirLote(tabela, registros) {
   const rs = registros.map((r) => comEvento(tabela, r));
   return ok(await supabase.from(tabela).insert(rs).select());

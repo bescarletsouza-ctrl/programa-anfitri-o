@@ -1,15 +1,19 @@
 // =============================================================================
 // Participantes do evento — visão Lista (tabela) e visão Pipeline (kanban).
 // Lista manual. tipo "Anfitrião" também cria/vincula um registro em anfitrioes.
+// Lista: edição inline (Tipo/Pagamento/Etapa), seleção múltipla + ações em
+// massa, filtro de presença, paginação e crachá pela gaveta.
 // =============================================================================
 import {
   iniciarPagina, esc, debounce, formatarData, abrirModal, abrirGaveta,
-  fecharGaveta, toast, confirmar, icone,
+  fecharGaveta, toast, confirmar, icone, abrirMenu,
 } from "./ui.js";
 import {
   listParticipantes, listEtapasParticipante, listAnfitrioes, listEstagios,
-  salvar, remover, inserirLote,
+  salvar, remover, inserirLote, atualizarEmLote, removerEmLote,
 } from "./supabase.js";
+import { eventoNome } from "./evento.js";
+import { imprimirCracha } from "./cracha.js";
 import { parsearTabela, gerarCSV, baixarCSV } from "./tabela.js";
 
 iniciarPagina("participantes");
@@ -22,22 +26,32 @@ const FAIXAS = [
   "500 mil – 1 milhão/mês", "1 milhão – 5 milhões/mês", "5 milhões – 10 milhões/mês",
   "Acima de 10 milhões/mês",
 ];
+const POR_PAGINA = 50;
 const ALIAS_IMPORT = {
   "nome completo": "nome", "e-mail": "email", whatsapp: "telefone", celular: "telefone",
   fone: "telefone", turma: "tipo", categoria: "tipo", "forma de pagamento": "pagamento",
   status: "pagamento", qtd: "quantidade", quantidade: "quantidade",
-  "tipo de ingresso": "ingresso",
+  "tipo de ingresso": "ingresso", empresa: "empresa", "razão social": "empresa",
 };
 
 let participantes = [], etapas = [], anfitrioes = [], estagios = [];
 let vista = "lista";
-const filtros = { busca: "", tipo: "", pagamento: "", etapa: "", buscaPipe: "", tipoPipe: "" };
+let pagina = 1;
+const selecionados = new Set();
+const filtros = { busca: "", tipo: "", pagamento: "", etapa: "", presenca: "", buscaPipe: "", tipoPipe: "" };
 
 const badgeTipo = (t) => (t === "Anfitrião" ? "badge-laranja" : "badge-neutro");
 const badgePag = (p) =>
   ({ Gratuito: "badge-neutro", Pago: "badge-ok", Convidado: "badge-info",
      Cancelado: "badge-erro", Reembolsado: "badge-alerta" }[p] || "badge-neutro");
 const nomeEtapa = (id) => etapas.find((e) => e.id === id)?.nome || "—";
+const horaCurta = (iso) => {
+  if (!iso) return "";
+  try {
+    return new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" })
+      .format(new Date(iso));
+  } catch { return ""; }
+};
 const normTipo = (v) => {
   const n = String(v || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
   return TIPOS.find((t) => t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "") === n) || null;
@@ -65,8 +79,11 @@ async function carregar() {
     render();
   } catch (e) {
     const falta = /participantes|etapas_participante/.test(e.message || "");
+    const faltaCheckin = /codigo|presente|empresa|column .* does not exist/.test(e.message || "");
     el("carregando").innerHTML = falta
       ? `Rode a migração <code>supabase/migrations/0004_participantes.sql</code> no SQL Editor do Supabase para ativar esta tela.`
+      : faltaCheckin
+      ? `Rode a migração <code>supabase/migrations/0006_checkin.sql</code> no SQL Editor do Supabase.`
       : "Erro ao carregar: " + esc(e.message);
   }
 }
@@ -85,18 +102,29 @@ function ligarEventos() {
       render();
     };
   });
-  el("busca").addEventListener("input", debounce((e) => { filtros.busca = e.target.value.toLowerCase(); render(); }, 200));
+  const refiltra = (fn) => (e) => { fn(e); pagina = 1; render(); };
+  el("busca").addEventListener("input", debounce(refiltra((e) => { filtros.busca = e.target.value.toLowerCase(); }), 200));
   el("busca-pipe").addEventListener("input", debounce((e) => { filtros.buscaPipe = e.target.value.toLowerCase(); render(); }, 200));
-  el("f-tipo").onchange = (e) => { filtros.tipo = e.target.value; render(); };
-  el("f-pagamento").onchange = (e) => { filtros.pagamento = e.target.value; render(); };
-  el("f-etapa").onchange = (e) => { filtros.etapa = e.target.value; render(); };
+  el("f-tipo").onchange = refiltra((e) => { filtros.tipo = e.target.value; });
+  el("f-pagamento").onchange = refiltra((e) => { filtros.pagamento = e.target.value; });
+  el("f-etapa").onchange = refiltra((e) => { filtros.etapa = e.target.value; });
+  el("f-presenca").onchange = refiltra((e) => { filtros.presenca = e.target.value; });
   el("f-tipo-pipe").onchange = (e) => { filtros.tipoPipe = e.target.value; render(); };
   el("btn-cadastrar").innerHTML = icone("mais") + "Cadastrar";
   el("btn-cadastrar").onclick = () => abrirForm(null);
   el("btn-importar").innerHTML = icone("subir") + "Importar Excel";
   el("btn-importar").onclick = modalImportar;
   el("btn-exportar").innerHTML = icone("baixar") + "Exportar Excel";
-  el("btn-exportar").onclick = exportar;
+  el("btn-exportar").onclick = () => exportar(filtrarLista());
+  el("check-todos").onchange = (e) => {
+    const dados = filtrarLista();
+    if (e.target.checked) dados.forEach((p) => selecionados.add(p.id));
+    else dados.forEach((p) => selecionados.delete(p.id));
+    render();
+  };
+  el("barra-acoes").querySelectorAll("[data-acao]").forEach((b) => {
+    b.onclick = () => acaoEmMassa(b.dataset.acao);
+  });
 }
 
 /* ---- render ---- */
@@ -111,8 +139,10 @@ function filtrarLista() {
     if (filtros.tipo && p.tipo !== filtros.tipo) return false;
     if (filtros.pagamento && p.pagamento !== filtros.pagamento) return false;
     if (filtros.etapa && p.etapa_id !== filtros.etapa) return false;
+    if (filtros.presenca === "sim" && !p.presente) return false;
+    if (filtros.presenca === "nao" && p.presente) return false;
     if (filtros.busca) {
-      const alvo = `${p.nome} ${p.email || ""} ${p.telefone || ""}`.toLowerCase();
+      const alvo = `${p.nome} ${p.email || ""} ${p.telefone || ""} ${p.empresa || ""} ${p.codigo || ""}`.toLowerCase();
       if (!alvo.includes(filtros.busca)) return false;
     }
     return true;
@@ -121,35 +151,194 @@ function filtrarLista() {
 
 function renderLista() {
   const dados = filtrarLista();
-  el("contador").textContent = `${dados.length} de ${participantes.length} participantes`;
+  const presentes = dados.filter((p) => p.presente).length;
+  el("contador").textContent =
+    `${dados.length} de ${participantes.length} participantes · ${presentes} presente${presentes === 1 ? "" : "s"}`;
+
   el("wrap").hidden = dados.length === 0;
   el("vazio").hidden = dados.length !== 0;
-  if (!dados.length) return;
-  el("linhas").innerHTML = dados
-    .map(
-      (p) => `<tr data-id="${p.id}">
-        <td><strong>${esc(p.nome)}</strong></td>
-        <td>${esc(p.email || "—")}</td>
-        <td>${esc(p.telefone || "—")}</td>
-        <td><span class="badge ${badgeTipo(p.tipo)}">${esc(p.tipo)}</span></td>
-        <td>${esc(p.ingresso || "—")}</td>
-        <td>${esc(p.faturamento || "—")}</td>
-        <td><span class="badge ${badgePag(p.pagamento)}">${esc(p.pagamento)}</span></td>
-        <td>${p.quantidade || 1}</td>
-        <td>${formatarData(p.created_at)}</td>
-        <td class="linha-acoes">
-          <button class="icone-btn" data-editar title="Editar">${icone("editar")}</button>
-          <button class="icone-btn" data-excluir title="Excluir">${icone("excluir")}</button>
-        </td>
-      </tr>`
-    )
-    .join("");
+
+  const totalPag = Math.max(1, Math.ceil(dados.length / POR_PAGINA));
+  if (pagina > totalPag) pagina = totalPag;
+  const fatia = dados.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA);
+
+  // seleção limpa ids que sumiram do filtro
+  [...selecionados].forEach((id) => { if (!dados.some((p) => p.id === id)) selecionados.delete(id); });
+  sincronizarBarra(dados);
+
+  if (dados.length) {
+    el("linhas").innerHTML = fatia.map((p) => linhaHtml(p)).join("");
+    ligarLinhas();
+  }
+  renderPaginacao(dados.length, totalPag);
+}
+
+function linhaHtml(p) {
+  const marcado = selecionados.has(p.id);
+  return `<tr data-id="${p.id}" class="${marcado ? "sel" : ""}">
+    <td class="col-check"><input type="checkbox" data-sel ${marcado ? "checked" : ""} aria-label="Selecionar ${esc(p.nome)}" /></td>
+    <td>
+      <strong>${esc(p.nome)}</strong>
+      ${p.email ? `<span class="cel-sub">${esc(p.email)}</span>` : ""}
+    </td>
+    <td><span class="chip-codigo">${esc(p.codigo || "—")}</span></td>
+    <td class="celula-edit" data-campo="tipo" title="Alterar tipo">
+      <span class="badge ${badgeTipo(p.tipo)}">${esc(p.tipo)}</span>${lapis()}
+    </td>
+    <td class="celula-edit" data-campo="pagamento" title="Alterar pagamento">
+      <span class="badge ${badgePag(p.pagamento)}">${esc(p.pagamento)}</span>${lapis()}
+    </td>
+    <td class="celula-edit" data-campo="etapa" title="Alterar etapa">
+      <span>${esc(nomeEtapa(p.etapa_id))}</span>${lapis()}
+    </td>
+    <td>${p.presente
+      ? `<span class="badge badge-ok" title="Check-in às ${esc(horaCurta(p.checkin_at))}">Presente</span>`
+      : `<span class="cel-tenue">—</span>`}</td>
+    <td>${formatarData(p.created_at)}</td>
+    <td class="linha-acoes">
+      <button class="icone-btn" data-editar title="Editar">${icone("editar")}</button>
+      <button class="icone-btn" data-excluir title="Excluir">${icone("excluir")}</button>
+    </td>
+  </tr>`;
+}
+
+const lapis = () => `<span class="cel-lapis">${icone("editar")}</span>`;
+
+function ligarLinhas() {
   el("linhas").querySelectorAll("tr").forEach((tr) => {
-    tr.onclick = (e) => {
-      if (e.target.closest("[data-excluir]")) return excluir(tr.dataset.id);
-      abrirGavetaDetalhe(tr.dataset.id);
+    const id = tr.dataset.id;
+    tr.querySelector("[data-sel]").onclick = (e) => {
+      e.stopPropagation();
+      e.target.checked ? selecionados.add(id) : selecionados.delete(id);
+      tr.classList.toggle("sel", e.target.checked);
+      sincronizarBarra(filtrarLista());
     };
+    tr.querySelectorAll(".celula-edit").forEach((td) => {
+      td.onclick = (e) => { e.stopPropagation(); editarCelula(id, td.dataset.campo, td); };
+    });
+    tr.querySelector("[data-excluir]").onclick = (e) => { e.stopPropagation(); excluir(id); };
+    tr.querySelector("[data-editar]").onclick = (e) => { e.stopPropagation(); abrirForm(participantes.find((x) => x.id === id)); };
+    tr.onclick = () => abrirGavetaDetalhe(id);
   });
+}
+
+async function editarCelula(id, campo, td) {
+  const p = participantes.find((x) => x.id === id);
+  if (!p) return;
+  let itens, atualValor;
+  if (campo === "tipo") { itens = TIPOS.map((t) => ({ valor: t, rotulo: t })); atualValor = p.tipo; }
+  else if (campo === "pagamento") { itens = PAGAMENTOS.map((t) => ({ valor: t, rotulo: t })); atualValor = p.pagamento; }
+  else {
+    itens = [{ valor: "", rotulo: "Sem etapa" }, ...etapas.map((e) => ({ valor: e.id, rotulo: e.nome }))];
+    atualValor = p.etapa_id || "";
+  }
+  itens.forEach((it) => (it.atual = it.valor === atualValor));
+  const escolha = await abrirMenu(td, itens);
+  if (escolha === null || escolha === atualValor) return;
+  td.classList.add("salvando");
+  try {
+    if (campo === "etapa") {
+      const salvo = await salvar("participantes", { id, etapa_id: escolha || null });
+      Object.assign(p, salvo);
+    } else if (campo === "tipo") {
+      const salvo = await salvar("participantes", { id, tipo: escolha });
+      Object.assign(p, salvo);
+      await sincronizarAnfitriao(p, p);
+      participantes = await listParticipantes();
+    } else {
+      const salvo = await salvar("participantes", { id, pagamento: escolha });
+      Object.assign(p, salvo);
+    }
+    toast("Atualizado.", "ok");
+    render();
+  } catch (e) {
+    toast(e.message, "erro");
+    td.classList.remove("salvando");
+  }
+}
+
+/* ---- Barra de ações em massa ---- */
+function sincronizarBarra(dados) {
+  const n = selecionados.size;
+  el("barra-acoes").hidden = n === 0;
+  el("sel-cont").textContent = `${n} selecionado${n === 1 ? "" : "s"}`;
+  const todos = el("check-todos");
+  const noFiltro = dados.filter((p) => selecionados.has(p.id)).length;
+  todos.checked = dados.length > 0 && noFiltro === dados.length;
+  todos.indeterminate = noFiltro > 0 && noFiltro < dados.length;
+}
+
+async function acaoEmMassa(acao) {
+  const ids = [...selecionados];
+  if (!ids.length && acao !== "limpar") return;
+
+  if (acao === "limpar") { selecionados.clear(); render(); return; }
+
+  if (acao === "exportar") {
+    exportar(participantes.filter((p) => selecionados.has(p.id)));
+    return;
+  }
+
+  if (acao === "excluir") {
+    if (!confirmar(`Excluir ${ids.length} participante(s) da lista?`)) return;
+    try {
+      await removerEmLote("participantes", ids);
+      selecionados.clear();
+      toast(`${ids.length} participante(s) excluído(s).`, "ok");
+      await recarregar();
+    } catch (e) { toast(e.message, "erro"); }
+    return;
+  }
+
+  if (acao === "presente" || acao === "ausente") {
+    try {
+      await atualizarEmLote("participantes", ids, acao === "presente"
+        ? { presente: true, checkin_at: new Date().toISOString() }
+        : { presente: false, checkin_at: null });
+      selecionados.clear();
+      toast(`Presença atualizada para ${ids.length} participante(s).`, "ok");
+      await recarregar();
+    } catch (e) { toast(e.message, "erro"); }
+    return;
+  }
+
+  // tipo / pagamento / etapa → menu ancorado no botão
+  const btn = el("barra-acoes").querySelector(`[data-acao="${acao}"]`);
+  let itens;
+  if (acao === "tipo") itens = TIPOS.map((t) => ({ valor: t, rotulo: t }));
+  else if (acao === "pagamento") itens = PAGAMENTOS.map((t) => ({ valor: t, rotulo: t }));
+  else itens = [{ valor: "", rotulo: "Sem etapa" }, ...etapas.map((e) => ({ valor: e.id, rotulo: e.nome }))];
+  const escolha = await abrirMenu(btn, itens);
+  if (escolha === null) return;
+  try {
+    if (acao === "etapa") {
+      await atualizarEmLote("participantes", ids, { etapa_id: escolha || null });
+    } else if (acao === "pagamento") {
+      await atualizarEmLote("participantes", ids, { pagamento: escolha });
+    } else {
+      // tipo: pode virar Anfitrião → precisa criar/limpar vínculo por linha
+      await atualizarEmLote("participantes", ids, { tipo: escolha });
+      participantes = await listParticipantes();
+      for (const p of participantes.filter((x) => selecionados.has(x.id))) {
+        await sincronizarAnfitriao(p, p);
+      }
+    }
+    selecionados.clear();
+    toast(`${ids.length} participante(s) atualizado(s).`, "ok");
+    await recarregar();
+  } catch (e) { toast(e.message, "erro"); }
+}
+
+function renderPaginacao(total, totalPag) {
+  const box = el("paginacao");
+  if (totalPag <= 1) { box.hidden = true; return; }
+  box.hidden = false;
+  box.innerHTML = `
+    <button class="btn btn-sm btn-secundario" data-pg="ant" ${pagina === 1 ? "disabled" : ""}>‹ Anterior</button>
+    <span>página ${pagina} de ${totalPag}</span>
+    <button class="btn btn-sm btn-secundario" data-pg="prox" ${pagina === totalPag ? "disabled" : ""}>Próxima ›</button>`;
+  box.querySelector('[data-pg="ant"]').onclick = () => { pagina = Math.max(1, pagina - 1); render(); window.scrollTo({ top: 0 }); };
+  box.querySelector('[data-pg="prox"]').onclick = () => { pagina = Math.min(totalPag, pagina + 1); render(); window.scrollTo({ top: 0 }); };
 }
 
 function renderPipeline() {
@@ -204,6 +393,7 @@ function cardPart(p) {
       <div class="pagina-sub" style="margin:2px 0 0;font-size:.72rem">${esc(p.email || p.telefone || "")}</div>
       <div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
         <span class="badge ${badgePag(p.pagamento)}" style="font-size:.65rem">${esc(p.pagamento)}</span>
+        ${p.presente ? `<span class="badge badge-ok" style="font-size:.65rem">Presente</span>` : ""}
         <span class="pagina-sub" style="margin:0;font-size:.68rem">${formatarData(p.created_at)}</span>
       </div>
     </div>
@@ -223,6 +413,7 @@ function abrirForm(p) {
       <label class="campo"><span>Nome *</span><input class="input" name="nome" required value="${esc(p?.nome || "")}" /></label>
       <label class="campo"><span>E-mail</span><input class="input" name="email" type="email" value="${esc(p?.email || "")}" /></label>
       <label class="campo"><span>Telefone</span><input class="input" name="telefone" value="${esc(p?.telefone || "")}" /></label>
+      <label class="campo"><span>Empresa</span><input class="input" name="empresa" value="${esc(p?.empresa || "")}" /></label>
       <label class="campo"><span>Tipo *</span>
         <select class="select" name="tipo">${TIPOS.map((t) => `<option ${t === (p?.tipo || "Convidado") ? "selected" : ""}>${t}</option>`).join("")}</select></label>
       <label class="campo"><span>Ingresso</span><input class="input" name="ingresso" value="${esc(p?.ingresso || "")}" placeholder="Convite, GOLD…" /></label>
@@ -239,6 +430,7 @@ function abrirForm(p) {
       const f = Object.fromEntries(new FormData(form));
       const reg = {
         nome: f.nome.trim(), email: f.email.trim() || null, telefone: f.telefone.trim() || null,
+        empresa: f.empresa.trim() || null,
         tipo: f.tipo, ingresso: f.ingresso.trim() || null, faturamento: f.faturamento || null,
         pagamento: f.pagamento, quantidade: Number(f.quantidade) || 1, etapa_id: f.etapa_id || null,
       };
@@ -292,11 +484,25 @@ function abrirGavetaDetalhe(id) {
       <span class="badge ${badgeTipo(p.tipo)}">${esc(p.tipo)}</span>
       <span class="badge ${badgePag(p.pagamento)}">${esc(p.pagamento)}</span>
       <span class="badge badge-neutro">${esc(nomeEtapa(p.etapa_id))}</span>
+      <span class="chip-codigo">${esc(p.codigo || "—")}</span>
     </div>
     <div class="secao">
       <p style="margin:4px 0">${esc(p.email || "—")}</p>
       <p style="margin:4px 0">${esc(p.telefone || "—")}</p>
+      ${p.empresa ? `<p style="margin:4px 0">${esc(p.empresa)}</p>` : ""}
       <p class="pagina-sub" style="margin:4px 0">Cadastrado em ${formatarData(p.created_at, true)}</p>
+    </div>
+    <div class="secao">
+      <h4>Credenciamento</h4>
+      <p style="margin:0 0 10px">${p.presente
+        ? `<span class="badge badge-ok">Presente</span> desde ${esc(horaCurta(p.checkin_at))}`
+        : `<span class="cel-tenue">Ainda não fez check-in</span>`}</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn ${p.presente ? "btn-secundario" : "btn-primario"}" id="g-presenca">
+          ${p.presente ? "Desfazer presença" : "Credenciar"}
+        </button>
+        <button class="btn btn-secundario" id="g-cracha">Imprimir crachá</button>
+      </div>
     </div>
     ${
       p.anfitriao_id
@@ -325,6 +531,20 @@ function abrirGavetaDetalhe(id) {
   );
   const g = document.getElementById("gaveta");
   g.querySelector("#g-editar").onclick = () => { fecharGaveta(); abrirForm(p); };
+  g.querySelector("#g-presenca").onclick = async () => {
+    try {
+      const patch = p.presente
+        ? { id: p.id, presente: false, checkin_at: null }
+        : { id: p.id, presente: true, checkin_at: new Date().toISOString() };
+      const salvo = await salvar("participantes", patch);
+      Object.assign(p, salvo);
+      toast(p.presente ? "Participante credenciado." : "Presença removida.", "ok");
+      if (p.presente) imprimirCracha(p, eventoNome());
+      await recarregar();
+      abrirGavetaDetalhe(id);
+    } catch (e) { toast(e.message, "erro"); }
+  };
+  g.querySelector("#g-cracha").onclick = () => imprimirCracha(p, eventoNome());
   g.querySelector("#g-etapa").onchange = async (e) => {
     try {
       await salvar("participantes", { id: p.id, etapa_id: e.target.value || null });
@@ -348,6 +568,7 @@ async function excluir(id) {
   if (!confirmar(`Excluir "${p?.nome}" da lista de participantes?`)) return;
   try {
     await remover("participantes", id);
+    selecionados.delete(id);
     toast("Participante excluído.", "ok");
     fecharGaveta();
     await recarregar();
@@ -356,9 +577,9 @@ async function excluir(id) {
 
 /* ---- Importar ---- */
 const MODELO =
-  "nome;email;telefone;tipo;ingresso;faturamento;pagamento;quantidade\n" +
-  "Maria Silva;maria@ex.com;11999990000;Convidado;Convite;150 mil – 500 mil/mês;Gratuito;1\n" +
-  "João Souza;joao@ex.com;11988887777;Anfitrião;Convite;;Gratuito;1";
+  "nome;email;telefone;empresa;tipo;ingresso;faturamento;pagamento;quantidade\n" +
+  "Maria Silva;maria@ex.com;11999990000;Acme Ltda;Convidado;Convite;150 mil – 500 mil/mês;Gratuito;1\n" +
+  "João Souza;joao@ex.com;11988887777;JS Co;Anfitrião;Convite;;Gratuito;1";
 
 function modalImportar() {
   abrirModal({
@@ -367,9 +588,9 @@ function modalImportar() {
     corpoHtml: `
       <p class="pagina-sub" style="margin:0 0 10px">
         Cole a tabela (Excel/Sheets) ou selecione um CSV. Colunas: <b>nome</b>
-        (obrigatória), email, telefone, tipo, ingresso, faturamento, pagamento,
-        quantidade. Quem vier com <b>tipo = Anfitrião</b> também entra na Gestão de
-        anfitriões (sem duplicar, casando por e-mail).
+        (obrigatória), email, telefone, empresa, tipo, ingresso, faturamento,
+        pagamento, quantidade. Quem vier com <b>tipo = Anfitrião</b> também entra
+        na Gestão de anfitriões (sem duplicar, casando por e-mail).
       </p>
       <a href="data:text/csv;charset=utf-8,${encodeURIComponent(MODELO)}" download="modelo-participantes.csv"
          style="font-size:.8rem;font-weight:600;color:var(--cor-laranja-forte)">↓ baixar modelo</a>
@@ -402,6 +623,7 @@ function modalImportar() {
         nome: l.nome.trim(),
         email: (l.email || "").trim() || null,
         telefone: (l.telefone || "").trim() || null,
+        empresa: (l.empresa || "").trim() || null,
         tipo: l._tipo,
         ingresso: (l.ingresso || "").trim() || null,
         faturamento: (l.faturamento || "").trim() || null,
@@ -419,19 +641,22 @@ function modalImportar() {
 }
 
 /* ---- Exportar ---- */
-function exportar() {
-  const dados = filtrarLista();
-  if (!dados.length) { toast("Nada para exportar com esses filtros.", "erro"); return; }
+function exportar(dados) {
+  if (!dados.length) { toast("Nada para exportar.", "erro"); return; }
   const csv = gerarCSV(dados, [
+    { chave: "codigo", rotulo: "Código" },
     { chave: "nome", rotulo: "Nome" },
     { chave: "email", rotulo: "E-mail" },
     { chave: "telefone", rotulo: "Telefone" },
+    { chave: "empresa", rotulo: "Empresa" },
     { chave: "tipo", rotulo: "Tipo" },
     { chave: "ingresso", rotulo: "Ingresso" },
     { chave: "faturamento", rotulo: "Faturamento" },
     { chave: "pagamento", rotulo: "Pagamento" },
     { chave: "quantidade", rotulo: "Quantidade" },
     { rotulo: "Etapa", valor: (p) => nomeEtapa(p.etapa_id) },
+    { rotulo: "Presente", valor: (p) => (p.presente ? "Sim" : "Não") },
+    { rotulo: "Check-in", valor: (p) => formatarData(p.checkin_at, true) },
     { rotulo: "Data de cadastro", valor: (p) => formatarData(p.created_at) },
   ]);
   baixarCSV("participantes.csv", csv);

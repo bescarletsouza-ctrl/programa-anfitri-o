@@ -51,6 +51,7 @@ const NAV = [
   { grupo: "Evento" },
   { chave: "painel",        rotulo: "Painel",                  href: "index.html",         ico: "painel" },
   { chave: "participantes", rotulo: "Participantes",           href: "participantes.html", ico: "participantes" },
+  { chave: "checkin",       rotulo: "Check-in",                href: "checkin.html",       ico: "check" },
   { chave: "config",        rotulo: "Configurações",           href: "configuracoes.html", ico: "config" },
   { grupo: "Anfitriões" },
   { chave: "anfitrioes",    rotulo: APP.termoAnfitriaoPlural,  href: "anfitrioes.html",    ico: "anfitrioes" },
@@ -242,6 +243,52 @@ export function abrirModal({ titulo, corpoHtml, textoConfirmar = "Salvar", onCon
   aoMontar?.(fundo);
   form.querySelector("input, select, textarea")?.focus();
   return { fechar, elemento: fundo };
+}
+
+/* ---- Menu flutuante (popover) -------------------------------------- */
+// itens: [{ valor, rotulo, atual? }]. Resolve com o valor escolhido ou null.
+export function abrirMenu(anchorEl, itens) {
+  return new Promise((resolve) => {
+    document.querySelector(".menu-flutuante")?.remove();
+    const m = document.createElement("div");
+    m.className = "menu-flutuante";
+    m.innerHTML = itens
+      .map(
+        (it) =>
+          `<button type="button" data-valor="${esc(it.valor ?? "")}" class="${it.atual ? "atual" : ""}">
+            ${esc(it.rotulo)}${it.atual ? icone("check") : ""}
+          </button>`
+      )
+      .join("");
+    document.body.appendChild(m);
+
+    const r = anchorEl.getBoundingClientRect();
+    const larg = m.offsetWidth || 200;
+    let left = r.left + window.scrollX;
+    left = Math.min(left, window.scrollX + document.documentElement.clientWidth - larg - 10);
+    m.style.left = Math.max(window.scrollX + 8, left) + "px";
+    let top = r.bottom + window.scrollY + 4;
+    if (r.bottom + m.offsetHeight + 8 > window.innerHeight) {
+      top = r.top + window.scrollY - m.offsetHeight - 4;
+    }
+    m.style.top = top + "px";
+
+    const fechar = (valor) => {
+      m.remove();
+      document.removeEventListener("keydown", onKey, true);
+      document.removeEventListener("click", onClickFora, true);
+      resolve(valor);
+    };
+    const onKey = (e) => { if (e.key === "Escape") { e.stopPropagation(); fechar(null); } };
+    const onClickFora = (e) => { if (!m.contains(e.target)) fechar(null); };
+    m.querySelectorAll("button").forEach((b) => {
+      b.onclick = () => fechar(b.dataset.valor);
+    });
+    setTimeout(() => {
+      document.addEventListener("keydown", onKey, true);
+      document.addEventListener("click", onClickFora, true);
+    });
+  });
 }
 
 /* ---- Gaveta (drawer) ------------------------------------------------- */

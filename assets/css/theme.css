@@ -424,6 +424,103 @@ table.tabela tbody tr:last-child td { border-bottom: none; }
 .evento-card-info { color: var(--texto-suave); font-size: .82rem; }
 .evento-card .badge { margin-top: 6px; justify-self: start; }
 
+/* ---- Lista de participantes (extras) ---- */
+.tabela-part thead th { position: sticky; top: 0; z-index: 3; }
+.tabela-part td.col-check, .tabela-part th.col-check { width: 34px; padding-right: 0; }
+.tabela-part input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-color: var(--cor-laranja); }
+.tabela-part tbody tr.sel { background: var(--cor-laranja-suave); }
+.cel-sub { display: block; color: var(--texto-tenue); font-size: .76rem; margin-top: 2px; }
+.cel-tenue { color: var(--texto-tenue); }
+.chip-codigo {
+  display: inline-flex; align-items: center; height: 20px; padding: 0 8px;
+  border-radius: 6px; background: var(--cinza-100); color: var(--texto-suave);
+  font-size: .74rem; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: .02em;
+}
+.celula-edit { cursor: pointer; white-space: nowrap; }
+.celula-edit .cel-lapis {
+  display: inline-flex; margin-left: 6px; color: var(--texto-tenue);
+  opacity: 0; transition: opacity .12s;
+}
+.celula-edit .cel-lapis svg { width: 12px; height: 12px; }
+.tabela-part tbody tr:hover .celula-edit .cel-lapis,
+.celula-edit:hover .cel-lapis { opacity: 1; }
+.celula-edit:hover { background: var(--superficie-2); }
+.celula-edit.salvando { opacity: .5; pointer-events: none; }
+
+.barra-acoes {
+  position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 8px;
+  align-items: center; margin-bottom: 12px; padding: 10px 12px;
+  background: var(--superficie); border: 1px solid var(--borda-forte);
+  border-radius: var(--raio); box-shadow: var(--sombra-md);
+}
+.barra-acoes-cont { font-size: .82rem; font-weight: 650; margin-right: 4px; }
+
+.paginacao {
+  display: flex; align-items: center; justify-content: center; gap: 14px;
+  margin-top: 16px; font-size: .84rem; color: var(--texto-suave); font-variant-numeric: tabular-nums;
+}
+
+/* ---- Menu flutuante (popover) ---- */
+.menu-flutuante {
+  position: absolute; z-index: 95; min-width: 176px; max-height: 300px; overflow-y: auto;
+  background: var(--superficie); border: 1px solid var(--borda-forte);
+  border-radius: var(--raio); box-shadow: var(--sombra-lg); padding: 5px;
+  animation: modal-in .12s ease;
+}
+.menu-flutuante button {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%; border: none; background: transparent; cursor: pointer;
+  padding: 8px 10px; border-radius: 7px; font: inherit; font-size: .84rem;
+  color: var(--texto); text-align: left;
+}
+.menu-flutuante button:hover { background: var(--superficie-2); }
+.menu-flutuante button.atual { color: var(--cor-laranja-forte); font-weight: 600; }
+.menu-flutuante button svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+/* ---- Tela de Check-in ---- */
+.checkin-stats { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; max-width: 460px; }
+.checkin-num { font-size: 1rem; color: var(--texto-suave); }
+.checkin-num b { font-size: 1.9rem; font-weight: 700; color: var(--texto); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.checkin-barra { height: 8px; border-radius: var(--raio-full); background: var(--cinza-100); overflow: hidden; }
+.checkin-barra i { display: block; height: 100%; background: var(--ok-solid); border-radius: inherit; transition: width .4s ease; }
+.checkin-busca { font-size: 1rem; height: 46px; margin-bottom: 14px; }
+.checkin-lista { display: grid; gap: 8px; }
+.checkin-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  padding: 12px 14px; border: 1px solid var(--borda); border-radius: var(--raio-lg);
+  background: var(--superficie);
+}
+.checkin-item.presente { border-color: color-mix(in srgb, var(--ok-solid) 45%, transparent); background: var(--ok-bg); }
+.checkin-item-info { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.checkin-item-info > strong { font-size: .95rem; }
+.checkin-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.checkin-sub { font-size: .78rem; color: var(--texto-tenue); }
+.checkin-item-acao { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.checkin-ok { font-size: .82rem; font-weight: 600; color: var(--ok); white-space: nowrap; }
+
+/* ---- Crachá (impressão) ---- */
+#cracha { position: fixed; inset: 0; background: #fff; z-index: 200; display: flex; align-items: center; justify-content: center; }
+#cracha[hidden] { display: none; }
+.cracha-cartao {
+  width: 340px; padding: 26px 24px; border: 2px solid #111; border-radius: 14px;
+  text-align: center; color: #111; font-family: Inter, system-ui, sans-serif;
+}
+.cracha-evento { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: #666; margin-bottom: 12px; }
+.cracha-nome { font-size: 1.6rem; font-weight: 800; line-height: 1.15; letter-spacing: -.02em; }
+.cracha-empresa { font-size: .95rem; color: #444; margin-top: 4px; }
+.cracha-tipo { display: inline-block; margin-top: 10px; padding: 3px 12px; border-radius: 999px; background: #111; color: #fff; font-size: .74rem; font-weight: 700; }
+.cracha-qr { margin: 18px 0 8px; }
+.cracha-qr img { width: 200px; height: 200px; }
+.cracha-semqr { font-size: 1.4rem; font-weight: 800; letter-spacing: .08em; padding: 30px 0; }
+.cracha-codigo { font-size: 1rem; font-weight: 700; letter-spacing: .12em; font-variant-numeric: tabular-nums; }
+
+@media print {
+  body { background: #fff !important; }
+  body > *:not(#cracha) { display: none !important; }
+  #cracha { position: static; }
+  .cracha-cartao { border-color: #000; }
+}
+
 /* ---- Kanban ---- */
 .kanban { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 10px; align-items: flex-start; }
 .kanban .coluna {

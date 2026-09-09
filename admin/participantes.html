@@ -31,10 +31,15 @@
     <!-- ================= LISTA ================= -->
     <div id="vista-lista" hidden>
       <div class="filtros" style="margin-bottom:12px">
-        <input class="input" id="busca" placeholder="Buscar por nome, e-mail ou telefone…" />
+        <input class="input" id="busca" placeholder="Buscar por nome, e-mail, telefone, empresa ou código…" />
         <select class="select" id="f-tipo"><option value="">Todos os tipos</option></select>
         <select class="select" id="f-pagamento"><option value="">Todos os pagamentos</option></select>
         <select class="select" id="f-etapa"><option value="">Todas as etapas</option></select>
+        <select class="select" id="f-presenca">
+          <option value="">Presença: todos</option>
+          <option value="sim">Presentes</option>
+          <option value="nao">Ausentes</option>
+        </select>
       </div>
       <div class="barra-topo">
         <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -45,16 +50,30 @@
         <span class="pagina-sub" id="contador" style="margin:0"></span>
       </div>
 
+      <div class="barra-acoes" id="barra-acoes" hidden>
+        <span class="barra-acoes-cont" id="sel-cont">0 selecionados</span>
+        <button class="btn btn-sm btn-secundario" data-acao="presente">Marcar presente</button>
+        <button class="btn btn-sm btn-secundario" data-acao="ausente">Marcar ausente</button>
+        <button class="btn btn-sm btn-secundario" data-acao="tipo">Tipo</button>
+        <button class="btn btn-sm btn-secundario" data-acao="pagamento">Pagamento</button>
+        <button class="btn btn-sm btn-secundario" data-acao="etapa">Etapa</button>
+        <button class="btn btn-sm btn-secundario" data-acao="exportar">Exportar</button>
+        <button class="btn btn-sm btn-perigo" data-acao="excluir">Excluir</button>
+        <button class="btn btn-sm btn-fantasma" data-acao="limpar">Limpar seleção</button>
+      </div>
+
       <div class="tabela-wrap" id="wrap" hidden>
-        <table class="tabela">
+        <table class="tabela tabela-part">
           <thead><tr>
-            <th>Nome</th><th>E-mail</th><th>Telefone</th><th>Tipo</th><th>Ingresso</th>
-            <th>Faturamento</th><th>Pagamento</th><th>Qtd</th><th>Cadastro</th><th></th>
+            <th class="col-check"><input type="checkbox" id="check-todos" aria-label="Selecionar todos" /></th>
+            <th>Nome</th><th>Código</th><th>Tipo</th><th>Pagamento</th>
+            <th>Etapa</th><th>Presença</th><th>Cadastro</th><th></th>
           </tr></thead>
           <tbody id="linhas"></tbody>
         </table>
       </div>
       <div id="vazio" class="vazio" hidden>Nenhum participante encontrado.</div>
+      <div class="paginacao" id="paginacao" hidden></div>
     </div>
 
     <!-- ================= PIPELINE ================= -->
@@ -67,6 +86,7 @@
     </div>
   </main>
 </div>
+<div id="cracha" hidden></div>
 <script type="module" src="../assets/js/participantes.js"></script>
 </body>
 </html>

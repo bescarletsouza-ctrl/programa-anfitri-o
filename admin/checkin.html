@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<script>try{var t=localStorage.getItem('tema')==='dark'?'dark':'light';document.documentElement.dataset.theme=t;document.documentElement.style.background=t==='dark'?'#0c0c0d':'#f7f7f6';}catch(e){}</script>
+<title>Check-in — Programa Anfitrião</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../assets/css/theme.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside id="sidebar" class="sidebar"></aside>
+  <main class="conteudo">
+    <div class="barra-topo">
+      <div>
+        <h1 class="pagina-titulo">Check-in</h1>
+        <p class="pagina-sub">Credenciamento na entrada do evento.</p>
+      </div>
+      <button class="btn btn-secundario" id="btn-atualizar">Atualizar</button>
+    </div>
+
+    <div id="carregando" class="vazio">Carregando…</div>
+
+    <div id="painel" hidden>
+      <div class="checkin-stats">
+        <div class="checkin-num"><b id="n-presentes">0</b> <span>de <span id="n-total">0</span> presentes</span></div>
+        <div class="checkin-barra"><i id="checkin-progresso" style="width:0%"></i></div>
+      </div>
+
+      <input class="input checkin-busca" id="busca" placeholder="Buscar por nome, e-mail, telefone ou código…" autocomplete="off" autofocus />
+
+      <div id="resultados" class="checkin-lista"></div>
+      <div id="dica" class="vazio">Digite para localizar o participante.</div>
+    </div>
+  </main>
+</div>
+<div id="cracha" hidden></div>
+<script type="module" src="../assets/js/checkin.js"></script>
+</body>
+</html>
