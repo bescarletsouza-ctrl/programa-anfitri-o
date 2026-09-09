@@ -85,6 +85,23 @@ export function renderSidebar(ativo) {
   el.querySelector("[data-toggle-tema]").onclick = alternarTema;
   montarTopbarMobile(el);
   popularSeletorEvento(el);
+  prefetchNoHover(el);
+}
+
+// Pré-carrega a página ao passar o mouse pelo item — a navegação fica instantânea.
+function prefetchNoHover(sidebar) {
+  const feitos = new Set();
+  sidebar.querySelectorAll(".nav-link").forEach((a) => {
+    a.addEventListener("mouseenter", () => {
+      const href = a.getAttribute("href");
+      if (!href || feitos.has(href)) return;
+      feitos.add(href);
+      const l = document.createElement("link");
+      l.rel = "prefetch";
+      l.href = href;
+      document.head.appendChild(l);
+    }, { once: false });
+  });
 }
 
 async function popularSeletorEvento(sidebar) {
