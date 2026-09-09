@@ -30,7 +30,7 @@ function ok(res) {
 // Tabelas escopadas por evento (usado na auto-injeção de evento_id nos inserts).
 const TABELAS_EVENTO = new Set([
   "grupos", "responsaveis", "estagios", "anfitrioes", "convidados",
-  "form_perguntas", "marcos", "etapas_participante", "participantes",
+  "form_perguntas", "marcos", "etapas_participante", "participantes", "checkins",
 ]);
 
 // eid: id explícito (páginas públicas). Sem argumento → evento atual do admin.
@@ -94,6 +94,25 @@ export const listParticipantes = (eid) =>
     .eq("evento_id", ev(eid))
     .order("created_at", { ascending: false })
     .then(ok);
+
+/* ---- Check-in (histórico entrada/saída) ---------------------------- */
+export const listCheckins = (eid) =>
+  supabase
+    .from("checkins")
+    .select("*, participante:participantes(nome, tipo, ingresso, empresa, email, codigo)")
+    .eq("evento_id", ev(eid))
+    .order("at", { ascending: false })
+    .then(ok);
+
+// Grava a linha no log e atualiza o estado atual do participante.
+export async function registrarCheckin(participanteId, acao = "entrada", origem = "checkin") {
+  await salvar("checkins", { participante_id: participanteId, acao, origem });
+  return salvar("participantes", {
+    id: participanteId,
+    presente: acao === "entrada",
+    checkin_at: acao === "entrada" ? new Date().toISOString() : null,
+  });
+}
 
 /* ---- Páginas públicas ----------------------------------------------- */
 export const getAnfitriaoPorSlug = (slug) =>

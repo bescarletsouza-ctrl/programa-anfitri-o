@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<script>try{var t=localStorage.getItem('tema')==='dark'?'dark':'light';document.documentElement.dataset.theme=t;document.documentElement.style.background=t==='dark'?'#0c0c0d':'#f7f7f6';}catch(e){}</script>
+<title>Relatórios — Programa Anfitrião</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../assets/css/theme.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside id="sidebar" class="sidebar"></aside>
+  <main class="conteudo">
+    <div class="barra-topo">
+      <div>
+        <h1 class="pagina-titulo">Relatórios de credenciamento</h1>
+        <p class="pagina-sub">Presença e check-ins do evento em tempo real.</p>
+      </div>
+      <button class="btn btn-secundario" id="btn-atualizar">Atualizar</button>
+    </div>
+
+    <div id="carregando" class="vazio">Carregando…</div>
+
+    <div id="painel" hidden>
+      <div class="grid grid-4" id="kpis" style="margin-bottom:26px"></div>
+
+      <div class="rel-secao">
+        <h2>Check-ins por hora <span class="rel-secao-sub">(hoje)</span></h2>
+        <div class="rel-horas" id="rel-horas"></div>
+      </div>
+
+      <div class="grid grid-2">
+        <div class="rel-secao">
+          <h2>Presença por tipo de ingresso</h2>
+          <div id="rel-ingresso"></div>
+        </div>
+        <div class="rel-secao">
+          <h2>Presença por tipo</h2>
+          <div id="rel-tipo"></div>
+        </div>
+      </div>
+
+      <div class="rel-secao">
+        <div class="barra-topo">
+          <h2 style="margin:0">Últimos check-ins</h2>
+          <div style="display:flex;gap:8px">
+            <input class="input" id="busca-log" placeholder="Buscar participante…" style="min-width:220px" />
+            <button class="btn btn-secundario btn-sm" id="btn-exportar">Exportar CSV</button>
+          </div>
+        </div>
+        <div class="tabela-wrap" id="wrap-log" hidden>
+          <table class="tabela">
+            <thead><tr><th>Ação</th><th>Participante</th><th>Categoria</th><th>Horário</th></tr></thead>
+            <tbody id="linhas-log"></tbody>
+          </table>
+        </div>
+        <div id="vazio-log" class="vazio">Nenhum check-in registrado ainda.</div>
+      </div>
+    </div>
+  </main>
+</div>
+<script type="module" src="../assets/js/relatorios.js"></script>
+</body>
+</html>

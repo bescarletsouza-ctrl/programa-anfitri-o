@@ -26,6 +26,7 @@ const PATHS = {
   lua: '<path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/>',
   check: '<polyline points="20 6 9 17 4 12"/>',
   inbox: '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.4 5.5 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.4-6.5A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.8 1.1z"/>',
+  grafico: '<line x1="3" y1="21" x2="21" y2="21"/><rect x="5" y="12" width="4" height="7"/><rect x="11" y="7" width="4" height="12"/><rect x="17" y="3" width="4" height="16"/>',
 };
 
 export function icone(nome, cls = "") {
@@ -52,6 +53,7 @@ const NAV = [
   { chave: "painel",        rotulo: "Painel",                  href: "index.html",         ico: "painel" },
   { chave: "participantes", rotulo: "Participantes",           href: "participantes.html", ico: "participantes" },
   { chave: "checkin",       rotulo: "Check-in",                href: "checkin.html",       ico: "check" },
+  { chave: "relatorios",    rotulo: "Relatórios",              href: "relatorios.html",    ico: "grafico" },
   { chave: "config",        rotulo: "Configurações",           href: "configuracoes.html", ico: "config" },
   { grupo: "Anfitriões" },
   { chave: "anfitrioes",    rotulo: APP.termoAnfitriaoPlural,  href: "anfitrioes.html",    ico: "anfitrioes" },

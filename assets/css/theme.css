@@ -495,8 +495,35 @@ table.tabela tbody tr:last-child td { border-bottom: none; }
 .checkin-item-info > strong { font-size: .95rem; }
 .checkin-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .checkin-sub { font-size: .78rem; color: var(--texto-tenue); }
-.checkin-item-acao { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.checkin-item-acao { display: flex; align-items: center; gap: 8px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
 .checkin-ok { font-size: .82rem; font-weight: 600; color: var(--ok); white-space: nowrap; }
+.chip-cat {
+  display: inline-flex; align-items: center; height: 20px; padding: 0 9px;
+  border-radius: var(--raio-full); background: var(--cor-laranja-suave); color: var(--cor-laranja-forte);
+  font-size: .74rem; font-weight: 700; white-space: nowrap;
+}
+.checkin-reentrada { font-size: .76rem; font-weight: 600; color: var(--alerta); }
+
+/* ---- Relatórios ---- */
+.rel-secao { margin-bottom: 26px; }
+.rel-secao > h2 { font-size: 1rem; font-weight: 650; letter-spacing: -.01em; margin: 0 0 12px; }
+.rel-secao-sub { color: var(--texto-tenue); font-weight: 500; font-size: .82rem; }
+
+.rel-barra { display: grid; grid-template-columns: 130px 1fr auto; align-items: center; gap: 12px; margin-bottom: 9px; }
+.rel-barra-nome { font-size: .82rem; color: var(--texto-suave); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rel-barra-trilha { background: var(--cinza-100); border-radius: 6px; height: 22px; overflow: hidden; }
+.rel-barra-trilha i { display: block; height: 100%; background: var(--ok-solid); border-radius: 6px; min-width: 2px; transition: width .4s ease; }
+.rel-barra-valor { font-weight: 700; font-size: .84rem; font-variant-numeric: tabular-nums; min-width: 52px; text-align: right; }
+
+.rel-horas {
+  display: flex; align-items: flex-end; gap: 6px; height: 150px;
+  padding: 12px 14px; border: 1px solid var(--borda); border-radius: var(--raio-lg);
+  background: var(--superficie); overflow-x: auto;
+}
+.rel-hora { flex: 1; min-width: 26px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 3px; }
+.rel-hora-barra { width: 100%; max-width: 26px; background: var(--cor-laranja); border-radius: 4px 4px 0 0; min-height: 2px; transition: height .4s ease; }
+.rel-hora-n { font-size: .68rem; font-weight: 700; color: var(--texto-suave); font-variant-numeric: tabular-nums; height: 12px; }
+.rel-hora-h { font-size: .66rem; color: var(--texto-tenue); }
 
 /* ---- Crachá (impressão) ---- */
 #cracha { position: fixed; inset: 0; background: #fff; z-index: 200; display: flex; align-items: center; justify-content: center; }

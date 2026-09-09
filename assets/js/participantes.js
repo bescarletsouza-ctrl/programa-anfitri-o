@@ -10,7 +10,7 @@ import {
 } from "./ui.js";
 import {
   listParticipantes, listEtapasParticipante, listAnfitrioes, listEstagios,
-  salvar, remover, inserirLote, atualizarEmLote, removerEmLote,
+  salvar, remover, inserirLote, atualizarEmLote, removerEmLote, registrarCheckin,
 } from "./supabase.js";
 import { eventoNome } from "./evento.js";
 import { imprimirCracha } from "./cracha.js";
@@ -295,6 +295,9 @@ async function acaoEmMassa(acao) {
       await atualizarEmLote("participantes", ids, acao === "presente"
         ? { presente: true, checkin_at: new Date().toISOString() }
         : { presente: false, checkin_at: null });
+      await inserirLote("checkins", ids.map((id) => ({
+        participante_id: id, acao: acao === "presente" ? "entrada" : "saida", origem: "lista",
+      }))).catch(() => {});
       selecionados.clear();
       toast(`Presença atualizada para ${ids.length} participante(s).`, "ok");
       await recarregar();
@@ -533,13 +536,11 @@ function abrirGavetaDetalhe(id) {
   g.querySelector("#g-editar").onclick = () => { fecharGaveta(); abrirForm(p); };
   g.querySelector("#g-presenca").onclick = async () => {
     try {
-      const patch = p.presente
-        ? { id: p.id, presente: false, checkin_at: null }
-        : { id: p.id, presente: true, checkin_at: new Date().toISOString() };
-      const salvo = await salvar("participantes", patch);
+      const entrar = !p.presente;
+      const salvo = await registrarCheckin(p.id, entrar ? "entrada" : "saida", "lista");
       Object.assign(p, salvo);
-      toast(p.presente ? "Participante credenciado." : "Presença removida.", "ok");
-      if (p.presente) imprimirCracha(p, eventoNome());
+      toast(entrar ? "Participante credenciado." : "Presença removida.", "ok");
+      if (entrar) imprimirCracha(p, eventoNome());
       await recarregar();
       abrirGavetaDetalhe(id);
     } catch (e) { toast(e.message, "erro"); }

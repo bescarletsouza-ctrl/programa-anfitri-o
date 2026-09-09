@@ -1,9 +1,10 @@
 // =============================================================================
 // Check-in / credenciamento — busca rápida do participante e marca presença.
-// Ao credenciar, abre o crachá para impressão (nome, empresa, tipo, QR).
+// Cada credenciamento grava uma linha no histórico (checkins). Ao credenciar,
+// abre o crachá para impressão (nome, empresa, categoria, QR).
 // =============================================================================
 import { iniciarPagina, esc, debounce, toast } from "./ui.js";
-import { listParticipantes, salvar } from "./supabase.js";
+import { listParticipantes, listCheckins, registrarCheckin, salvar, remover } from "./supabase.js";
 import { eventoNome } from "./evento.js";
 import { imprimirCracha } from "./cracha.js";
 
@@ -11,6 +12,7 @@ iniciarPagina("checkin");
 const el = (id) => document.getElementById(id);
 
 let participantes = [];
+let checkins = [];
 let termo = "";
 
 carregar();
@@ -20,7 +22,10 @@ setInterval(() => { if (!document.hidden) carregar(); }, 30000);
 
 async function carregar() {
   try {
-    participantes = await listParticipantes();
+    [participantes, checkins] = await Promise.all([
+      listParticipantes(),
+      listCheckins().catch(() => []),
+    ]);
     el("carregando").hidden = true;
     el("painel").hidden = false;
     render();
@@ -33,6 +38,8 @@ async function carregar() {
   }
 }
 
+const hoje0 = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
+
 function hora(iso) {
   if (!iso) return "";
   try {
@@ -42,11 +49,20 @@ function hora(iso) {
   } catch { return ""; }
 }
 
+// nº de ENTRADAS hoje de um participante (para detectar reentrada)
+function entradasHoje(pid) {
+  const t0 = hoje0().getTime();
+  return checkins.filter((c) => c.participante_id === pid && c.acao === "entrada" && new Date(c.at).getTime() >= t0).length;
+}
+
 function render() {
   const total = participantes.length;
   const presentes = participantes.filter((p) => p.presente).length;
+  const t0 = hoje0().getTime();
+  const entradasDia = checkins.filter((c) => c.acao === "entrada" && new Date(c.at).getTime() >= t0).length;
   el("n-presentes").textContent = presentes;
   el("n-total").textContent = total;
+  el("n-hoje").textContent = entradasDia;
   el("checkin-progresso").style.width = total ? Math.round((presentes / total) * 100) + "%" : "0%";
 
   if (!termo) {
@@ -70,49 +86,69 @@ function render() {
     return;
   }
 
-  el("resultados").innerHTML = achados
-    .map((p) => {
-      const sub = [p.empresa, p.email, p.telefone].filter(Boolean).join(" · ");
-      return `<div class="checkin-item ${p.presente ? "presente" : ""}" data-id="${p.id}">
-        <div class="checkin-item-info">
-          <strong>${esc(p.nome)}</strong>
-          <span class="checkin-meta">
-            <span class="badge ${p.tipo === "Anfitrião" ? "badge-laranja" : "badge-neutro"}">${esc(p.tipo)}</span>
-            <span class="chip-codigo">${esc(p.codigo || "—")}</span>
-            ${sub ? `<span class="checkin-sub">${esc(sub)}</span>` : ""}
-          </span>
-        </div>
-        <div class="checkin-item-acao">
-          ${p.presente
-            ? `<span class="checkin-ok">✓ ${esc(hora(p.checkin_at)) || "presente"}</span>
-               <button class="btn btn-fantasma btn-sm" data-desfazer>Desfazer</button>`
-            : `<button class="btn btn-primario" data-credenciar>Credenciar</button>`}
-        </div>
-      </div>`;
-    })
-    .join("");
-
+  el("resultados").innerHTML = achados.map((p) => cardHtml(p)).join("");
   el("resultados").querySelectorAll(".checkin-item").forEach((row) => {
     const p = participantes.find((x) => x.id === row.dataset.id);
-    row.querySelector("[data-credenciar]")?.addEventListener("click", () => credenciar(p, true));
-    row.querySelector("[data-desfazer]")?.addEventListener("click", () => credenciar(p, false));
+    row.querySelector("[data-credenciar]")?.addEventListener("click", () => acao(p, "entrada"));
+    row.querySelector("[data-saida]")?.addEventListener("click", () => acao(p, "saida"));
+    row.querySelector("[data-reimprimir]")?.addEventListener("click", () => imprimirCracha(p, eventoNome()));
+    row.querySelector("[data-desfazer]")?.addEventListener("click", () => desfazer(p));
   });
 }
 
-async function credenciar(p, entrar) {
+function cardHtml(p) {
+  const categoria = p.ingresso || p.tipo;
+  const sub = [p.empresa, p.email, p.telefone].filter(Boolean).join(" · ");
+  const reentrada = !p.presente && entradasHoje(p.id) > 0;
+  return `<div class="checkin-item ${p.presente ? "presente" : ""}" data-id="${p.id}">
+    <div class="checkin-item-info">
+      <strong>${esc(p.nome)}</strong>
+      <span class="checkin-meta">
+        <span class="badge ${p.tipo === "Anfitrião" ? "badge-laranja" : "badge-neutro"}">${esc(p.tipo)}</span>
+        ${categoria && categoria !== p.tipo ? `<span class="chip-cat">${esc(categoria)}</span>` : ""}
+        <span class="chip-codigo">${esc(p.codigo || "—")}</span>
+      </span>
+      ${sub ? `<span class="checkin-sub">${esc(sub)}</span>` : ""}
+      ${reentrada ? `<span class="checkin-reentrada">↻ Reentrada — já esteve presente hoje</span>` : ""}
+    </div>
+    <div class="checkin-item-acao">
+      ${p.presente
+        ? `<span class="checkin-ok">✓ Presente desde ${esc(hora(p.checkin_at)) || "hoje"}</span>
+           <button class="btn btn-secundario btn-sm" data-reimprimir>Reimprimir crachá</button>
+           <button class="btn btn-fantasma btn-sm" data-saida>Registrar saída</button>
+           <button class="btn btn-fantasma btn-sm" data-desfazer title="Desfazer check-in">Desfazer</button>`
+        : `<button class="btn btn-primario" data-credenciar>Credenciar e imprimir</button>`}
+    </div>
+  </div>`;
+}
+
+async function acao(p, tipo) {
   try {
-    const patch = entrar
-      ? { id: p.id, presente: true, checkin_at: new Date().toISOString() }
-      : { id: p.id, presente: false, checkin_at: null };
-    const salvo = await salvar("participantes", patch);
+    const salvo = await registrarCheckin(p.id, tipo);
     Object.assign(p, salvo);
+    checkins = await listCheckins().catch(() => checkins);
     render();
-    if (entrar) {
+    if (tipo === "entrada") {
       toast(`${p.nome} credenciado(a).`, "ok");
       imprimirCracha(p, eventoNome());
     } else {
-      toast("Presença removida.", "ok");
+      toast(`Saída registrada para ${p.nome}.`, "ok");
     }
+  } catch (e) {
+    toast(e.message, "erro");
+  }
+}
+
+async function desfazer(p) {
+  try {
+    const ultimo = checkins.find((c) => c.participante_id === p.id);
+    if (ultimo) await remover("checkins", ultimo.id);
+    await salvar("participantes", { id: p.id, presente: false, checkin_at: null });
+    p.presente = false;
+    p.checkin_at = null;
+    checkins = await listCheckins().catch(() => checkins);
+    render();
+    toast("Check-in desfeito.", "ok");
   } catch (e) {
     toast(e.message, "erro");
   }
