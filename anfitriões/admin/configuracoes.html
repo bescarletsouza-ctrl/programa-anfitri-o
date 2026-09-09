@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Configurações — Programa Anfitrião</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../assets/css/theme.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside id="sidebar"></aside>
+  <main class="conteudo">
+    <div class="barra-topo">
+      <div>
+        <h1 class="pagina-titulo">Configurações</h1>
+        <p class="pagina-sub">Grupos, responsáveis, estágios do funil e textos do sistema.</p>
+      </div>
+    </div>
+
+    <div id="carregando" class="vazio">Carregando…</div>
+
+    <div id="conteudo" hidden class="grid grid-2">
+      <section class="card">
+        <h3>Geral</h3>
+        <form id="form-config">
+          <label class="campo"><span>Nome do produto</span>
+            <input class="input" name="nome_produto" required /></label>
+          <label class="campo"><span>Meta de confirmados</span>
+            <input class="input" name="meta_confirmados" type="number" min="0" /></label>
+          <label class="campo"><span>Subtítulo do convite</span>
+            <input class="input" name="subtitulo_convite" /></label>
+          <label class="campo"><span>Texto de confirmação da aplicação</span>
+            <textarea class="input" name="texto_confirmacao" rows="2"></textarea></label>
+          <button class="btn btn-primario" type="submit">Salvar geral</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <div class="barra-topo" style="margin-bottom:12px">
+          <h3 style="margin:0">Grupos</h3>
+          <button class="btn btn-secundario" data-add="grupos">+ Grupo</button>
+        </div>
+        <div id="lista-grupos"></div>
+      </section>
+
+      <section class="card">
+        <div class="barra-topo" style="margin-bottom:12px">
+          <h3 style="margin:0">Responsáveis</h3>
+          <button class="btn btn-secundario" data-add="responsaveis">+ Responsável</button>
+        </div>
+        <div id="lista-responsaveis"></div>
+      </section>
+
+      <section class="card">
+        <div class="barra-topo" style="margin-bottom:12px">
+          <h3 style="margin:0">Estágios do funil</h3>
+          <button class="btn btn-secundario" data-add="estagios">+ Estágio</button>
+        </div>
+        <div id="lista-estagios"></div>
+      </section>
+    </div>
+  </main>
+</div>
+<script type="module" src="../assets/js/configuracoes.js"></script>
+</body>
+</html>

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Convidados — Programa Anfitrião</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../assets/css/theme.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside id="sidebar"></aside>
+  <main class="conteudo">
+    <div class="barra-topo">
+      <div>
+        <h1 class="pagina-titulo">Gestão de convidados</h1>
+        <p class="pagina-sub">Aplicações dos convidados indicados pelos anfitriões.</p>
+      </div>
+      <button class="btn btn-primario" id="btn-novo">+ Novo convidado</button>
+    </div>
+
+    <div class="filtros" style="margin-bottom:14px">
+      <input class="input" id="busca" placeholder="Buscar por nome, e-mail ou empresa…" />
+      <select class="select" id="f-status"><option value="">Todos os status</option></select>
+      <select class="select" id="f-grupo"><option value="">Todos os grupos</option></select>
+    </div>
+
+    <div class="grid grid-4" id="pills" style="margin-bottom:16px"></div>
+
+    <div id="carregando" class="vazio">Carregando…</div>
+    <div class="tabela-wrap" id="wrap" hidden>
+      <table class="tabela">
+        <thead><tr>
+          <th>Convidado</th><th>Empresa</th><th>Convidado por</th>
+          <th>Telefone</th><th>Status</th><th>Data</th>
+        </tr></thead>
+        <tbody id="linhas"></tbody>
+      </table>
+    </div>
+    <div id="vazio" class="vazio" hidden>Nenhum convidado encontrado.</div>
+  </main>
+</div>
+<script type="module" src="../assets/js/convidados.js"></script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Formulário de inscrição — Programa Anfitrião</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../assets/css/theme.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside id="sidebar"></aside>
+  <main class="conteudo">
+    <div class="barra-topo">
+      <div>
+        <h1 class="pagina-titulo">Formulário de inscrição</h1>
+        <p class="pagina-sub">As perguntas que o convidado responde ao aceitar um convite.</p>
+      </div>
+      <button class="btn btn-primario" id="btn-nova">+ Nova pergunta</button>
+    </div>
+
+    <div class="aviso">
+      Estas perguntas alimentam a página pública de convite (próxima fase). As perguntas
+      marcadas como <b>do sistema</b> têm a chave travada e não podem ser removidas —
+      só o rótulo, a obrigatoriedade e as opções são editáveis.
+    </div>
+
+    <div id="carregando" class="vazio">Carregando…</div>
+    <div id="lista" class="grid" style="max-width:760px"></div>
+  </main>
+</div>
+<script type="module" src="../assets/js/formulario.js"></script>
+</body>
+</html>

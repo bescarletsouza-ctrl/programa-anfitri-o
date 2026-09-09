@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Painel — Programa Anfitrião</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../assets/css/theme.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside id="sidebar"></aside>
+  <main class="conteudo">
+    <div class="barra-topo">
+      <div>
+        <h1 class="pagina-titulo" id="saudacao">Painel</h1>
+        <p class="pagina-sub" id="data-hoje">—</p>
+      </div>
+      <div class="filtros">
+        <select class="select" id="filtro-grupo"><option value="">Todos os grupos</option></select>
+      </div>
+    </div>
+
+    <div id="carregando" class="vazio">Carregando painel…</div>
+
+    <div id="painel" hidden class="grid grid-2">
+      <section class="card" style="grid-column: 1 / -1">
+        <h3>Funil de anfitriões</h3>
+        <div id="funil-anfitrioes"></div>
+      </section>
+
+      <section class="card">
+        <h3>Funil de convidados</h3>
+        <div id="funil-convidados"></div>
+        <div id="meta-box" style="margin-top:16px"></div>
+      </section>
+
+      <section class="card">
+        <h3>Confirmados por faixa de faturamento</h3>
+        <div class="toggle-abas" id="fx-toggle" style="margin-bottom:14px">
+          <button data-fx="Confirmado" class="ativo">Confirmados</button>
+          <button data-fx="Aprovado">Aprovados</button>
+          <button data-fx="Todos">Todos</button>
+        </div>
+        <div id="faixas"></div>
+      </section>
+
+      <section class="card" style="grid-column: 1 / -1">
+        <h3>Visão por grupo</h3>
+        <div class="grid grid-3" id="visao-grupos"></div>
+      </section>
+
+      <section class="card">
+        <h3>Top anfitriões</h3>
+        <div id="top-anfitrioes"></div>
+      </section>
+
+      <section class="card">
+        <h3>Top responsáveis</h3>
+        <div id="top-responsaveis"></div>
+      </section>
+
+      <section class="card" style="grid-column: 1 / -1">
+        <h3>Convidados recentes</h3>
+        <div id="recentes"></div>
+      </section>
+    </div>
+  </main>
+</div>
+<script type="module" src="../assets/js/dashboard.js"></script>
+</body>
+</html>

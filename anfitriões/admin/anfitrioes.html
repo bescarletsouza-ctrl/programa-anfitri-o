@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Anfitriões — Programa Anfitrião</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../assets/css/theme.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside id="sidebar"></aside>
+  <main class="conteudo">
+    <div class="barra-topo">
+      <div>
+        <h1 class="pagina-titulo">Gestão de anfitriões</h1>
+        <p class="pagina-sub">Cadastre e acompanhe quem convida.</p>
+      </div>
+      <button class="btn btn-primario" id="btn-novo">+ Novo anfitrião</button>
+    </div>
+
+    <div class="filtros" style="margin-bottom:14px">
+      <input class="input" id="busca" placeholder="Buscar por nome ou e-mail…" />
+      <select class="select" id="f-grupo"><option value="">Todos os grupos</option></select>
+      <select class="select" id="f-estagio"><option value="">Todos os estágios</option></select>
+      <select class="select" id="f-presenca">
+        <option value="">Presença: todas</option>
+        <option value="sim">Presença confirmada</option>
+        <option value="nao">Presença não confirmada</option>
+      </select>
+    </div>
+
+    <div class="barra-topo">
+      <div class="toggle-abas" id="abas">
+        <button data-aba="ativos" class="ativo">Ativos</button>
+        <button data-aba="nao">Não vão</button>
+      </div>
+      <span class="pagina-sub" id="contador" style="margin:0"></span>
+    </div>
+
+    <div id="carregando" class="vazio">Carregando…</div>
+    <div class="tabela-wrap" id="wrap" hidden>
+      <table class="tabela">
+        <thead><tr>
+          <th>Nome</th><th>Grupo</th><th>E-mail</th><th>Telefone</th>
+          <th>Presença</th><th>Enviados</th><th>Aprovados</th><th></th>
+        </tr></thead>
+        <tbody id="linhas"></tbody>
+      </table>
+    </div>
+    <div id="vazio" class="vazio" hidden>Nenhum anfitrião encontrado.</div>
+  </main>
+</div>
+<script type="module" src="../assets/js/anfitrioes.js"></script>
+</body>
+</html>
