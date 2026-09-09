@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Acompanhar inscrição — Programa Anfitrião</title>
+<meta name="robots" content="noindex" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/css/theme.css" />
+<link rel="stylesheet" href="assets/css/publico.css" />
+</head>
+<body class="publico">
+  <div class="pub-wrap">
+    <div class="pub-marca" id="marca">Programa <b>Anfitrião</b></div>
+
+    <div id="carregando" class="pub-erro-central" hidden>Carregando…</div>
+
+    <div class="pub-card" id="cartao-busca" hidden>
+      <div class="pub-hero">
+        <h1>Acompanhe sua <b>inscrição</b></h1>
+        <p>Informe o e-mail que você usou na aplicação.</p>
+      </div>
+      <form id="form-busca" novalidate>
+        <label class="pergunta-rotulo">Seu e-mail</label>
+        <input class="pub-input" type="email" id="email" placeholder="voce@email.com" required />
+        <div class="passo-erro" id="busca-erro"></div>
+        <div class="passo-acoes">
+          <button type="submit" class="btn btn-primario" id="btn-buscar">Ver status</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="pub-card" id="cartao-resultado" hidden>
+      <div id="resultado"></div>
+      <button class="btn btn-secundario" id="btn-voltar" style="width:100%;justify-content:center;margin-top:16px">Consultar outro e-mail</button>
+    </div>
+  </div>
+<script type="module" src="assets/js/status.js"></script>
+</body>
+</html>

@@ -166,11 +166,13 @@ async function enviar() {
   });
 
   try {
-    await criarConvidado(registro);
+    const novo = await criarConvidado(registro);
     el("cartao").hidden = true;
+    el("link-acompanhar").hidden = true;
     el("sucesso").hidden = false;
     el("sucesso-texto").textContent =
       config?.texto_confirmacao || "Recebemos sua aplicação. Em breve nossa equipe entra em contato.";
+    el("btn-acompanhar").href = `status.html?c=${novo.id}`;
     window.scrollTo({ top: 0, behavior: "smooth" });
   } catch (e) {
     console.error(e);

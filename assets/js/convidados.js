@@ -137,9 +137,18 @@ function abrirGavetaDetalhe(id) {
     `
     <div class="secao">
       <h4>Decisão</h4>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <button class="btn btn-primario" id="d-aprovar" style="flex:1;justify-content:center;background:var(--ok)"
+          ${c.status === "Aprovado" || c.status === "Confirmado" ? "disabled" : ""}>✓ Aprovar</button>
+        <button class="btn btn-perigo" id="d-reprovar" style="flex:1;justify-content:center"
+          ${c.status === "Recusado" ? "disabled" : ""}>✕ Reprovar</button>
+      </div>
       <select class="select" id="d-status">
         ${STATUS_CONVIDADO.map((s) => `<option ${s === c.status ? "selected" : ""}>${s}</option>`).join("")}
       </select>
+      <p class="pagina-sub" style="margin:6px 0 0;font-size:.72rem">
+        Status atual: <b>${esc(c.status)}</b> — o convidado vê isso na página de acompanhamento.
+      </p>
     </div>
 
     <div class="secao">
@@ -199,6 +208,10 @@ function abrirGavetaDetalhe(id) {
   };
   g.querySelector("#d-status").onchange = (e) =>
     salvarConvidado({ status: e.target.value }, "Status atualizado.");
+  g.querySelector("#d-aprovar").onclick = () =>
+    salvarConvidado({ status: "Aprovado" }, "Convidado aprovado.").then(fecharGaveta);
+  g.querySelector("#d-reprovar").onclick = () =>
+    salvarConvidado({ status: "Recusado" }, "Convidado reprovado.").then(fecharGaveta);
   g.querySelector("#d-salvar").onclick = () =>
     salvarConvidado({ observacao: g.querySelector("#d-obs").value.trim() || null }, "Observação salva.").then(fecharGaveta);
   g.querySelector("#d-excluir").onclick = async () => {

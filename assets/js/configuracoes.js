@@ -18,19 +18,19 @@ async function carregar() {
   try {
     config = await getConfig();
     const form = el("form-config");
-    form.nome_produto.value = config.nome_produto || "";
+    const campos = ["nome_produto", "subtitulo_convite", "texto_confirmacao",
+      "texto_em_analise", "texto_aprovado", "texto_recusado"];
+    campos.forEach((k) => { if (form[k]) form[k].value = config[k] || ""; });
     form.meta_confirmados.value = config.meta_confirmados ?? 0;
-    form.subtitulo_convite.value = config.subtitulo_convite || "";
-    form.texto_confirmacao.value = config.texto_confirmacao || "";
     form.onsubmit = async (e) => {
       e.preventDefault();
       try {
-        await salvarConfig({
-          nome_produto: form.nome_produto.value.trim(),
-          meta_confirmados: Number(form.meta_confirmados.value) || 0,
-          subtitulo_convite: form.subtitulo_convite.value.trim() || null,
-          texto_confirmacao: form.texto_confirmacao.value.trim() || null,
+        const patch = { meta_confirmados: Number(form.meta_confirmados.value) || 0 };
+        // só envia colunas que existem (as de texto_* dependem da migração 0003)
+        campos.forEach((k) => {
+          if (form[k] && k in config) patch[k] = form[k].value.trim() || null;
         });
+        await salvarConfig(patch);
         toast("Configurações salvas.", "ok");
       } catch (err) {
         toast(err.message, "erro");

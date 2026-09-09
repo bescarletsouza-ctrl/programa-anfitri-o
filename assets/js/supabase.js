@@ -91,6 +91,22 @@ export const listRankingPublico = () =>
 export const criarConvidado = (registro) =>
   supabase.from("convidados").insert(registro).select().single().then(ok);
 
+export const getConvidadoStatus = (id) =>
+  supabase
+    .from("convidados")
+    .select("id, nome, status, created_at, anfitriao:anfitrioes(nome)")
+    .eq("id", id)
+    .maybeSingle()
+    .then(ok);
+
+export const listConvidadosPorEmail = (email) =>
+  supabase
+    .from("convidados")
+    .select("id, nome, status, created_at, anfitriao:anfitrioes(nome)")
+    .ilike("email", email.trim())
+    .order("created_at", { ascending: false })
+    .then(ok);
+
 /* ---- Escrita ----------------------------------------------------------- */
 // tabela: string; registro: objeto (com id => update, sem id => insert)
 export async function salvar(tabela, registro) {
