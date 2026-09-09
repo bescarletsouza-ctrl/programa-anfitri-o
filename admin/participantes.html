@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Participantes — Programa Anfitrião</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../assets/css/theme.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside id="sidebar"></aside>
+  <main class="conteudo">
+    <div class="barra-topo">
+      <div>
+        <h1 class="pagina-titulo">Participantes</h1>
+        <p class="pagina-sub">Lista de presença e pipeline do evento.</p>
+      </div>
+      <div class="toggle-abas" id="vistas">
+        <button data-vista="lista" class="ativo">Lista</button>
+        <button data-vista="pipeline">Pipeline</button>
+      </div>
+    </div>
+
+    <div id="carregando" class="vazio">Carregando…</div>
+
+    <!-- ================= LISTA ================= -->
+    <div id="vista-lista" hidden>
+      <div class="filtros" style="margin-bottom:12px">
+        <input class="input" id="busca" placeholder="Buscar por nome, e-mail ou telefone…" />
+        <select class="select" id="f-tipo"><option value="">Todos os tipos</option></select>
+        <select class="select" id="f-pagamento"><option value="">Todos os pagamentos</option></select>
+        <select class="select" id="f-etapa"><option value="">Todas as etapas</option></select>
+      </div>
+      <div class="barra-topo">
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-primario" id="btn-cadastrar">+ Cadastrar</button>
+          <button class="btn btn-secundario" id="btn-importar">Importar Excel</button>
+          <button class="btn btn-secundario" id="btn-exportar">Exportar Excel</button>
+        </div>
+        <span class="pagina-sub" id="contador" style="margin:0"></span>
+      </div>
+
+      <div class="tabela-wrap" id="wrap" hidden>
+        <table class="tabela">
+          <thead><tr>
+            <th>Nome</th><th>E-mail</th><th>Telefone</th><th>Tipo</th><th>Ingresso</th>
+            <th>Faturamento</th><th>Pagamento</th><th>Qtd</th><th>Cadastro</th><th></th>
+          </tr></thead>
+          <tbody id="linhas"></tbody>
+        </table>
+      </div>
+      <div id="vazio" class="vazio" hidden>Nenhum participante encontrado.</div>
+    </div>
+
+    <!-- ================= PIPELINE ================= -->
+    <div id="vista-pipeline" hidden>
+      <div class="filtros" style="margin-bottom:14px">
+        <input class="input" id="busca-pipe" placeholder="Buscar…" />
+        <select class="select" id="f-tipo-pipe"><option value="">Todos os tipos</option></select>
+      </div>
+      <div class="kanban" id="kanban"></div>
+    </div>
+  </main>
+</div>
+<script type="module" src="../assets/js/participantes.js"></script>
+</body>
+</html>

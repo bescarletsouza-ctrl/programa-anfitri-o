@@ -9,6 +9,7 @@ const NAV = [
   { chave: "painel",       rotulo: "Painel",                  href: "index.html" },
   { chave: "anfitrioes",   rotulo: APP.termoAnfitriaoPlural,  href: "anfitrioes.html" },
   { chave: "convidados",   rotulo: APP.termoConvidadoPlural,  href: "convidados.html" },
+  { chave: "participantes", rotulo: "Participantes",           href: "participantes.html" },
   { chave: "formulario",   rotulo: "Formulário de inscrição", href: "formulario.html" },
   { chave: "config",       rotulo: "Configurações",           href: "configuracoes.html" },
 ];

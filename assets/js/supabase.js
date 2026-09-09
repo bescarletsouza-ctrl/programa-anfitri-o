@@ -69,6 +69,16 @@ export const listFormPerguntas = () =>
 export const listMarcos = () =>
   supabase.from("marcos").select("*").order("quantidade").then(ok);
 
+export const listEtapasParticipante = () =>
+  supabase.from("etapas_participante").select("*").order("ordem").then(ok);
+
+export const listParticipantes = () =>
+  supabase
+    .from("participantes")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .then(ok);
+
 export const getConfig = () =>
   supabase.from("config").select("*").eq("id", 1).single().then(ok);
 

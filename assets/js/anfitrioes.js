@@ -10,6 +10,7 @@ import {
   listConvidadosDoAnfitriao, salvar, remover, inserirLote,
 } from "./supabase.js";
 import { APP, TIPOS_ANFITRIAO } from "./config.js";
+import { parsearTabela } from "./tabela.js";
 
 iniciarPagina("anfitrioes");
 const el = (id) => document.getElementById(id);
@@ -155,47 +156,12 @@ const MODELO_CSV =
   "Maria Silva,maria@exemplo.com,11999990000,Titular,Turma 1,Ana\n" +
   "João Souza,joao@exemplo.com,11988887777,Titular,Turma 1,Ana";
 
-function normalizarCab(h) {
-  return h.toLowerCase().trim().normalize("NFD").replace(/[̀-ͯ]/g, "");
-}
 const ALIAS = {
-  nome: "nome", "nome completo": "nome",
-  email: "email", "e-mail": "email",
-  telefone: "telefone", whatsapp: "telefone", celular: "telefone", fone: "telefone",
-  tipo: "tipo",
-  grupo: "grupo", turma: "grupo",
-  responsavel: "responsavel", "responsavel (cs)": "responsavel", cs: "responsavel",
+  "nome completo": "nome", "e-mail": "email",
+  whatsapp: "telefone", celular: "telefone", fone: "telefone",
+  turma: "grupo",
+  "responsavel (cs)": "responsavel", cs: "responsavel",
 };
-
-function parsearTabela(texto) {
-  const linhas = texto.replace(/\r/g, "").split("\n").filter((l) => l.trim());
-  if (linhas.length < 2) return [];
-  const primeira = linhas[0];
-  const delim = primeira.includes("\t") ? "\t"
-    : (primeira.split(";").length > primeira.split(",").length ? ";" : ",");
-
-  const parseLinha = (l) => {
-    const out = []; let cur = "", dentro = false;
-    for (let i = 0; i < l.length; i++) {
-      const c = l[i];
-      if (c === '"') {
-        if (dentro && l[i + 1] === '"') { cur += '"'; i++; }
-        else dentro = !dentro;
-      } else if (c === delim && !dentro) { out.push(cur); cur = ""; }
-      else cur += c;
-    }
-    out.push(cur);
-    return out.map((s) => s.trim());
-  };
-
-  const cab = parseLinha(linhas[0]).map((h) => ALIAS[normalizarCab(h)] || normalizarCab(h));
-  return linhas.slice(1).map((l) => {
-    const cols = parseLinha(l);
-    const o = {};
-    cab.forEach((h, i) => (o[h] = (cols[i] || "").trim()));
-    return o;
-  });
-}
 
 function modalImportar() {
   abrirModal({
@@ -227,7 +193,7 @@ function modalImportar() {
     },
     onConfirmar: async (form) => {
       const texto = form.querySelector('[name="texto"]').value;
-      const linhas = parsearTabela(texto);
+      const linhas = parsearTabela(texto, ALIAS);
       const validas = linhas.filter((l) => (l.nome || "").trim());
       if (!validas.length) {
         toast("Nenhuma linha com nome encontrada. Confira o cabeçalho.", "erro");

@@ -3,8 +3,8 @@
 // =============================================================================
 import { iniciarPagina, esc, abrirModal, toast, confirmar } from "./ui.js";
 import {
-  listGrupos, listResponsaveis, listEstagios, listMarcos, getConfig,
-  salvar, remover, salvarConfig,
+  listGrupos, listResponsaveis, listEstagios, listEtapasParticipante, listMarcos,
+  getConfig, salvar, remover, salvarConfig,
 } from "./supabase.js";
 
 iniciarPagina("config");
@@ -44,7 +44,7 @@ async function carregar() {
 
     el("carregando").hidden = true;
     el("conteudo").hidden = false;
-    await Promise.all([renderGrupos(), renderResponsaveis(), renderEstagios(), renderMarcos()]);
+    await Promise.allSettled([renderGrupos(), renderResponsaveis(), renderEstagios(), renderEtapasPart(), renderMarcos()]);
   } catch (e) {
     el("carregando").textContent = "Erro ao carregar: " + e.message;
   }
@@ -94,6 +94,20 @@ async function renderEstagios() {
     ? arr.map((x) => itemLinha("estagios", x, ` <span class="pagina-sub" style="font-size:.72rem">ordem ${x.ordem}</span>`)).join("")
     : vazio();
   ligar(c, "estagios", renderEstagios);
+}
+async function renderEtapasPart() {
+  const c = el("lista-etapas-part");
+  let arr;
+  try {
+    arr = await listEtapasParticipante();
+  } catch {
+    c.innerHTML = `<p class="pagina-sub" style="margin:0">Rode a migração <code>0004_participantes.sql</code> para ativar.</p>`;
+    return;
+  }
+  c.innerHTML = arr.length
+    ? arr.map((x) => itemLinha("etapas_participante", x, ` <span class="pagina-sub" style="font-size:.72rem">ordem ${x.ordem}</span>`)).join("")
+    : vazio();
+  ligar(c, "etapas_participante", renderEtapasPart);
 }
 
 const vazio = () => `<p class="pagina-sub" style="margin:0">Nada cadastrado ainda.</p>`;
@@ -161,23 +175,33 @@ function editarMarco(m) {
 }
 
 /* ---- editar / criar ---- */
-const RECARGA = { grupos: renderGrupos, responsaveis: renderResponsaveis, estagios: renderEstagios };
-const TITULO = { grupos: "grupo", responsaveis: "responsável", estagios: "estágio" };
+const RECARGA = {
+  grupos: renderGrupos, responsaveis: renderResponsaveis,
+  estagios: renderEstagios, etapas_participante: renderEtapasPart,
+};
+const TITULO = {
+  grupos: "grupo", responsaveis: "responsável",
+  estagios: "estágio", etapas_participante: "etapa",
+};
+const COM_ORDEM = ["estagios", "etapas_participante"];
 
 async function editarItem(tabela, id, recarregar) {
   recarregar = recarregar || RECARGA[tabela];
   let atual = null;
   if (id) {
-    const fn = { grupos: listGrupos, responsaveis: listResponsaveis, estagios: listEstagios }[tabela];
+    const fn = {
+      grupos: listGrupos, responsaveis: listResponsaveis,
+      estagios: listEstagios, etapas_participante: listEtapasParticipante,
+    }[tabela];
     atual = (await fn()).find((x) => x.id === id);
   }
   abrirModal({
-    titulo: (id ? "Editar " : "Novo ") + TITULO[tabela],
+    titulo: (id ? "Editar " : "Nova ") + TITULO[tabela],
     corpoHtml: `
       <label class="campo"><span>Nome *</span>
         <input class="input" name="nome" required value="${esc(atual?.nome || "")}" /></label>
       ${
-        tabela === "estagios"
+        COM_ORDEM.includes(tabela)
           ? `<label class="campo"><span>Ordem</span>
                <input class="input" type="number" name="ordem" value="${atual?.ordem ?? ""}" /></label>
              <label class="campo"><span>Cor (hex, opcional)</span>
@@ -187,7 +211,7 @@ async function editarItem(tabela, id, recarregar) {
     onConfirmar: async (form) => {
       const f = Object.fromEntries(new FormData(form));
       const registro = { nome: f.nome.trim() };
-      if (tabela === "estagios") {
+      if (COM_ORDEM.includes(tabela)) {
         registro.ordem = Number(f.ordem) || 0;
         registro.cor = f.cor || null;
       }
