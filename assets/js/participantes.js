@@ -4,7 +4,7 @@
 // =============================================================================
 import {
   iniciarPagina, esc, debounce, formatarData, abrirModal, abrirGaveta,
-  fecharGaveta, toast, confirmar,
+  fecharGaveta, toast, confirmar, icone,
 } from "./ui.js";
 import {
   listParticipantes, listEtapasParticipante, listAnfitrioes, listEstagios,
@@ -91,8 +91,11 @@ function ligarEventos() {
   el("f-pagamento").onchange = (e) => { filtros.pagamento = e.target.value; render(); };
   el("f-etapa").onchange = (e) => { filtros.etapa = e.target.value; render(); };
   el("f-tipo-pipe").onchange = (e) => { filtros.tipoPipe = e.target.value; render(); };
+  el("btn-cadastrar").innerHTML = icone("mais") + "Cadastrar";
   el("btn-cadastrar").onclick = () => abrirForm(null);
+  el("btn-importar").innerHTML = icone("subir") + "Importar Excel";
   el("btn-importar").onclick = modalImportar;
+  el("btn-exportar").innerHTML = icone("baixar") + "Exportar Excel";
   el("btn-exportar").onclick = exportar;
 }
 
@@ -135,8 +138,8 @@ function renderLista() {
         <td>${p.quantidade || 1}</td>
         <td>${formatarData(p.created_at)}</td>
         <td class="linha-acoes">
-          <button class="icone-btn" data-editar>✎</button>
-          <button class="icone-btn" data-excluir>🗑</button>
+          <button class="icone-btn" data-editar title="Editar">${icone("editar")}</button>
+          <button class="icone-btn" data-excluir title="Excluir">${icone("excluir")}</button>
         </td>
       </tr>`
     )

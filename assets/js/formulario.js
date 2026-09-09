@@ -1,7 +1,7 @@
 // =============================================================================
 // Editor do formulário de inscrição (perguntas do convite).
 // =============================================================================
-import { iniciarPagina, esc, slugify, abrirModal, toast, confirmar } from "./ui.js";
+import { iniciarPagina, esc, slugify, abrirModal, toast, confirmar, icone } from "./ui.js";
 import { listFormPerguntas, salvar, remover } from "./supabase.js";
 import { TIPOS_PERGUNTA } from "./config.js";
 
@@ -21,6 +21,7 @@ async function carregar() {
   }
 }
 
+el("btn-nova").innerHTML = icone("mais") + "Nova pergunta";
 el("btn-nova").onclick = () => editar(null);
 
 function rotuloTipo(v) {
@@ -52,8 +53,8 @@ function render() {
           </div>
           <div class="linha-acoes">
             <button class="icone-btn" data-toggle-ativo title="Ativar/desativar">${p.ativo ? "🚫" : "✔"}</button>
-            <button class="icone-btn" data-editar title="Editar">✎</button>
-            ${p.sistema ? "" : '<button class="icone-btn" data-excluir title="Excluir">🗑</button>'}
+            <button class="icone-btn" data-editar title="Editar">${icone("editar")}</button>
+            ${p.sistema ? "" : `<button class="icone-btn" data-excluir title="Excluir">${icone("excluir")}</button>`}
           </div>
         </div>
       </div>`;

@@ -3,7 +3,7 @@
 // =============================================================================
 import {
   iniciarPagina, esc, debounce, formatarData, telParaWhatsApp,
-  abrirModal, abrirGaveta, fecharGaveta, toast, confirmar,
+  abrirModal, abrirGaveta, fecharGaveta, toast, confirmar, icone,
 } from "./ui.js";
 import {
   listGrupos, listAnfitrioes, listConvidados, listFormPerguntas, salvar, remover,
@@ -37,6 +37,7 @@ async function carregar() {
 el("busca").addEventListener("input", debounce((e) => { filtros.busca = e.target.value.toLowerCase(); render(); }, 200));
 el("f-status").addEventListener("change", (e) => { filtros.status = e.target.value; render(); });
 el("f-grupo").addEventListener("change", (e) => { filtros.grupo = e.target.value; render(); });
+el("btn-novo").innerHTML = icone("mais") + "Novo convidado";
 el("btn-novo").onclick = modalNovo;
 
 const badgeStatus = (s) =>
@@ -138,10 +139,10 @@ function abrirGavetaDetalhe(id) {
     <div class="secao">
       <h4>Decisão</h4>
       <div style="display:flex;gap:8px;margin-bottom:10px">
-        <button class="btn btn-primario" id="d-aprovar" style="flex:1;justify-content:center;background:var(--ok)"
-          ${c.status === "Aprovado" || c.status === "Confirmado" ? "disabled" : ""}>✓ Aprovar</button>
-        <button class="btn btn-perigo" id="d-reprovar" style="flex:1;justify-content:center"
-          ${c.status === "Recusado" ? "disabled" : ""}>✕ Reprovar</button>
+        <button class="btn btn-primario" id="d-aprovar" style="flex:1;background:var(--ok-solid);border-color:var(--ok-solid)"
+          ${c.status === "Aprovado" || c.status === "Confirmado" ? "disabled" : ""}>${icone("check")} Aprovar</button>
+        <button class="btn btn-perigo" id="d-reprovar" style="flex:1"
+          ${c.status === "Recusado" ? "disabled" : ""}>${icone("x")} Reprovar</button>
       </div>
       <select class="select" id="d-status">
         ${STATUS_CONVIDADO.map((s) => `<option ${s === c.status ? "selected" : ""}>${s}</option>`).join("")}

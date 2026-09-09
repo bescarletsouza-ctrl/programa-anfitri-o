@@ -1,7 +1,7 @@
 // =============================================================================
 // Configurações — geral + CRUD de grupos, responsáveis e estágios.
 // =============================================================================
-import { iniciarPagina, esc, abrirModal, toast, confirmar } from "./ui.js";
+import { iniciarPagina, esc, abrirModal, toast, confirmar, icone } from "./ui.js";
 import {
   listGrupos, listResponsaveis, listEstagios, listEtapasParticipante, listMarcos,
   getConfig, salvar, remover, salvarConfig,
@@ -55,8 +55,8 @@ function itemLinha(tabela, x, extra = "") {
   return `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--cinza-100)" data-id="${x.id}">
     <span style="font-size:.9rem">${esc(x.nome)}${extra}</span>
     <span class="linha-acoes">
-      <button class="icone-btn" data-editar>✎</button>
-      <button class="icone-btn" data-excluir>🗑</button>
+      <button class="icone-btn" data-editar title="Editar">${icone("editar")}</button>
+      <button class="icone-btn" data-excluir title="Excluir">${icone("excluir")}</button>
     </span>
   </div>`;
 }

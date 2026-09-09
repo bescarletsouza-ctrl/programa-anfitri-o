@@ -3,7 +3,7 @@
 // =============================================================================
 import {
   iniciarPagina, esc, debounce, formatarData, slugify, telParaWhatsApp,
-  abrirModal, abrirGaveta, fecharGaveta, toast, confirmar,
+  abrirModal, abrirGaveta, fecharGaveta, toast, confirmar, icone,
 } from "./ui.js";
 import {
   listEstagios, listGrupos, listResponsaveis, listAnfitrioes,
@@ -56,7 +56,9 @@ el("abas").querySelectorAll("button").forEach((b) => {
     render();
   };
 });
+el("btn-novo").innerHTML = icone("mais") + "Novo anfitrião";
 el("btn-novo").onclick = modalNovo;
+el("btn-importar").innerHTML = icone("subir") + "Importar lista";
 el("btn-importar").onclick = modalImportar;
 
 /* ---- render ---- */
@@ -101,8 +103,8 @@ function render() {
         <td>${a.enviados || 0}</td>
         <td>${a.aprovados || 0}</td>
         <td class="linha-acoes">
-          <button class="icone-btn" data-editar title="Editar">✎</button>
-          <button class="icone-btn" data-excluir title="Excluir">🗑</button>
+          <button class="icone-btn" data-editar title="Editar">${icone("editar")}</button>
+          <button class="icone-btn" data-excluir title="Excluir">${icone("excluir")}</button>
         </td>
       </tr>`;
     })
