@@ -7,7 +7,7 @@ import {
 } from "./ui.js";
 import {
   listEstagios, listGrupos, listResponsaveis, listAnfitrioes,
-  listConvidadosDoAnfitriao, salvar, remover, inserirLote,
+  listConvidadosDoAnfitriao, salvar, remover, inserirLote, reSincCategoriaAnfitriao,
 } from "./supabase.js";
 import { APP, TIPOS_ANFITRIAO } from "./config.js";
 import { parsearTabela } from "./tabela.js";
@@ -120,6 +120,9 @@ function render() {
   });
 }
 
+const categoriasUsadas = () =>
+  [...new Set(lista.map((a) => (a.categoria_convidado || "").trim()).filter(Boolean))].sort();
+
 /* ---- Novo anfitrião ---- */
 function modalNovo() {
   abrirModal({
@@ -134,6 +137,9 @@ function modalNovo() {
       <label class="campo"><span>Grupo</span>
         <select class="select" name="grupo_id"><option value="">—</option>
           ${grupos.map((g) => `<option value="${g.id}">${esc(g.nome)}</option>`).join("")}</select></label>
+      <label class="campo"><span>Categoria liberada para os convidados dele</span>
+        <input class="input" name="categoria_convidado" list="cats-anf" placeholder="Ex.: VIP, GOLD…" />
+        <datalist id="cats-anf">${categoriasUsadas().map((c) => `<option value="${esc(c)}">`).join("")}</datalist></label>
       <label class="campo"><span>Responsável</span>
         <select class="select" name="responsavel_id"><option value="">—</option>
           ${responsaveis.map((r) => `<option value="${r.id}">${esc(r.nome)}</option>`).join("")}</select></label>`,
@@ -142,6 +148,7 @@ function modalNovo() {
       const novo = await salvar("anfitrioes", {
         tipo: f.tipo, nome: f.nome.trim(), email: f.email || null, telefone: f.telefone || null,
         grupo_id: f.grupo_id || null, responsavel_id: f.responsavel_id || null,
+        categoria_convidado: f.categoria_convidado.trim() || null,
         estagio_id: estagios[0]?.id || null,
       });
       toast("Anfitrião criado.", "ok");
@@ -280,6 +287,9 @@ async function abrirGavetaDetalhe(id) {
       <label class="campo"><span>Grupo</span>
         <select class="select" id="d-grupo"><option value="">—</option>
           ${grupos.map((g) => `<option value="${g.id}" ${g.id === a.grupo_id ? "selected" : ""}>${esc(g.nome)}</option>`).join("")}</select></label>
+      <label class="campo"><span>Categoria liberada para os convidados dele</span>
+        <input class="input" id="d-categoria-convidado" list="cats-anf" value="${esc(a.categoria_convidado || "")}" placeholder="Ex.: VIP, GOLD…" />
+        <datalist id="cats-anf">${categoriasUsadas().map((c) => `<option value="${esc(c)}">`).join("")}</datalist></label>
       <label class="campo"><span>Estágio do funil</span>
         <select class="select" id="d-estagio"><option value="">—</option>
           ${estagios.map((s) => `<option value="${s.id}" ${s.id === a.estagio_id ? "selected" : ""}>${esc(s.nome)}</option>`).join("")}</select></label>
@@ -321,17 +331,22 @@ async function abrirGavetaDetalhe(id) {
   const g = document.getElementById("gaveta");
   g.querySelector("#d-salvar").onclick = async () => {
     try {
+      const catConv = g.querySelector("#d-categoria-convidado").value.trim() || null;
       await salvar("anfitrioes", {
         id: a.id,
         email: g.querySelector("#d-email").value.trim() || null,
         telefone: g.querySelector("#d-telefone").value.trim() || null,
         responsavel_id: g.querySelector("#d-resp").value || null,
         grupo_id: g.querySelector("#d-grupo").value || null,
+        categoria_convidado: catConv,
         estagio_id: g.querySelector("#d-estagio").value || null,
         vai: g.querySelector("#d-vai").checked,
         presenca: g.querySelector("#d-presenca").checked,
         observacao: g.querySelector("#d-obs").value.trim() || null,
       });
+      if (catConv !== (a.categoria_convidado || null)) {
+        await reSincCategoriaAnfitriao(a.id, catConv).catch(() => {});
+      }
       toast("Anfitrião atualizado.", "ok");
       lista = await listAnfitrioes();
       render();

@@ -31,10 +31,18 @@
 
     <div class="grid grid-4" id="pills" style="margin-bottom:16px"></div>
 
+    <div class="barra-acoes" id="barra-acoes" hidden>
+      <span class="barra-acoes-cont" id="sel-cont">0 selecionados</span>
+      <button class="btn btn-sm btn-secundario" data-acao="aprovar">Aprovar</button>
+      <button class="btn btn-sm btn-secundario" data-acao="reprovar">Reprovar</button>
+      <button class="btn btn-sm btn-fantasma" data-acao="limpar">Limpar seleção</button>
+    </div>
+
     <div id="carregando" class="vazio">Carregando…</div>
     <div class="tabela-wrap" id="wrap" hidden>
-      <table class="tabela">
+      <table class="tabela tabela-part">
         <thead><tr>
+          <th class="col-check"><input type="checkbox" id="check-todos" aria-label="Selecionar todos" /></th>
           <th>Convidado</th><th>Empresa</th><th>Convidado por</th>
           <th>Telefone</th><th>Status</th><th>Data</th>
         </tr></thead>

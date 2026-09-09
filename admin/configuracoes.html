@@ -95,6 +95,30 @@
         </p>
         <div id="lista-marcos"></div>
       </section>
+
+      <section class="card" style="grid-column: 1 / -1">
+        <h3>Crachá / Etiqueta</h3>
+        <p class="pagina-sub" style="margin:0 0 14px">
+          O que aparece e o tamanho de cada linha no crachá impresso no check-in.
+          <b>Nome, Categoria e Nome do evento</b> são obrigatórios.
+        </p>
+        <div class="grid grid-2" style="align-items:start">
+          <div>
+            <div class="cracha-dims" style="margin-bottom:14px">
+              <label class="campo"><span>Largura (mm)</span><input class="input" id="cr-largura" type="number" min="30" max="200" /></label>
+              <label class="campo"><span>Altura (mm)</span><input class="input" id="cr-altura" type="number" min="20" max="200" /></label>
+            </div>
+            <label class="campo" style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+              <input type="checkbox" id="cr-qr" /> <span style="margin:0">Mostrar QR Code</span></label>
+            <div id="cr-linhas"></div>
+            <button class="btn btn-primario" id="cr-salvar" style="margin-top:14px">Salvar crachá</button>
+          </div>
+          <div>
+            <span class="campo"><span style="display:block;font-size:.78rem;font-weight:600;margin-bottom:6px;color:var(--texto-suave)">Prévia</span></span>
+            <div class="cracha-preview" id="cr-preview"></div>
+          </div>
+        </div>
+      </section>
     </div>
   </main>
 </div>

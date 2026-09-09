@@ -7,6 +7,7 @@ import {
 } from "./ui.js";
 import {
   listGrupos, listAnfitrioes, listConvidados, listFormPerguntas, salvar, remover,
+  sincParticipanteConvidado,
 } from "./supabase.js";
 import { STATUS_CONVIDADO } from "./config.js";
 
@@ -15,6 +16,13 @@ const el = (id) => document.getElementById(id);
 
 let grupos = [], anfitrioes = [], lista = [], perguntas = [];
 const filtros = { busca: "", status: "", grupo: "" };
+const selecionados = new Set();
+
+// aplica a decisão do convidado (status) + sincroniza a lista de Participantes
+async function decidir(c, status) {
+  await salvar("convidados", { id: c.id, status });
+  await sincParticipanteConvidado({ ...c, status }).catch((e) => console.warn(e));
+}
 
 carregar();
 
@@ -30,7 +38,9 @@ async function carregar() {
     el("carregando").hidden = true;
     render();
   } catch (e) {
-    el("carregando").textContent = "Erro ao carregar: " + e.message;
+    el("carregando").innerHTML = /categoria_convidado|convidado_id|schema cache/.test(e.message || "")
+      ? "Rode a migração <code>supabase/migrations/0008_convidado_participante.sql</code> no SQL Editor do Supabase."
+      : "Erro ao carregar: " + esc(e.message);
   }
 }
 
@@ -68,12 +78,17 @@ function render() {
   const vazio = filtrada.length === 0;
   el("wrap").hidden = vazio;
   el("vazio").hidden = !vazio;
+
+  [...selecionados].forEach((id) => { if (!filtrada.some((c) => c.id === id)) selecionados.delete(id); });
+  sincronizarBarra(filtrada);
   if (vazio) return;
 
   el("linhas").innerHTML = filtrada
     .map((c) => {
       const wa = telParaWhatsApp(c.telefone);
-      return `<tr data-id="${c.id}">
+      const marcado = selecionados.has(c.id);
+      return `<tr data-id="${c.id}" class="${marcado ? "sel" : ""}">
+        <td class="col-check"><input type="checkbox" data-sel ${marcado ? "checked" : ""} aria-label="Selecionar ${esc(c.nome || "")}" /></td>
         <td><strong>${esc(c.nome || "—")}</strong><div class="pagina-sub" style="margin:0;font-size:.75rem">${esc(c.email || "")}</div></td>
         <td>${esc(c.empresa || "—")}</td>
         <td>${esc(c.anfitriao?.nome || "—")}</td>
@@ -84,8 +99,50 @@ function render() {
     })
     .join("");
   el("linhas").querySelectorAll("tr").forEach((tr) => {
-    tr.onclick = () => abrirGavetaDetalhe(tr.dataset.id);
+    const id = tr.dataset.id;
+    tr.querySelector("[data-sel]").onclick = (e) => {
+      e.stopPropagation();
+      e.target.checked ? selecionados.add(id) : selecionados.delete(id);
+      tr.classList.toggle("sel", e.target.checked);
+      sincronizarBarra(filtrar());
+    };
+    tr.onclick = () => abrirGavetaDetalhe(id);
   });
+}
+
+function sincronizarBarra(filtrada) {
+  const n = selecionados.size;
+  el("barra-acoes").hidden = n === 0;
+  el("sel-cont").textContent = `${n} selecionado${n === 1 ? "" : "s"}`;
+  const todos = el("check-todos");
+  const noFiltro = filtrada.filter((c) => selecionados.has(c.id)).length;
+  todos.checked = filtrada.length > 0 && noFiltro === filtrada.length;
+  todos.indeterminate = noFiltro > 0 && noFiltro < filtrada.length;
+}
+
+el("check-todos").onchange = (e) => {
+  const filtrada = filtrar();
+  if (e.target.checked) filtrada.forEach((c) => selecionados.add(c.id));
+  else filtrada.forEach((c) => selecionados.delete(c.id));
+  render();
+};
+el("barra-acoes").querySelectorAll("[data-acao]").forEach((b) => {
+  b.onclick = () => acaoEmMassa(b.dataset.acao);
+});
+
+async function acaoEmMassa(acao) {
+  if (acao === "limpar") { selecionados.clear(); render(); return; }
+  const alvo = lista.filter((c) => selecionados.has(c.id));
+  if (!alvo.length) return;
+  const status = acao === "aprovar" ? "Aprovado" : "Recusado";
+  if (!confirmar(`${acao === "aprovar" ? "Aprovar" : "Reprovar"} ${alvo.length} convidado(s)?`)) return;
+  try {
+    for (const c of alvo) await decidir(c, status);
+    selecionados.clear();
+    toast(`${alvo.length} convidado(s) ${acao === "aprovar" ? "aprovado(s)" : "reprovado(s)"}.`, "ok");
+    lista = await listConvidados();
+    render();
+  } catch (e) { toast(e.message, "erro"); }
 }
 
 /* ---- Novo convidado (manual) ---- */
@@ -150,6 +207,13 @@ function abrirGavetaDetalhe(id) {
       <p class="pagina-sub" style="margin:6px 0 0;font-size:.72rem">
         Status atual: <b>${esc(c.status)}</b> — o convidado vê isso na página de acompanhamento.
       </p>
+      <p class="pagina-sub" style="margin:6px 0 0;font-size:.72rem">
+        Ao aprovar, entra na lista de Participantes${
+          c.anfitriao?.categoria_convidado
+            ? ` na categoria <b>${esc(c.anfitriao.categoria_convidado)}</b>`
+            : " (defina a categoria no cadastro do anfitrião)"
+        }. Reprovar remove da lista.
+      </p>
     </div>
 
     <div class="secao">
@@ -200,6 +264,7 @@ function abrirGavetaDetalhe(id) {
   const salvarConvidado = async (patch, msg) => {
     try {
       await salvar("convidados", { id: c.id, ...patch });
+      if (patch.status) await sincParticipanteConvidado({ ...c, status: patch.status }).catch((e) => console.warn(e));
       toast(msg, "ok");
       lista = await listConvidados();
       render();

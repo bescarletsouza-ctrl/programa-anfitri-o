@@ -74,10 +74,46 @@ export const listAnfitrioes = (eid) =>
 export const listConvidados = (eid) =>
   supabase
     .from("convidados")
-    .select("*, anfitriao:anfitrioes(id, nome, slug, grupo_id)")
+    .select("*, anfitriao:anfitrioes(id, nome, slug, grupo_id, categoria_convidado)")
     .eq("evento_id", ev(eid))
     .order("created_at", { ascending: false })
     .then(ok);
+
+// Mantém a lista de Participantes em dia com a decisão do convidado:
+// aprovado → cria o participante (categoria = a do anfitrião); reprovado/pendente
+// → remove o participante gerado (sempre, mesmo com check-in).
+export async function sincParticipanteConvidado(convidado) {
+  const aprovado = ["Aprovado", "Confirmado"].includes(convidado.status);
+  const existentes = await supabase
+    .from("participantes").select("id").eq("convidado_id", convidado.id).then(ok);
+  if (aprovado && !existentes.length) {
+    return salvar("participantes", {
+      nome: convidado.nome,
+      email: convidado.email || null,
+      telefone: convidado.telefone || null,
+      empresa: convidado.empresa || null,
+      tipo: "Convidado",
+      pagamento: "Convidado",
+      ingresso: convidado.anfitriao?.categoria_convidado || null,
+      convidado_id: convidado.id,
+    });
+  }
+  if (!aprovado && existentes.length) {
+    await supabase.from("participantes").delete().in("id", existentes.map((p) => p.id)).then(ok);
+  }
+}
+
+// Categoria do anfitrião mudou → atualiza os participantes já gerados por ele.
+export async function reSincCategoriaAnfitriao(anfitriaoId, categoria) {
+  const convs = await supabase
+    .from("convidados").select("id").eq("anfitriao_id", anfitriaoId).then(ok);
+  if (!convs.length) return;
+  await supabase
+    .from("participantes")
+    .update({ ingresso: categoria || null })
+    .in("convidado_id", convs.map((c) => c.id))
+    .then(ok);
+}
 
 export const listConvidadosDoAnfitriao = (anfitriaoId) =>
   supabase

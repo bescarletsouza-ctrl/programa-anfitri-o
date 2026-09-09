@@ -1,12 +1,42 @@
 // =============================================================================
-// Crachá imprimível do participante (nome, empresa, tipo, QR do código).
-// Usado pela tela de Check-in e pela gaveta de Participantes.
-// O QR codifica o "codigo" curto do participante (ex.: IMER-0042).
+// Crachá / etiqueta imprimível do participante. O layout (linhas, tamanhos e
+// dimensões) vem de eventos.cracha_config; sem config usa CRACHA_PADRAO.
+// Campos obrigatórios (a UI não deixa desligar): evento, nome, categoria.
 // =============================================================================
 import { esc } from "./ui.js";
+import { getEvento } from "./supabase.js";
+import { eventoId } from "./evento.js";
 
 const QR_SRC = "https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js";
 let qrPronto = null;
+let eventoCache = null;
+
+export const CRACHA_PADRAO = {
+  largura_mm: 90,
+  altura_mm: 55,
+  qr: true,
+  linhas: [
+    { campo: "evento", tam: 13, on: true },
+    { campo: "nome", tam: 34, on: true },
+    { campo: "categoria", tam: 18, on: true },
+    { campo: "texto", texto: "", tam: 13, on: false },
+    { campo: "empresa", tam: 13, on: false },
+    { campo: "email", tam: 13, on: false },
+    { campo: "telefone", tam: 13, on: false },
+    { campo: "codigo", tam: 13, on: true },
+  ],
+};
+
+export const TAMANHOS_CRACHA = [
+  { valor: 13, rotulo: "Pequeno" },
+  { valor: 18, rotulo: "Médio" },
+  { valor: 24, rotulo: "Grande" },
+  { valor: 34, rotulo: "Muito grande" },
+];
+
+// px de fallback → preset mais próximo (configs antigas ou fora da escala)
+export const snapTamanho = (px) =>
+  TAMANHOS_CRACHA.reduce((a, b) => (Math.abs(b.valor - px) < Math.abs(a.valor - px) ? b : a)).valor;
 
 function carregarQR() {
   if (qrPronto) return qrPronto;
@@ -40,27 +70,71 @@ function garantirCaixa() {
   return box;
 }
 
-// participante: { nome, empresa, tipo, codigo }
+// participante: { nome, empresa, email, telefone, tipo, ingresso, codigo }
+// qrUri: data URI já gerado (ou null). config: cracha_config.
+export function montarCrachaHtml(participante, nomeEvento = "", config = CRACHA_PADRAO, qrUri = null) {
+  const cfg = { ...CRACHA_PADRAO, ...(config || {}) };
+  const p = participante || {};
+  const categoria = p.ingresso || p.tipo || "";
+  const valor = (campo, linha) => ({
+    evento: nomeEvento,
+    nome: p.nome,
+    categoria,
+    empresa: p.empresa,
+    email: p.email,
+    telefone: p.telefone,
+    codigo: p.codigo,
+    texto: linha?.texto,
+  }[campo] || "");
+  const classe = { evento: "cracha-evento", nome: "cracha-nome", categoria: "cracha-tipo", codigo: "cracha-codigo" };
+
+  const linhas = (cfg.linhas || CRACHA_PADRAO.linhas).filter((l) => l.on !== false);
+  const antesQr = linhas.filter((l) => l.campo !== "codigo");
+  const linhaCodigo = linhas.find((l) => l.campo === "codigo");
+
+  const linhaHtml = (l) => {
+    const v = valor(l.campo, l);
+    if (!v) return "";
+    return `<div class="${classe[l.campo] || "cracha-linha"}" style="font-size:${Number(l.tam) || 14}px">${esc(v)}</div>`;
+  };
+
+  return `<div class="cracha-cartao" style="width:${Number(cfg.largura_mm) || 90}mm;min-height:${Number(cfg.altura_mm) || 55}mm">
+    ${antesQr.map(linhaHtml).join("")}
+    ${cfg.qr !== false
+      ? `<div class="cracha-qr">${qrUri
+          ? `<img src="${qrUri}" alt="QR ${esc(p.codigo || "")}" />`
+          : `<div class="cracha-semqr">${esc(p.codigo || "")}</div>`}</div>`
+      : ""}
+    ${linhaCodigo ? linhaHtml(linhaCodigo) : ""}
+  </div>`;
+}
+
+async function carregarConfig() {
+  if (eventoCache) return eventoCache;
+  try { eventoCache = await getEvento(eventoId()); } catch { eventoCache = {}; }
+  return eventoCache;
+}
+export function limparConfigCracha() { eventoCache = null; }
+
 export async function imprimirCracha(participante, nomeEvento = "") {
+  const ev = await carregarConfig();
+  const config = ev?.cracha_config || CRACHA_PADRAO;
+  const nome = nomeEvento || ev?.nome || "";
   const box = garantirCaixa();
-  const uri = await qrDataURL(participante.codigo || participante.id || "");
-  box.innerHTML = `
-    <div class="cracha-cartao">
-      ${nomeEvento ? `<div class="cracha-evento">${esc(nomeEvento)}</div>` : ""}
-      <div class="cracha-nome">${esc(participante.nome || "")}</div>
-      ${participante.empresa ? `<div class="cracha-empresa">${esc(participante.empresa)}</div>` : ""}
-      <div class="cracha-tipo">${esc(participante.tipo || "")}</div>
-      <div class="cracha-qr">
-        ${uri
-          ? `<img src="${uri}" alt="QR ${esc(participante.codigo || "")}" />`
-          : `<div class="cracha-semqr">${esc(participante.codigo || "")}</div>`}
-      </div>
-      <div class="cracha-codigo">${esc(participante.codigo || "")}</div>
-    </div>`;
+  const uri = config.qr !== false ? await qrDataURL(participante.codigo || participante.id || "") : null;
+
+  const larg = Number(config.largura_mm) || 90;
+  const alt = Number(config.altura_mm) || 55;
+  document.getElementById("cracha-page-style")?.remove();
+  const st = document.createElement("style");
+  st.id = "cracha-page-style";
+  st.textContent = `@media print{@page{size:${larg}mm ${alt}mm;margin:0}}`;
+  document.head.appendChild(st);
+
+  box.innerHTML = montarCrachaHtml(participante, nome, config, uri);
   box.hidden = false;
   const limpar = () => { box.hidden = true; window.removeEventListener("afterprint", limpar); };
   window.addEventListener("afterprint", limpar);
   window.print();
-  // fallback: alguns navegadores não disparam afterprint
   setTimeout(limpar, 800);
 }

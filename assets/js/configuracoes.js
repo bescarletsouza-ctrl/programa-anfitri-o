@@ -7,6 +7,7 @@ import {
   getEvento, salvar, remover, salvarEvento,
 } from "./supabase.js";
 import { eventoId, definirEvento } from "./evento.js";
+import { montarCrachaHtml, CRACHA_PADRAO, TAMANHOS_CRACHA, snapTamanho } from "./cracha.js";
 
 iniciarPagina("config");
 const el = (id) => document.getElementById(id);
@@ -50,6 +51,7 @@ async function carregar() {
 
     el("carregando").hidden = true;
     el("conteudo").hidden = false;
+    montarCrachaConfig();
     await Promise.allSettled([renderGrupos(), renderResponsaveis(), renderEstagios(), renderEtapasPart(), renderMarcos()]);
   } catch (e) {
     el("carregando").innerHTML = /evento_id|eventos|schema cache/.test(e.message || "")
@@ -180,6 +182,90 @@ function editarMarco(m) {
       renderMarcos();
     },
   });
+}
+
+/* ---- Crachá / Etiqueta ---- */
+const CR_ROTULOS = {
+  evento: "Nome do evento", nome: "Nome completo", categoria: "Categoria",
+  texto: "Texto livre", empresa: "Empresa", email: "E-mail",
+  telefone: "Telefone", codigo: "Código",
+};
+const CR_FIXOS = ["evento", "nome", "categoria"];
+const CR_FAKE = {
+  nome: "Maria Aparecida da Silva", empresa: "Acme Consultoria Ltda",
+  email: "maria@acme.com.br", telefone: "(11) 99999-0000", ingresso: "VIP", codigo: "IMER-0042",
+};
+
+function crachaConfigAtual() {
+  const base = JSON.parse(JSON.stringify(CRACHA_PADRAO));
+  const salvo = config?.cracha_config;
+  if (!salvo) return base;
+  base.largura_mm = salvo.largura_mm ?? base.largura_mm;
+  base.altura_mm = salvo.altura_mm ?? base.altura_mm;
+  base.qr = salvo.qr !== false;
+  base.linhas = base.linhas.map((l) => {
+    const s = (salvo.linhas || []).find((x) => x.campo === l.campo);
+    return s ? { ...l, ...s } : l;
+  });
+  return base;
+}
+
+function montarCrachaConfig() {
+  const cfg = crachaConfigAtual();
+  el("cr-largura").value = cfg.largura_mm;
+  el("cr-altura").value = cfg.altura_mm;
+  el("cr-qr").checked = cfg.qr !== false;
+
+  const opts = (tam) => {
+    const sel = snapTamanho(Number(tam) || 18);
+    return TAMANHOS_CRACHA
+      .map((t) => `<option value="${t.valor}" ${sel === t.valor ? "selected" : ""}>${t.rotulo}</option>`).join("");
+  };
+
+  el("cr-linhas").innerHTML = cfg.linhas.map((l) => {
+    const fixo = CR_FIXOS.includes(l.campo);
+    return `<div class="cracha-linha-cfg" data-campo="${l.campo}">
+      <input type="checkbox" data-on ${l.on !== false ? "checked" : ""} ${fixo ? "disabled" : ""} />
+      <span class="rot">${esc(CR_ROTULOS[l.campo] || l.campo)}${fixo ? ' <span class="pagina-sub" style="font-size:.7rem">(obrigatório)</span>' : ""}
+        ${l.campo === "texto" ? `<input class="input" data-texto value="${esc(l.texto || "")}" placeholder="texto fixo do crachá" style="margin-top:5px" />` : ""}
+      </span>
+      <select class="select" data-tam>${opts(l.tam)}</select>
+    </div>`;
+  }).join("");
+
+  const preview = () => {
+    el("cr-preview").innerHTML = montarCrachaHtml(CR_FAKE, config?.nome || "Nome do Evento", lerCrachaConfig());
+  };
+  el("conteudo").querySelectorAll("#cr-largura,#cr-altura,#cr-qr,#cr-linhas input,#cr-linhas select")
+    .forEach((c) => { c.oninput = preview; c.onchange = preview; });
+  el("cr-salvar").onclick = salvarCracha;
+  preview();
+}
+
+function lerCrachaConfig() {
+  return {
+    largura_mm: Number(el("cr-largura").value) || 90,
+    altura_mm: Number(el("cr-altura").value) || 55,
+    qr: el("cr-qr").checked,
+    linhas: [...el("cr-linhas").querySelectorAll(".cracha-linha-cfg")].map((row) => {
+      const campo = row.dataset.campo;
+      const o = {
+        campo,
+        on: CR_FIXOS.includes(campo) ? true : row.querySelector("[data-on]").checked,
+        tam: Number(row.querySelector("[data-tam]").value) || 14,
+      };
+      if (campo === "texto") o.texto = row.querySelector("[data-texto]").value.trim();
+      return o;
+    }),
+  };
+}
+
+async function salvarCracha() {
+  try {
+    const salvo = await salvarEvento({ cracha_config: lerCrachaConfig() });
+    config = salvo;
+    toast("Crachá salvo.", "ok");
+  } catch (e) { toast(e.message, "erro"); }
 }
 
 /* ---- editar / criar ---- */
