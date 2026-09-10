@@ -52,7 +52,7 @@ function alternarTema() {
 /* ---- Navegação -------------------------------------------------------- */
 const NAV = [
   { grupo: "Evento" },
-  { chave: "painel",        rotulo: "Painel",                  href: "index.html",         ico: "painel" },
+  { chave: "painel-evento", rotulo: "Painel",                  href: "painel-evento.html", ico: "painel" },
   { chave: "ingressos",     rotulo: "Tipos de ingresso",       href: "ingressos.html",     ico: "ticket" },
   { chave: "participantes", rotulo: "Participantes",           href: "participantes.html", ico: "participantes" },
   { chave: "checkin",       rotulo: "Check-in",                href: "checkin.html",       ico: "check" },
@@ -60,6 +60,7 @@ const NAV = [
   { chave: "relatorios",    rotulo: "Relatórios",              href: "relatorios.html",    ico: "grafico" },
   { chave: "config",        rotulo: "Configurações",           href: "configuracoes.html", ico: "config" },
   { grupo: "Anfitriões" },
+  { chave: "painel",        rotulo: "Painel dos anfitriões",   href: "index.html",         ico: "grafico" },
   { chave: "anfitrioes",    rotulo: APP.termoAnfitriaoPlural,  href: "anfitrioes.html",    ico: "anfitrioes" },
   { chave: "convidados",    rotulo: APP.termoConvidadoPlural,  href: "convidados.html",    ico: "convidados" },
   { chave: "formulario",    rotulo: "Formulário de inscrição", href: "formulario.html",    ico: "formulario" },

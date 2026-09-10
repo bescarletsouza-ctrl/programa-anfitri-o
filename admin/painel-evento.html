@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<script>try{var t=localStorage.getItem('tema')==='dark'?'dark':'light';document.documentElement.dataset.theme=t;document.documentElement.style.background=t==='dark'?'#0c0c0d':'#f7f7f6';}catch(e){}</script>
+<title>Painel do evento — Programa Anfitrião</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../assets/css/theme.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside id="sidebar" class="sidebar"></aside>
+  <main class="conteudo">
+    <div class="barra-topo">
+      <div>
+        <h1 class="pagina-titulo">Painel do evento</h1>
+        <p class="pagina-sub">Inscritos, faturamento e distribuição por categoria, tipo e situação.</p>
+      </div>
+      <button class="btn btn-secundario" id="btn-atualizar">Atualizar</button>
+    </div>
+
+    <div id="carregando" class="vazio">Carregando…</div>
+
+    <div id="painel" hidden>
+      <div class="grid grid-4" id="kpis" style="margin-bottom:26px"></div>
+
+      <div class="rel-secao">
+        <h2>Inscrições por dia <span class="rel-secao-sub">(últimos 14 dias)</span></h2>
+        <div class="rel-horas" id="rel-dias"></div>
+      </div>
+
+      <div class="grid grid-2">
+        <div class="rel-secao">
+          <h2>Por categoria de ingresso</h2>
+          <div id="rel-categoria"></div>
+        </div>
+        <div class="rel-secao">
+          <h2>Por tipo de participante</h2>
+          <div id="rel-tipo"></div>
+        </div>
+      </div>
+
+      <div class="grid grid-2">
+        <div class="rel-secao">
+          <h2>Por situação</h2>
+          <div id="rel-situacao"></div>
+        </div>
+        <div class="rel-secao">
+          <h2>Faturamento por categoria</h2>
+          <div id="rel-faturamento"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+<script type="module" src="../assets/js/painel-evento.js"></script>
+</body>
+</html>
