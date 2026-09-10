@@ -30,6 +30,29 @@ const FAIXAS = [
   "Acima de 10 milhões/mês",
 ];
 const POR_PAGINA = 50;
+
+// Colunas opcionais da lista (Nome e ações são fixas). Ordem + visibilidade
+// ficam salvas no navegador.
+const COLUNAS = {
+  codigo:    "Código",
+  tipo:      "Tipo",
+  categoria: "Categoria",
+  situacao:  "Situação",
+  pagamento: "Pagamento",
+  empresa:   "Empresa",
+  telefone:  "Telefone",
+  etapa:     "Etapa",
+  presenca:  "Presença",
+  cadastro:  "Cadastro",
+};
+const COLUNAS_PADRAO = ["codigo", "tipo", "categoria", "situacao", "pagamento", "etapa", "presenca", "cadastro"];
+let colunas = [...COLUNAS_PADRAO];
+try {
+  const s = JSON.parse(localStorage.getItem("part_colunas") || "null");
+  if (Array.isArray(s) && s.length) colunas = s.filter((c) => COLUNAS[c]);
+} catch {}
+const salvarColunas = () => { try { localStorage.setItem("part_colunas", JSON.stringify(colunas)); } catch {} };
+const COL_DB = { categoria: "ingresso" };
 const ALIAS_IMPORT = {
   "nome completo": "nome", "e-mail": "email", whatsapp: "telefone", celular: "telefone",
   fone: "telefone", turma: "tipo", categoria: "tipo", "forma de pagamento": "pagamento",
@@ -187,15 +210,25 @@ function ligarEventos() {
   el("btn-exportar").onclick = () => exportar(filtrarLista());
   el("btn-email").innerHTML = icone("inbox") + "Enviar e-mail";
   el("btn-email").onclick = () => abrirEmailPara(filtrarLista());
+  el("btn-colunas").innerHTML = icone("filtro") + "Colunas";
+  el("btn-colunas").onclick = modalColunas;
+  el("barra-acoes").querySelectorAll("[data-acao]").forEach((b) => {
+    b.onclick = () => acaoEmMassa(b.dataset.acao);
+  });
+}
+
+function renderCabecalho() {
+  el("thead-part").innerHTML =
+    `<th class="col-check"><input type="checkbox" id="check-todos" aria-label="Selecionar todos" /></th>
+     <th>Nome</th>
+     ${colunas.map((c) => `<th>${esc(COLUNAS[c])}</th>`).join("")}
+     <th></th>`;
   el("check-todos").onchange = (e) => {
     const dados = filtrarLista();
     if (e.target.checked) dados.forEach((p) => selecionados.add(p.id));
     else dados.forEach((p) => selecionados.delete(p.id));
     render();
   };
-  el("barra-acoes").querySelectorAll("[data-acao]").forEach((b) => {
-    b.onclick = () => acaoEmMassa(b.dataset.acao);
-  });
 }
 
 /* ---- render ---- */
@@ -248,6 +281,7 @@ function abrirEmailPara(dados) {
 }
 
 function renderLista() {
+  renderCabecalho();
   const dados = filtrarLista();
   const presentes = dados.filter((p) => p.presente).length;
   const totalAtivos = participantes.filter(ativo).length;
@@ -281,28 +315,98 @@ function linhaHtml(p) {
       <strong>${esc(p.nome)}</strong>
       ${p.email ? `<span class="cel-sub">${esc(p.email)}</span>` : ""}
     </td>
-    <td><span class="chip-codigo">${esc(p.codigo || "—")}</span></td>
-    <td class="celula-edit" data-campo="tipo" title="Alterar tipo">
-      <span class="badge ${badgeTipo(p.tipo)}">${esc(p.tipo)}</span>${lapis()}
-    </td>
-    <td class="celula-edit" data-campo="situacao" title="Alterar situação">
-      <span class="badge ${badgeSituacao(situacaoDe(p))}">${esc(situacaoDe(p))}</span>${lapis()}
-    </td>
-    <td class="celula-edit" data-campo="pagamento" title="Alterar pagamento">
-      <span class="badge ${badgePag(p.pagamento)}">${esc(p.pagamento)}</span>${lapis()}
-    </td>
-    <td class="celula-edit" data-campo="etapa" title="Alterar etapa">
-      <span>${esc(nomeEtapa(p.etapa_id))}</span>${lapis()}
-    </td>
-    <td>${p.presente
-      ? `<span class="badge badge-ok" title="Check-in às ${esc(horaCurta(p.checkin_at))}">Presente</span>`
-      : `<span class="cel-tenue">—</span>`}</td>
-    <td>${formatarData(p.created_at)}</td>
+    ${colunas.map((c) => celulaHtml(p, c)).join("")}
     <td class="linha-acoes">
       <button class="icone-btn" data-editar title="Editar">${icone("editar")}</button>
       <button class="icone-btn" data-excluir title="Excluir">${icone("excluir")}</button>
     </td>
   </tr>`;
+}
+
+function celulaHtml(p, c) {
+  switch (c) {
+    case "codigo":
+      return `<td><span class="chip-codigo">${esc(p.codigo || "—")}</span></td>`;
+    case "tipo":
+      return `<td class="celula-edit" data-campo="tipo" title="Alterar tipo"><span class="badge ${badgeTipo(p.tipo)}">${esc(p.tipo)}</span>${lapis()}</td>`;
+    case "categoria": {
+      const cat = (p.ingresso || "").trim();
+      return `<td class="celula-edit" data-campo="categoria" title="Alterar categoria">${cat ? `<span class="chip-cat">${esc(cat)}</span>` : `<span class="cel-tenue">—</span>`}${lapis()}</td>`;
+    }
+    case "situacao":
+      return `<td class="celula-edit" data-campo="situacao" title="Alterar situação"><span class="badge ${badgeSituacao(situacaoDe(p))}">${esc(situacaoDe(p))}</span>${lapis()}</td>`;
+    case "pagamento":
+      return `<td class="celula-edit" data-campo="pagamento" title="Alterar pagamento"><span class="badge ${badgePag(p.pagamento)}">${esc(p.pagamento)}</span>${lapis()}</td>`;
+    case "empresa":
+      return `<td>${p.empresa ? esc(p.empresa) : `<span class="cel-tenue">—</span>`}</td>`;
+    case "telefone":
+      return `<td>${p.telefone ? esc(p.telefone) : `<span class="cel-tenue">—</span>`}</td>`;
+    case "etapa":
+      return `<td class="celula-edit" data-campo="etapa" title="Alterar etapa"><span>${esc(nomeEtapa(p.etapa_id))}</span>${lapis()}</td>`;
+    case "presenca":
+      return `<td>${p.presente
+        ? `<span class="badge badge-ok" title="Check-in às ${esc(horaCurta(p.checkin_at))}">Presente</span>`
+        : `<span class="cel-tenue">—</span>`}</td>`;
+    case "cadastro":
+      return `<td>${formatarData(p.created_at)}</td>`;
+    default:
+      return "<td></td>";
+  }
+}
+
+/* ---- Modal de colunas ---- */
+function modalColunas() {
+  let ordem = [...colunas, ...Object.keys(COLUNAS).filter((c) => !colunas.includes(c))];
+  const visiveis = new Set(colunas);
+  const corpo = () => ordem.map((c, i) => `
+    <div class="col-cfg" data-c="${c}">
+      <label><input type="checkbox" data-vis ${visiveis.has(c) ? "checked" : ""} /> ${esc(COLUNAS[c])}</label>
+      <span class="linha-acoes">
+        <button type="button" class="icone-btn" data-mv="-1" ${i === 0 ? "disabled" : ""} aria-label="Subir">▲</button>
+        <button type="button" class="icone-btn" data-mv="1" ${i === ordem.length - 1 ? "disabled" : ""} aria-label="Descer">▼</button>
+      </span>
+    </div>`).join("");
+
+  abrirModal({
+    titulo: "Colunas da lista",
+    textoConfirmar: "Aplicar",
+    corpoHtml: `<p class="pagina-sub" style="margin:0 0 12px">Marque as colunas que aparecem e use ▲ ▼ para reordenar. Nome fica sempre visível.</p>
+      <div id="col-lista">${corpo()}</div>
+      <button type="button" class="btn btn-fantasma btn-sm" id="col-reset" style="margin-top:8px">Restaurar padrão</button>`,
+    aoMontar: (root) => {
+      const redraw = () => { root.querySelector("#col-lista").innerHTML = corpo(); wire(); };
+      const wire = () => {
+        root.querySelectorAll(".col-cfg").forEach((row) => {
+          const c = row.dataset.c;
+          row.querySelector("[data-vis]").onchange = (e) => {
+            e.target.checked ? visiveis.add(c) : visiveis.delete(c);
+          };
+          row.querySelectorAll("[data-mv]").forEach((b) => {
+            b.onclick = () => {
+              const i = ordem.indexOf(c);
+              const j = i + Number(b.dataset.mv);
+              if (j < 0 || j >= ordem.length) return;
+              [ordem[i], ordem[j]] = [ordem[j], ordem[i]];
+              redraw();
+            };
+          });
+        });
+      };
+      wire();
+      root.querySelector("#col-reset").onclick = () => {
+        ordem = [...COLUNAS_PADRAO, ...Object.keys(COLUNAS).filter((c) => !COLUNAS_PADRAO.includes(c))];
+        visiveis.clear();
+        COLUNAS_PADRAO.forEach((c) => visiveis.add(c));
+        redraw();
+      };
+    },
+    onConfirmar: () => {
+      colunas = ordem.filter((c) => visiveis.has(c));
+      if (!colunas.length) colunas = [...COLUNAS_PADRAO];
+      salvarColunas();
+      render();
+    },
+  });
 }
 
 const lapis = () => `<span class="cel-lapis">${icone("editar")}</span>`;
@@ -332,7 +436,10 @@ async function editarCelula(id, campo, td) {
   if (campo === "tipo") { itens = TIPOS.map((t) => ({ valor: t, rotulo: t })); atualValor = p.tipo; }
   else if (campo === "pagamento") { itens = PAGAMENTOS.map((t) => ({ valor: t, rotulo: t })); atualValor = p.pagamento; }
   else if (campo === "situacao") { itens = SITUACOES.map((t) => ({ valor: t, rotulo: t })); atualValor = situacaoDe(p); }
-  else {
+  else if (campo === "categoria") {
+    itens = [{ valor: "", rotulo: "— sem tipo —" }, ...categoriasIngresso().map((c) => ({ valor: c, rotulo: c }))];
+    atualValor = (p.ingresso || "").trim();
+  } else {
     itens = [{ valor: "", rotulo: "Sem etapa" }, ...etapas.map((e) => ({ valor: e.id, rotulo: e.nome }))];
     atualValor = p.etapa_id || "";
   }
@@ -350,7 +457,7 @@ async function editarCelula(id, campo, td) {
       await sincParticipanteAnfitriao(p).catch((e) => console.warn(e));
       participantes = await listParticipantes();
     } else {
-      const salvo = await salvar("participantes", { id, [campo]: escolha });
+      const salvo = await salvar("participantes", { id, [COL_DB[campo] || campo]: escolha || null });
       Object.assign(p, salvo);
     }
     toast("Atualizado.", "ok");

@@ -39,6 +39,7 @@
         </div>
         <div style="display:flex;gap:10px;align-items:center">
           <span class="pagina-sub" id="contador" style="margin:0"></span>
+          <button class="btn btn-sm btn-secundario" id="btn-colunas">Colunas</button>
           <button class="btn btn-sm btn-secundario" id="btn-toggle-filtros" aria-expanded="false">Filtros</button>
         </div>
       </div>
@@ -115,11 +116,7 @@
 
       <div class="tabela-wrap" id="wrap" hidden>
         <table class="tabela tabela-part">
-          <thead><tr>
-            <th class="col-check"><input type="checkbox" id="check-todos" aria-label="Selecionar todos" /></th>
-            <th>Nome</th><th>Código</th><th>Tipo</th><th>Situação</th><th>Pagamento</th>
-            <th>Etapa</th><th>Presença</th><th>Cadastro</th><th></th>
-          </tr></thead>
+          <thead><tr id="thead-part"></tr></thead>
           <tbody id="linhas"></tbody>
         </table>
       </div>

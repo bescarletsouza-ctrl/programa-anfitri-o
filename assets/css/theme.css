@@ -318,6 +318,12 @@ table.tabela tbody tr:last-child td { border-bottom: none; }
 .filtros-linha .campo { margin: 0; }
 .filtros-linha .campo > span { font-size: .72rem; }
 
+/* Modal "Colunas da lista" */
+.col-cfg { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 2px; border-bottom: 1px solid var(--cinza-100); }
+.col-cfg label { display: flex; align-items: center; gap: 8px; margin: 0; font-size: .88rem; font-weight: 500; cursor: pointer; flex: 1; }
+.col-cfg label input { width: 15px; height: 15px; accent-color: var(--cor-laranja); }
+.col-cfg .icone-btn { width: 26px; height: 26px; font-size: .68rem; }
+
 /* ---- KPI ---- */
 .kpi { display: flex; flex-direction: column; gap: 3px; }
 .kpi .valor { font-size: 1.8rem; font-weight: 700; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
