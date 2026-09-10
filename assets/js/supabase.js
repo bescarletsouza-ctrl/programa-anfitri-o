@@ -518,6 +518,24 @@ export async function dispararIntegracoes(gatilho, dados = {}) {
   }
 }
 
+/* ---- Equipe de check-in (Edge Function "equipe" + Supabase Auth) ---------- */
+async function chamarEquipe(body) {
+  const { data, error } = await supabase.functions.invoke("equipe", { body });
+  if (error) {
+    throw new Error(
+      /Failed to (send|fetch)|not found|Function not found/i.test(error.message || "")
+        ? "Função não encontrada. Faça o deploy de supabase/functions/equipe."
+        : error.message || "Falha na operação."
+    );
+  }
+  if (data?.erro) throw new Error(data.erro);
+  return data;
+}
+export const listarEquipe = () => chamarEquipe({ acao: "listar" }).then((d) => d.membros || []);
+export const criarMembroEquipe = (email, senha) => chamarEquipe({ acao: "criar", email, senha });
+export const trocarSenhaMembro = (id, senha) => chamarEquipe({ acao: "senha", id, senha });
+export const removerMembroEquipe = (id) => chamarEquipe({ acao: "remover", id });
+
 // Envia um payload de teste de uma integração específica. Aqui os erros sobem.
 export async function testarIntegracao(integracaoId) {
   const { data, error } = await supabase.functions.invoke("integracoes", {

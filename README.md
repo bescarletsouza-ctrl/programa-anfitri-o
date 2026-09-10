@@ -87,10 +87,12 @@ Edge Functions (opcionais — o cadastro funciona sem elas, o disparo não):
 supabase functions deploy enviar-email     # e-mail (Resend) — precisa dos secrets RESEND_API_KEY / EMAIL_FROM
 supabase functions deploy integracoes      # dispara webhooks/conectores de saída
 supabase functions deploy webhook-in       # recebe inscrições de ticketeiras/gateways
+supabase functions deploy equipe           # cria/lista/remove os logins da equipe de check-in
 ```
 
-`integracoes` e `webhook-in` não precisam de secret extra (usam as chaves já
-presentes no ambiente da função). Config em [`supabase/config.toml`](supabase/config.toml).
+`integracoes`, `webhook-in` e `equipe` não precisam de secret extra (usam as
+chaves já presentes no ambiente da função). Config em
+[`supabase/config.toml`](supabase/config.toml).
 
 ### 6. Check-in no celular como "app"
 
@@ -103,9 +105,16 @@ geral ou uma atividade) → escanear o QR do crachá. Para ativar:
 
 1. Rode `supabase/migrations/0015_auth_checkin.sql` (libera o papel
    `authenticated` na RLS — sem isso o app loga mas não lê nada).
-2. Crie as contas da equipe em **Supabase Studio → Authentication → Users →
-   Add user**. Em *Authentication → Providers → Email*, desligue *Confirm email*
-   para a pessoa entrar direto.
+2. Deploy da função `equipe`:
+
+   ```
+   supabase functions deploy equipe
+   ```
+
+3. Crie os logins da equipe em **Configurações → Equipe de check-in**
+   (a função `equipe` usa a service role para chamar o `auth.admin` — a conta
+   já entra direto, sem confirmar e-mail). Dá para criar/remover/trocar senha
+   por lá. Alternativa manual: Supabase Studio → Authentication → Users.
 
 Para gerar um **`.apk` / `.aab` de verdade** (Play Store ou instalação manual),
 empacote o PWA numa TWA:

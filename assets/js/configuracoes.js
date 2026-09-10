@@ -1,10 +1,11 @@
 // =============================================================================
 // Configurações — geral + CRUD de grupos, responsáveis e estágios.
 // =============================================================================
-import { iniciarPagina, esc, abrirModal, toast, confirmar, icone } from "./ui.js";
+import { iniciarPagina, esc, abrirModal, toast, confirmar, icone, formatarData } from "./ui.js";
 import {
   listGrupos, listResponsaveis, listEstagios, listEtapasParticipante, listMarcos,
   getEvento, salvar, remover, salvarEvento,
+  listarEquipe, criarMembroEquipe, trocarSenhaMembro, removerMembroEquipe,
 } from "./supabase.js";
 import { eventoId, definirEvento } from "./evento.js";
 import { montarCrachaHtml, CRACHA_PADRAO, TAMANHOS_CRACHA, snapTamanho, qrDataURL } from "./cracha.js";
@@ -68,6 +69,7 @@ async function carregar() {
     el("conteudo").hidden = false;
     montarCrachaConfig();
     montarCtaMobile();
+    montarEquipe();
     await Promise.allSettled([renderGrupos(), renderResponsaveis(), renderEstagios(), renderEtapasPart(), renderMarcos()]);
   } catch (e) {
     el("carregando").innerHTML = /evento_id|eventos|schema cache/.test(e.message || "")
@@ -285,6 +287,69 @@ async function salvarCracha() {
     config = salvo;
     toast("Crachá salvo.", "ok");
   } catch (e) { toast(e.message, "erro"); }
+}
+
+/* ---- Equipe de check-in (logins via Edge Function "equipe") ---- */
+async function montarEquipe() {
+  const c = el("equipe-lista");
+  if (!c) return;
+  el("equipe-add").onclick = () => modalMembro();
+  c.innerHTML = `<p class="pagina-sub" style="margin:0">Carregando…</p>`;
+  try {
+    const membros = await listarEquipe();
+    if (!membros.length) {
+      c.innerHTML = `<p class="pagina-sub" style="margin:0">Ninguém com acesso ainda. Clique em “+ Adicionar pessoa”.</p>`;
+      return;
+    }
+    c.innerHTML = membros.map((m) => `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--cinza-100)" data-id="${esc(m.id)}">
+        <div style="min-width:0">
+          <div style="font-size:.9rem;font-weight:600;overflow:hidden;text-overflow:ellipsis">${esc(m.email || "—")}</div>
+          <div class="pagina-sub" style="margin:2px 0 0;font-size:.74rem">
+            ${m.ultimo_login ? "último acesso " + formatarData(m.ultimo_login) : "nunca acessou"}
+          </div>
+        </div>
+        <span class="linha-acoes">
+          <button class="btn btn-secundario btn-sm" data-senha title="Trocar senha">Senha</button>
+          <button class="icone-btn" data-excluir title="Remover acesso">${icone("excluir")}</button>
+        </span>
+      </div>`).join("");
+    c.querySelectorAll("[data-id]").forEach((row) => {
+      const m = membros.find((x) => x.id === row.dataset.id);
+      row.querySelector("[data-senha]").onclick = () => modalMembro(m);
+      row.querySelector("[data-excluir]").onclick = async () => {
+        if (!confirmar(`Remover o acesso de ${m.email}?`)) return;
+        try { await removerMembroEquipe(m.id); toast("Acesso removido.", "ok"); montarEquipe(); }
+        catch (e) { toast(e.message, "erro"); }
+      };
+    });
+  } catch (e) {
+    c.innerHTML = `<p class="pagina-sub" style="margin:0">${/deploy/.test(e.message)
+      ? "Faça o deploy de <code>supabase/functions/equipe</code> para gerenciar os logins por aqui."
+      : esc(e.message)}</p>`;
+  }
+}
+
+function modalMembro(m) {
+  abrirModal({
+    titulo: m ? `Trocar senha — ${m.email}` : "Adicionar pessoa à equipe",
+    textoConfirmar: m ? "Salvar senha" : "Criar acesso",
+    corpoHtml: `
+      ${m ? "" : `<label class="campo"><span>E-mail *</span>
+        <input class="input" name="email" type="email" required placeholder="pessoa@email.com" /></label>`}
+      <label class="campo"><span>${m ? "Nova senha *" : "Senha *"}</span>
+        <input class="input" name="senha" type="text" required minlength="6" placeholder="mín. 6 caracteres" /></label>
+      <p class="pagina-sub" style="margin:2px 0 0;font-size:.78rem">
+        ${m ? "A pessoa passa a entrar com a senha nova." : "A conta já entra direto, sem confirmar e-mail."}
+      </p>`,
+    onConfirmar: async (form) => {
+      const f = Object.fromEntries(new FormData(form));
+      if (m) await trocarSenhaMembro(m.id, f.senha);
+      else await criarMembroEquipe(f.email.trim(), f.senha);
+      toast(m ? "Senha atualizada." : "Acesso criado.", "ok");
+      montarEquipe();
+    },
+  });
 }
 
 /* ---- CTA: check-in pelo celular (link + QR) ---- */

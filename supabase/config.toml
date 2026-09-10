@@ -17,3 +17,7 @@ verify_jwt = false
 # (querystring ?token= ou header x-webhook-token), não por JWT.
 [functions.webhook-in]
 verify_jwt = false
+
+# Cria/lista/remove os logins da equipe de check-in (auth.admin via service role).
+[functions.equipe]
+verify_jwt = false
