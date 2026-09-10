@@ -14,6 +14,21 @@ const el = (id) => document.getElementById(id);
 
 let config = null;
 
+// Blocos recolhíveis — lembra quais o usuário fechou.
+const BLOCOS_KEY = "cfg_blocos_recolhidos";
+(function restaurarBlocos() {
+  let fechados = [];
+  try { fechados = JSON.parse(localStorage.getItem(BLOCOS_KEY) || "[]"); } catch {}
+  document.querySelectorAll(".cfg-bloco[data-bloco]").forEach((d) => {
+    if (fechados.includes(d.dataset.bloco)) d.open = false;
+    d.addEventListener("toggle", () => {
+      const agora = [...document.querySelectorAll(".cfg-bloco[data-bloco]")]
+        .filter((x) => !x.open).map((x) => x.dataset.bloco);
+      try { localStorage.setItem(BLOCOS_KEY, JSON.stringify(agora)); } catch {}
+    });
+  });
+})();
+
 carregar();
 
 async function carregar() {

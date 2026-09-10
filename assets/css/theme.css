@@ -324,10 +324,22 @@ table.tabela tbody tr:last-child td { border-bottom: none; }
 
 .barra-topo { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 18px; }
 
-/* ---- Configurações: blocos temáticos ---- */
-.cfg-bloco { margin-bottom: 34px; }
+/* ---- Configurações: blocos temáticos recolhíveis (<details>) ---- */
+.cfg-bloco { margin-bottom: 16px; }
 .cfg-bloco:last-child { margin-bottom: 0; }
-.cfg-bloco-cab { margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--borda); }
+.cfg-bloco-cab {
+  display: flex; align-items: flex-start; gap: 10px; cursor: pointer;
+  padding-bottom: 10px; border-bottom: 1px solid var(--borda); list-style: none;
+}
+.cfg-bloco-cab::-webkit-details-marker { display: none; }
+.cfg-bloco-cab::before {
+  content: "▸"; color: var(--texto-tenue); font-size: .8rem; line-height: 1.7;
+  flex-shrink: 0; transition: transform .15s;
+}
+.cfg-bloco[open] > .cfg-bloco-cab { margin-bottom: 16px; }
+.cfg-bloco[open] > .cfg-bloco-cab::before { transform: rotate(90deg); }
+.cfg-bloco-cab:hover h2 { color: var(--cor-laranja-forte); }
+.cfg-bloco-tit { min-width: 0; }
 .cfg-bloco-cab h2 { margin: 0; font-size: 1.05rem; font-weight: 700; letter-spacing: -.015em; color: var(--texto); }
 .cfg-bloco-cab p { margin: 4px 0 0; color: var(--texto-suave); font-size: .85rem; line-height: 1.5; }
 .cfg-campos-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }

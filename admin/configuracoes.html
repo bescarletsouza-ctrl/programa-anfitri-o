@@ -25,11 +25,13 @@
     <div id="carregando" class="vazio">Carregando…</div>
 
     <div id="conteudo" hidden>
-      <section class="cfg-bloco">
-        <div class="cfg-bloco-cab">
-          <h2>Dados do evento</h2>
-          <p>Identificação do evento e as mensagens que o inscrito vê no formulário público.</p>
-        </div>
+      <details class="cfg-bloco" data-bloco="dados" open>
+        <summary class="cfg-bloco-cab">
+          <span class="cfg-bloco-tit">
+            <h2>Dados do evento</h2>
+            <p>Identificação do evento e as mensagens que o inscrito vê no formulário público.</p>
+          </span>
+        </summary>
         <section class="card">
           <form id="form-config">
             <div class="cfg-campos-2">
@@ -56,13 +58,15 @@
             <button class="btn btn-primario" type="submit">Salvar dados do evento</button>
           </form>
         </section>
-      </section>
+      </details>
 
-      <section class="cfg-bloco">
-        <div class="cfg-bloco-cab">
-          <h2>Equipe e organização</h2>
-          <p>Grupos de anfitriões e as pessoas responsáveis pelo acompanhamento.</p>
-        </div>
+      <details class="cfg-bloco" data-bloco="equipe" open>
+        <summary class="cfg-bloco-cab">
+          <span class="cfg-bloco-tit">
+            <h2>Equipe e organização</h2>
+            <p>Grupos de anfitriões e as pessoas responsáveis pelo acompanhamento.</p>
+          </span>
+        </summary>
         <div class="grid grid-2">
           <section class="card">
             <div class="barra-topo" style="margin-bottom:12px">
@@ -80,13 +84,15 @@
             <div id="lista-responsaveis"></div>
           </section>
         </div>
-      </section>
+      </details>
 
-      <section class="cfg-bloco">
-        <div class="cfg-bloco-cab">
-          <h2>Funil e pipeline</h2>
-          <p>As colunas dos quadros de Anfitriões e de Participantes.</p>
-        </div>
+      <details class="cfg-bloco" data-bloco="funil" open>
+        <summary class="cfg-bloco-cab">
+          <span class="cfg-bloco-tit">
+            <h2>Funil e pipeline</h2>
+            <p>As colunas dos quadros de Anfitriões e de Participantes.</p>
+          </span>
+        </summary>
         <div class="grid grid-2">
           <section class="card">
             <div class="barra-topo" style="margin-bottom:6px">
@@ -106,13 +112,15 @@
             <div id="lista-etapas-part"></div>
           </section>
         </div>
-      </section>
+      </details>
 
-      <section class="cfg-bloco">
-        <div class="cfg-bloco-cab">
-          <h2>Engajamento dos anfitriões</h2>
-          <p>Marcos desbloqueados conforme o anfitrião confirma convidados — aparecem na aba “Jornada” do painel dele.</p>
-        </div>
+      <details class="cfg-bloco" data-bloco="engajamento" open>
+        <summary class="cfg-bloco-cab">
+          <span class="cfg-bloco-tit">
+            <h2>Engajamento dos anfitriões</h2>
+            <p>Marcos desbloqueados conforme o anfitrião confirma convidados — aparecem na aba “Jornada” do painel dele.</p>
+          </span>
+        </summary>
         <section class="card">
           <div class="barra-topo" style="margin-bottom:12px">
             <h3 style="margin:0">Marcos / Prêmios</h3>
@@ -120,13 +128,15 @@
           </div>
           <div id="lista-marcos"></div>
         </section>
-      </section>
+      </details>
 
-      <section class="cfg-bloco">
-        <div class="cfg-bloco-cab">
-          <h2>Check-in</h2>
-          <p>O que aparece e o tamanho de cada linha no crachá impresso. <b>Nome, Categoria e Nome do evento</b> são obrigatórios.</p>
-        </div>
+      <details class="cfg-bloco" data-bloco="checkin" open>
+        <summary class="cfg-bloco-cab">
+          <span class="cfg-bloco-tit">
+            <h2>Check-in</h2>
+            <p>O que aparece e o tamanho de cada linha no crachá impresso. <b>Nome, Categoria e Nome do evento</b> são obrigatórios.</p>
+          </span>
+        </summary>
         <section class="card">
           <h3>Crachá / Etiqueta</h3>
           <div class="grid grid-2" style="align-items:start">
@@ -146,7 +156,7 @@
             </div>
           </div>
         </section>
-      </section>
+      </details>
     </div>
   </main>
 </div>
