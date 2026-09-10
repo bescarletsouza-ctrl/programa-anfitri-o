@@ -729,7 +729,15 @@ table.tabela tbody tr:last-child td { border-bottom: none; }
   border-radius: var(--raio); padding: 12px; box-shadow: var(--sombra);
 }
 .kanban .card-corpo { cursor: pointer; }
+.kanban .card-part { cursor: grab; }
+.kanban .card-part:active { cursor: grabbing; }
+.kanban .card-part.arrastando { opacity: .4; }
 .kanban .card-part .select { width: 100%; }
+.kanban .coluna.drop-alvo { border-color: var(--cor-laranja); }
+.kanban .coluna.drop-alvo .coluna-corpo {
+  outline: 2px dashed var(--cor-laranja); outline-offset: -4px;
+  background: var(--cor-laranja-suave); border-radius: var(--raio);
+}
 
 /* =============================================================================
    Mobile

@@ -607,7 +607,7 @@ function renderPipeline() {
       const cor = et?.cor || "var(--cinza-400)";
       const ind = ordemPipe[chave] ? (ordemPipe[chave].endsWith("desc") ? " ▼" : " ▲") : "";
       const ordenados = ordenarCards(itens, chave);
-      return `<div class="coluna">
+      return `<div class="coluna" data-chave="${esc(chave)}">
         <div class="coluna-topo">
           <button type="button" class="coluna-titulo" data-ordenar="${esc(chave)}" title="Ordenar cards">
             <span class="ponto" style="background:${esc(cor)}"></span>
@@ -635,16 +635,42 @@ function renderPipeline() {
   el("kanban").querySelectorAll(".card-part").forEach((card) => {
     const id = card.dataset.id;
     card.querySelector("[data-mover]").onclick = (e) => e.stopPropagation();
-    card.querySelector("[data-mover]").onchange = async (e) => {
-      try {
-        await salvar("participantes", { id, etapa_id: e.target.value || null });
-        participantes = await listParticipantes();
-        toast("Movido.", "ok");
-        render();
-      } catch (err) { toast(err.message, "erro"); }
-    };
+    card.querySelector("[data-mover]").onchange = (e) => moverEtapa(id, e.target.value || null);
     card.querySelector(".card-corpo").onclick = () => abrirGavetaDetalhe(id);
+    card.addEventListener("dragstart", (e) => {
+      e.dataTransfer.setData("text/plain", id);
+      e.dataTransfer.effectAllowed = "move";
+      card.classList.add("arrastando");
+    });
+    card.addEventListener("dragend", () => card.classList.remove("arrastando"));
   });
+
+  el("kanban").querySelectorAll(".coluna[data-chave]").forEach((col) => {
+    col.addEventListener("dragover", (e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; col.classList.add("drop-alvo"); });
+    col.addEventListener("dragleave", (e) => { if (!col.contains(e.relatedTarget)) col.classList.remove("drop-alvo"); });
+    col.addEventListener("drop", (e) => {
+      e.preventDefault();
+      col.classList.remove("drop-alvo");
+      const id = e.dataTransfer.getData("text/plain");
+      const chave = col.dataset.chave;
+      moverEtapa(id, chave === "sem" ? null : chave);
+    });
+  });
+}
+
+async function moverEtapa(id, etapaId) {
+  const p = participantes.find((x) => x.id === id);
+  if (!p || (p.etapa_id || null) === (etapaId || null)) return;
+  const anterior = p.etapa_id;
+  p.etapa_id = etapaId;            // otimista: card pula na hora
+  renderPipeline();
+  try {
+    await salvar("participantes", { id, etapa_id: etapaId });
+  } catch (err) {
+    p.etapa_id = anterior;
+    renderPipeline();
+    toast(err.message, "erro");
+  }
 }
 
 async function escolherOrdem(anchor, chave) {
@@ -701,7 +727,7 @@ function atualizarSelectEtapas() {
 }
 
 function cardPart(p) {
-  return `<div class="card-part" data-id="${p.id}">
+  return `<div class="card-part" data-id="${p.id}" draggable="true">
     <div class="card-corpo">
       <div style="display:flex;justify-content:space-between;gap:8px;align-items:start">
         <strong style="font-size:.9rem">${esc(p.nome)}</strong>
