@@ -494,6 +494,10 @@ table.tabela tbody tr:last-child td { border-bottom: none; }
   border-radius: var(--raio); padding: 12px 14px; font-size: .85rem; line-height: 1.5; margin-bottom: 18px;
 }
 .aviso a { font-weight: 600; }
+.aviso-erro {
+  background: var(--erro-bg); color: var(--erro);
+  border-color: color-mix(in srgb, var(--erro) 30%, transparent);
+}
 .vazio { text-align: center; padding: 52px 20px; color: var(--texto-suave); font-size: .9rem; }
 .vazio svg { width: 32px; height: 32px; opacity: .35; margin: 0 auto 10px; display: block; }
 .linha-acoes { display: flex; gap: 4px; }

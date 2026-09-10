@@ -10,10 +10,11 @@ import {
 import { eventoId, definirEvento } from "./evento.js";
 import { montarCrachaHtml, CRACHA_PADRAO, TAMANHOS_CRACHA, snapTamanho, qrDataURL } from "./cracha.js";
 
-iniciarPagina("config");
+const _iniciando = iniciarPagina("config");
 const el = (id) => document.getElementById(id);
 
 let config = null;
+let CTX = null;
 
 // Blocos recolhíveis — lembra quais o usuário fechou.
 const BLOCOS_KEY = "cfg_blocos_recolhidos";
@@ -30,7 +31,7 @@ const BLOCOS_KEY = "cfg_blocos_recolhidos";
   });
 })();
 
-carregar();
+_iniciando.then((ctx) => { if (ctx) { CTX = ctx; carregar(ctx); } });
 
 async function carregar() {
   try {
@@ -289,14 +290,19 @@ async function salvarCracha() {
   } catch (e) { toast(e.message, "erro"); }
 }
 
-/* ---- Equipe de check-in (logins via Edge Function "equipe") ---- */
+/* ---- Usuários da organização (Edge Function "equipe") ---- */
 async function montarEquipe() {
   const c = el("equipe-lista");
+  const bloco = el("equipe-lista")?.closest(".cfg-bloco");
   if (!c) return;
+  const orgId = CTX?.org?.id;
+  const podeGerir = CTX?.superAdmin || CTX?.papel === "admin";
+  if (bloco) bloco.hidden = !podeGerir;
+  if (!podeGerir || !orgId) return;
   el("equipe-add").onclick = () => modalMembro();
   c.innerHTML = `<p class="pagina-sub" style="margin:0">Carregando…</p>`;
   try {
-    const membros = await listarEquipe();
+    const membros = await listarEquipe(orgId);
     if (!membros.length) {
       c.innerHTML = `<p class="pagina-sub" style="margin:0">Ninguém com acesso ainda. Clique em “+ Adicionar pessoa”.</p>`;
       return;
@@ -319,7 +325,7 @@ async function montarEquipe() {
       row.querySelector("[data-senha]").onclick = () => modalMembro(m);
       row.querySelector("[data-excluir]").onclick = async () => {
         if (!confirmar(`Remover o acesso de ${m.email}?`)) return;
-        try { await removerMembroEquipe(m.id); toast("Acesso removido.", "ok"); montarEquipe(); }
+        try { await removerMembroEquipe(CTX.org.id, m.id); toast("Acesso removido.", "ok"); montarEquipe(); }
         catch (e) { toast(e.message, "erro"); }
       };
     });
@@ -332,21 +338,28 @@ async function montarEquipe() {
 
 function modalMembro(m) {
   abrirModal({
-    titulo: m ? `Trocar senha — ${m.email}` : "Adicionar pessoa à equipe",
+    titulo: m ? `Trocar senha — ${m.email}` : "Adicionar pessoa à organização",
     textoConfirmar: m ? "Salvar senha" : "Criar acesso",
     corpoHtml: `
-      ${m ? "" : `<label class="campo"><span>E-mail *</span>
-        <input class="input" name="email" type="email" required placeholder="pessoa@email.com" /></label>`}
-      <label class="campo"><span>${m ? "Nova senha *" : "Senha *"}</span>
-        <input class="input" name="senha" type="text" required minlength="6" placeholder="mín. 6 caracteres" /></label>
-      <p class="pagina-sub" style="margin:2px 0 0;font-size:.78rem">
-        ${m ? "A pessoa passa a entrar com a senha nova." : "A conta já entra direto, sem confirmar e-mail."}
-      </p>`,
+      ${m ? "" : `<label class="campo"><span>Nome</span>
+          <input class="input" name="nome" placeholder="Nome da pessoa" /></label>
+        <label class="campo"><span>E-mail *</span>
+          <input class="input" name="email" type="email" required placeholder="pessoa@email.com" /></label>
+        <label class="campo"><span>Papel</span>
+          <select class="select" name="papel"><option value="membro">Membro</option><option value="admin">Admin (gerencia usuários)</option></select></label>`}
+      <label class="campo"><span>${m ? "Nova senha *" : "Senha (opcional)"}</span>
+        <input class="input" name="senha" type="text" ${m ? "required" : ""} minlength="6" placeholder="${m ? "mín. 6 caracteres" : "em branco = manda convite por e-mail"}" /></label>`,
     onConfirmar: async (form) => {
       const f = Object.fromEntries(new FormData(form));
-      if (m) await trocarSenhaMembro(m.id, f.senha);
-      else await criarMembroEquipe(f.email.trim(), f.senha);
-      toast(m ? "Senha atualizada." : "Acesso criado.", "ok");
+      if (m) {
+        await trocarSenhaMembro(CTX.org.id, m.id, f.senha);
+        toast("Senha atualizada.", "ok");
+      } else {
+        const r = await criarMembroEquipe(CTX.org.id, {
+          email: f.email.trim(), senha: f.senha || undefined, nome: f.nome || null, papel: f.papel,
+        });
+        toast(r.link ? "Convite enviado por e-mail." : "Acesso criado.", "ok");
+      }
       montarEquipe();
     },
   });

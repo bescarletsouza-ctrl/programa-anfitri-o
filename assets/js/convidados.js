@@ -11,7 +11,7 @@ import {
 } from "./supabase.js";
 import { STATUS_CONVIDADO } from "./config.js";
 
-iniciarPagina("convidados");
+const _iniciando = iniciarPagina("convidados");
 const el = (id) => document.getElementById(id);
 
 let grupos = [], anfitrioes = [], lista = [], perguntas = [];
@@ -24,7 +24,7 @@ async function decidir(c, status) {
   await sincParticipanteConvidado({ ...c, status }).catch((e) => console.warn(e));
 }
 
-carregar();
+_iniciando.then((ctx) => { if (ctx) carregar(ctx); });
 
 async function carregar() {
   try {

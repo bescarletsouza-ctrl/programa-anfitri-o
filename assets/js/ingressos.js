@@ -7,7 +7,7 @@ import { iniciarPagina, esc, debounce, formatarData, abrirModal, toast, confirma
 import { listTiposIngresso, listParticipantes, salvar, remover } from "./supabase.js";
 import { gerarCSV, baixarCSV } from "./tabela.js";
 
-iniciarPagina("ingressos");
+const _iniciando = iniciarPagina("ingressos");
 const el = (id) => document.getElementById(id);
 
 let tipos = [], participantes = [];
@@ -15,7 +15,7 @@ let termo = "";
 
 const SIT_ORDEM = ["Confirmado", "Pendente", "Fila de espera", "Pré-inscrito", "Desativado"];
 
-carregar();
+_iniciando.then((ctx) => { if (ctx) carregar(ctx); });
 el("btn-novo").onclick = () => editar(null);
 el("btn-exportar").onclick = exportar;
 el("busca").addEventListener("input", debounce((e) => { termo = e.target.value.trim().toLowerCase(); render(); }, 150));

@@ -6,7 +6,7 @@ import { iniciarPagina, esc, debounce, formatarData, toast } from "./ui.js";
 import { listParticipantes, listCheckins, listAtividades } from "./supabase.js";
 import { gerarCSV, baixarCSV } from "./tabela.js";
 
-iniciarPagina("relatorios");
+const _iniciando = iniciarPagina("relatorios");
 const el = (id) => document.getElementById(id);
 
 let participantes = [];
@@ -14,7 +14,7 @@ let checkins = [];
 let atividades = [];
 let buscaLog = "";
 
-carregar();
+_iniciando.then((ctx) => { if (ctx) carregar(ctx); });
 el("btn-atualizar").onclick = () => carregar();
 el("btn-exportar").onclick = exportar;
 el("busca-log").addEventListener("input", debounce((e) => { buscaLog = e.target.value.trim().toLowerCase(); renderLog(); }, 200));

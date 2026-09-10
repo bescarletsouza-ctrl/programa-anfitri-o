@@ -3,15 +3,22 @@
 // Não usa iniciarPagina (não exige evento selecionado).
 // =============================================================================
 import { esc, formatarData, abrirModal, toast, icone } from "./ui.js";
-import { listEventos, criarEvento, salvarEventoPorId, excluirEvento } from "./supabase.js";
+import { listEventos, criarEvento, salvarEventoPorId, excluirEvento, listarOrgs } from "./supabase.js";
 import { definirEvento, eventoId, sairEvento } from "./evento.js";
+import { exigirLogin, contexto, sair, planoBloqueado } from "./auth.js";
 
 const el = (id) => document.getElementById(id);
+let CTX = null;
 
 el("btn-criar").innerHTML = icone("mais") + "Criar evento";
 el("btn-criar").onclick = modalCriar;
 
-carregar();
+(async function () {
+  if (!(await exigirLogin())) return;
+  CTX = await contexto();
+  if (el("eventos-sair")) el("eventos-sair").onclick = sair;
+  carregar();
+})();
 
 async function carregar() {
   try {
@@ -76,17 +83,33 @@ const camposHtml = (e = {}) => `
     <input class="input" name="local" value="${esc(e.local || "")}"
       placeholder="Ex: Alphaville, São Paulo" /></label>`;
 
-function modalCriar() {
+async function modalCriar() {
+  const bloqueio = planoBloqueado(CTX);
+  if (bloqueio) { toast(bloqueio, "erro"); return; }
+
+  let orgsSuper = null;
+  if (CTX?.superAdmin) {
+    orgsSuper = await listarOrgs().catch(() => []);
+  }
+  const orgSelHtml = orgsSuper
+    ? `<label class="campo"><span>Organização *</span>
+        <select class="select" name="org_id" required>
+          ${orgsSuper.map((o) => `<option value="${esc(o.id)}">${esc(o.nome)}${o.max_eventos ? ` (${o.eventos_usados}/${o.max_eventos})` : ""}</option>`).join("")}
+        </select></label>`
+    : "";
+
   abrirModal({
     titulo: "Criar evento",
     textoConfirmar: "Criar e abrir",
-    corpoHtml: camposHtml() + `
+    corpoHtml: orgSelHtml + camposHtml() + `
       <p class="pagina-sub" style="margin:2px 0 0;font-size:.8rem">
         O evento nasce com as etapas, perguntas e marcos padrão — você ajusta tudo depois em Configurações.
       </p>`,
     onConfirmar: async (form) => {
       const f = Object.fromEntries(new FormData(form));
-      const id = await criarEvento(f.nome.trim(), f.data_evento || null, f.local.trim() || null);
+      const orgId = f.org_id || CTX?.org?.id || null;
+      if (!orgId) { toast("Sem organização vinculada à sua conta.", "erro"); return false; }
+      const id = await criarEvento(f.nome.trim(), orgId, f.data_evento || null, f.local.trim() || null);
       definirEvento(id, f.nome.trim());
       toast("Evento criado.", "ok");
       location.href = "index.html";

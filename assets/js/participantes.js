@@ -18,7 +18,7 @@ import { imprimirCracha } from "./cracha.js";
 import { parsearTabela, gerarCSV, baixarCSV } from "./tabela.js";
 import { abrirEnvioEmail } from "./email.js";
 
-iniciarPagina("participantes");
+const _iniciando = iniciarPagina("participantes");
 const el = (id) => document.getElementById(id);
 
 const TIPOS = ["Convidado", "Anfitrião", "Acompanhante", "Comprador", "Cliente", "Outro"];
@@ -136,7 +136,7 @@ const normPag = (v) => {
   return PAGAMENTOS.find((p) => p.toLowerCase() === n) || null;
 };
 
-carregar();
+_iniciando.then((ctx) => { if (ctx) carregar(ctx); });
 
 async function carregar() {
   try {

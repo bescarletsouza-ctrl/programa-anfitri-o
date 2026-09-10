@@ -3,13 +3,13 @@
 // por evento (não usa iniciarPagina). Junta participantes, presença, check-ins,
 // faturamento e anfitriões de todo o histórico. Gráficos em CSS, sem lib.
 // =============================================================================
-import { renderSidebar, esc, formatarData } from "./ui.js";
+import { iniciarPagina, esc, formatarData } from "./ui.js";
 import {
   listEventos, listParticipantesTodos, listCheckinsTodos,
   listAnfitrioesTodos, listTiposIngressoTodos,
 } from "./supabase.js";
 
-renderSidebar("geral");
+const _iniciando = iniciarPagina("geral", { semEvento: true });
 const el = (id) => document.getElementById(id);
 
 let eventos = [], parts = [], checks = [], anfs = [], tipos = [];
@@ -27,7 +27,7 @@ function parsePreco(txt) {
 }
 const brl = (n) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: n % 1 ? 2 : 0 });
 
-carregar();
+_iniciando.then((ctx) => { if (ctx) carregar(); });
 el("btn-atualizar").onclick = () => carregar();
 
 async function carregar() {

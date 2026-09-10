@@ -10,14 +10,14 @@ import {
 } from "./supabase.js";
 import { parsearTabela, gerarCSV, baixarCSV } from "./tabela.js";
 
-iniciarPagina("atividades");
+const _iniciando = iniciarPagina("atividades");
 const el = (id) => document.getElementById(id);
 
 let atividades = [];
 let checkins = [];
 let participantes = [];
 
-carregar();
+_iniciando.then((ctx) => { if (ctx) carregar(ctx); });
 el("btn-atualizar").onclick = () => carregar();
 el("nova-atividade").onclick = () => editar(null);
 

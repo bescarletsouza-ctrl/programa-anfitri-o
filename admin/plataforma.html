@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="light dark" />
 <script>try{var t=localStorage.getItem('tema')==='dark'?'dark':'light';document.documentElement.dataset.theme=t;document.documentElement.style.background=t==='dark'?'#0c0c0d':'#f7f7f6';}catch(e){}</script>
 <script>try{if(!localStorage.getItem("sb-xiuhqkvkiexmbgwyvunr-auth-token"))location.replace("/login.html?next="+encodeURIComponent(location.pathname+location.search));}catch(e){}</script>
-<title>Atividades — We.events</title>
+<title>Plataforma — We.events</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&display=swap" rel="stylesheet" />
@@ -18,24 +18,30 @@
   <main class="conteudo">
     <div class="barra-topo">
       <div>
-        <h1 class="pagina-titulo">Atividades</h1>
-        <p class="pagina-sub">Palestras e sessões com vagas e categorias liberadas. O credenciamento em cada atividade é feito na tela de Check-in.</p>
+        <h1 class="pagina-titulo">Plataforma</h1>
+        <p class="pagina-sub">Organizações (clientes), limites de plano e usuários. Só você vê esta tela.</p>
       </div>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-secundario" id="btn-atualizar">Atualizar</button>
-        <button class="btn btn-primario" id="nova-atividade">+ Atividade</button>
-      </div>
+      <button class="btn btn-primario" id="btn-nova">+ Nova organização</button>
     </div>
 
     <div id="carregando" class="vazio">Carregando…</div>
 
     <div id="painel" hidden>
-      <div id="lista" class="grid grid-2"></div>
-      <div id="vazio" class="vazio" hidden>Nenhuma atividade cadastrada. Crie a primeira em “+ Atividade”.</div>
+      <div class="grid grid-4" id="kpis" style="margin-bottom:24px"></div>
+      <div class="tabela-wrap">
+        <table class="tabela">
+          <thead><tr>
+            <th>Empresa</th><th>Ramo</th><th>Acesso</th>
+            <th class="num">Membros</th><th class="num">Eventos</th>
+            <th>Expira</th><th>Status</th><th></th>
+          </tr></thead>
+          <tbody id="linhas"></tbody>
+        </table>
+      </div>
+      <div id="vazio" class="vazio" hidden>Nenhuma organização ainda. Crie a primeira.</div>
     </div>
   </main>
 </div>
-<div id="cracha" hidden></div>
-<script type="module" src="../assets/js/atividades.js"></script>
+<script type="module" src="../assets/js/plataforma.js"></script>
 </body>
 </html>

@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="color-scheme" content="light dark" />
 <script>try{var t=localStorage.getItem('tema')==='dark'?'dark':'light';document.documentElement.dataset.theme=t;document.documentElement.style.background=t==='dark'?'#0c0c0d':'#f7f7f6';}catch(e){}</script>
+<script>try{if(!localStorage.getItem("sb-xiuhqkvkiexmbgwyvunr-auth-token"))location.replace("/login.html?next="+encodeURIComponent(location.pathname+location.search));}catch(e){}</script>
 <title>Configurações — We.events</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -179,11 +180,11 @@
         </section>
       </details>
 
-      <details class="cfg-bloco" data-bloco="equipe-checkin" open>
+      <details class="cfg-bloco" data-bloco="equipe-checkin" open hidden>
         <summary class="cfg-bloco-cab">
           <span class="cfg-bloco-tit">
-            <h2>Equipe de check-in (logins)</h2>
-            <p>Contas que a equipe usa para entrar no app de check-in do celular. Cada pessoa entra com e-mail e senha.</p>
+            <h2>Usuários da organização</h2>
+            <p>Quem entra no painel e no app de check-in desta organização. O convite vai por e-mail; a pessoa define a própria senha.</p>
           </span>
         </summary>
         <section class="card">
@@ -191,10 +192,6 @@
             <h3 style="margin:0">Pessoas com acesso</h3>
             <button class="btn btn-primario btn-sm" id="equipe-add" type="button">+ Adicionar pessoa</button>
           </div>
-          <p class="pagina-sub" style="margin:0 0 12px">
-            As contas valem para <b>todos os eventos</b>. Enquanto o painel não
-            tiver login próprio, mantenha senhas fortes.
-          </p>
           <div id="equipe-lista"></div>
         </section>
       </details>

@@ -5,11 +5,11 @@ import { iniciarPagina, esc, slugify, abrirModal, toast, confirmar, icone } from
 import { listFormPerguntas, salvar, remover } from "./supabase.js";
 import { TIPOS_PERGUNTA } from "./config.js";
 
-iniciarPagina("formulario");
+const _iniciando = iniciarPagina("formulario");
 const el = (id) => document.getElementById(id);
 let perguntas = [];
 
-carregar();
+_iniciando.then((ctx) => { if (ctx) carregar(ctx); });
 
 async function carregar() {
   try {

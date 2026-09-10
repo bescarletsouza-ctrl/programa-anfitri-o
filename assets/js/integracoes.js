@@ -12,7 +12,7 @@ import {
   webhookEntradaUrl, testarIntegracao,
 } from "./supabase.js";
 
-iniciarPagina("integracoes");
+const _iniciando = iniciarPagina("integracoes");
 const el = (id) => document.getElementById(id);
 
 let integracoes = [];
@@ -57,7 +57,7 @@ const CONECTORES = {
 // Origens de entrada (só um rótulo — todas usam o mesmo mapeador genérico)
 const ORIGENS = ["Genérico / Zapier", "Sympla", "Even3", "Eventbrite", "Hotmart", "Eduzz", "Mercado Pago", "Stripe", "Outro"];
 
-carregar();
+_iniciando.then((ctx) => { if (ctx) carregar(ctx); });
 el("add-webhook").onclick = () => modalWebhook(null);
 el("add-entrada").onclick = () => modalEntrada(null);
 

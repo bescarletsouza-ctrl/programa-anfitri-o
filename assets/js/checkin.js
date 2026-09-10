@@ -14,7 +14,7 @@ import { imprimirCracha } from "./cracha.js";
 
 const AVATAR = `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="8.5" r="4"/><path d="M4 21a8 8 0 0 1 16 0z"/></svg>`;
 
-iniciarPagina("checkin");
+const _iniciando = iniciarPagina("checkin");
 const el = (id) => document.getElementById(id);
 
 let participantes = [];
@@ -27,7 +27,7 @@ let filtroCat = "";     // "" | categoria de ingresso
 
 const SEM_CAT = "Sem categoria";
 
-carregar();
+_iniciando.then((ctx) => { if (ctx) carregar(ctx); });
 el("btn-atualizar").onclick = () => carregar();
 el("busca").addEventListener("input", debounce((e) => { termo = e.target.value.trim().toLowerCase(); render(); }, 150));
 el("alvo").addEventListener("change", (e) => { alvo = e.target.value; filtroStat = ""; render(); });

@@ -7,7 +7,7 @@
 import { iniciarPagina, esc, formatarData } from "./ui.js";
 import { listParticipantes, listTiposIngresso } from "./supabase.js";
 
-iniciarPagina("painel-evento");
+const _iniciando = iniciarPagina("painel-evento");
 const el = (id) => document.getElementById(id);
 
 let participantes = [];
@@ -28,7 +28,7 @@ function parsePreco(txt) {
 const brl = (n) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: n % 1 ? 2 : 0 });
 
-carregar();
+_iniciando.then((ctx) => { if (ctx) carregar(ctx); });
 el("btn-atualizar").onclick = () => carregar();
 
 async function carregar() {

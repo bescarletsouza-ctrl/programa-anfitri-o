@@ -3,7 +3,10 @@
 // =============================================================================
 import { APP } from "./config.js";
 import { CONFIGURADO, listEventos } from "./supabase.js";
-import { eventoId, eventoNome, definirEvento, exigirEvento } from "./evento.js";
+import { eventoId, eventoNome, definirEvento } from "./evento.js";
+import {
+  exigirLogin, contexto, guardAcesso, sair, planoBloqueado, CLUSTERS_POR_ACESSO,
+} from "./auth.js";
 
 /* ---- Ícones (feather-style, stroke currentColor) --------------------- */
 const PATHS = {
@@ -108,10 +111,22 @@ function alternarRecolhida() {
 const navLinkHtml = (n, ativo) =>
   `<a class="nav-link ${n.chave === ativo ? "ativo" : ""}" href="${n.href}" title="${esc(n.rotulo)}">${icone(n.ico)}<span>${esc(n.rotulo)}</span></a>`;
 
-export function renderSidebar(ativo) {
+export function renderSidebar(ativo, ctx) {
   const el = document.getElementById("sidebar");
   if (!el) return;
   el.className = "sidebar" + (lerRecolhida() ? " recolhida" : "");
+
+  const clusters = ctx?.superAdmin
+    ? ["Geral", "Evento", "Anfitriões"]
+    : (CLUSTERS_POR_ACESSO[ctx?.acesso || "tudo"] || CLUSTERS_POR_ACESSO.tudo);
+  const nav = NAV.filter((b) => clusters.includes(b.grupo));
+
+  let rodape = NAV_RODAPE.filter((n) =>
+    n.chave !== "integracoes" || ctx?.superAdmin || (ctx?.acesso || "tudo") !== "anfitrioes");
+  if (ctx?.superAdmin) {
+    rodape = [{ chave: "plataforma", rotulo: "Plataforma", href: "plataforma.html", ico: "config" }, ...rodape];
+  }
+
   el.innerHTML = `
     <div class="marca">
       <span class="marca-full">${APP.marcaHtml}</span>
@@ -123,20 +138,22 @@ export function renderSidebar(ativo) {
       </select>
     </div>
     <nav>
-      ${NAV.map((bloco) => `
+      ${nav.map((bloco) => `
         <div class="nav-bloco">
           <div class="nav-grupo">${esc(bloco.grupo)}</div>
           ${bloco.itens.map((n) => navLinkHtml(n, ativo)).join("")}
         </div>`).join("")}
     </nav>
     <div class="rodape">
-      ${NAV_RODAPE.map((n) => navLinkHtml(n, ativo)).join("")}
+      ${rodape.map((n) => navLinkHtml(n, ativo)).join("")}
+      ${ctx ? `<button class="nav-link" data-sair type="button" style="width:100%;text-align:left">${icone("x")}<span>Sair${ctx.email ? " (" + esc(ctx.email) + ")" : ""}</span></button>` : ""}
       <button class="btn-tema" data-toggle-tema type="button"></button>
       <div class="side-credito">${APP.creditoHtml}</div>
     </div>`;
   aplicarTema(document.documentElement.dataset.theme === "dark" ? "dark" : "light");
   el.querySelector("[data-toggle-tema]").onclick = alternarTema;
   el.querySelector("[data-recolher]").onclick = alternarRecolhida;
+  el.querySelector("[data-sair]")?.addEventListener("click", sair);
   montarTopbarMobile(el);
   popularSeletorEvento(el);
   prefetchNoHover(el);
@@ -380,20 +397,44 @@ export function montarGaveta() {
 }
 
 /* ---- Boilerplate de página ----------------------------------------- */
-export function iniciarPagina(chaveNav) {
-  exigirEvento();
-  renderSidebar(chaveNav);
+// Devolve uma Promise que resolve com o `ctx` da organização (ou null se
+// redirecionou). Cada módulo faz:  iniciarPagina("x").then(c => c && carregar(c));
+export function iniciarPagina(chaveNav, opts = {}) {
+  renderSidebar(chaveNav, null);   // esqueleto imediato (sem NAV filtrada ainda)
   montarGaveta();
-  if (!CONFIGURADO) {
-    const alvo = document.querySelector(".conteudo");
-    if (alvo && !document.getElementById("aviso-config")) {
-      const d = document.createElement("div");
-      d.id = "aviso-config";
-      d.className = "aviso";
-      d.innerHTML =
-        "Supabase não configurado. Preencha <code>SUPABASE_URL</code> e " +
-        "<code>SUPABASE_ANON_KEY</code> em <code>assets/js/config.js</code> (veja o README).";
-      alvo.querySelector(".topbar-mobile")?.after(d) || alvo.prepend(d);
-    }
+  avisoConfig();
+  return (async () => {
+    if (!(await exigirLogin())) return null;
+    const ctx = await contexto();
+    if (!guardAcesso(chaveNav, ctx)) return null;
+    if (!opts.semEvento && !eventoId()) { location.href = "eventos.html"; return null; }
+    renderSidebar(chaveNav, ctx);
+    bannerPlano(ctx);
+    return ctx;
+  })();
+}
+
+function avisoConfig() {
+  if (CONFIGURADO) return;
+  const alvo = document.querySelector(".conteudo");
+  if (alvo && !document.getElementById("aviso-config")) {
+    const d = document.createElement("div");
+    d.id = "aviso-config";
+    d.className = "aviso";
+    d.innerHTML =
+      "Supabase não configurado. Preencha <code>SUPABASE_URL</code> e " +
+      "<code>SUPABASE_ANON_KEY</code> em <code>assets/js/config.js</code> (veja o README).";
+    alvo.querySelector(".topbar-mobile")?.after(d) || alvo.prepend(d);
   }
+}
+
+function bannerPlano(ctx) {
+  const msg = planoBloqueado(ctx);
+  const alvo = document.querySelector(".conteudo");
+  if (!msg || !alvo || document.getElementById("banner-plano")) return;
+  const d = document.createElement("div");
+  d.id = "banner-plano";
+  d.className = "aviso aviso-erro";
+  d.textContent = msg;
+  alvo.querySelector(".barra-topo")?.after(d) || alvo.prepend(d);
 }

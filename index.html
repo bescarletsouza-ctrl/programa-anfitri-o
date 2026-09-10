@@ -2,10 +2,17 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8" />
-<meta http-equiv="refresh" content="0; url=admin/index.html" />
 <title>We.events</title>
+<script>
+  try {
+    var k = "sb-xiuhqkvkiexmbgwyvunr-auth-token";
+    location.replace(localStorage.getItem(k) ? "admin/index.html" : "login.html");
+  } catch (e) {
+    location.replace("login.html");
+  }
+</script>
 </head>
 <body>
-<p>Redirecionando para o <a href="admin/index.html">painel</a>…</p>
+<p>Redirecionando… <a href="login.html">continuar</a></p>
 </body>
 </html>

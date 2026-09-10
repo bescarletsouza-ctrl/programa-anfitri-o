@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="color-scheme" content="light dark" />
 <script>try{var t=localStorage.getItem('tema')==='dark'?'dark':'light';document.documentElement.dataset.theme=t;document.documentElement.style.background=t==='dark'?'#0c0c0d':'#f7f7f6';}catch(e){}</script>
+<script>try{if(!localStorage.getItem("sb-xiuhqkvkiexmbgwyvunr-auth-token"))location.replace("/login.html?next="+encodeURIComponent(location.pathname+location.search));}catch(e){}</script>
 <title>Eventos — We.events</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -13,7 +14,10 @@
 </head>
 <body>
   <div class="eventos-tela">
-    <div class="marca-grande">We<b>.events</b></div>
+    <div class="marca-grande" style="display:flex;justify-content:space-between;align-items:center">
+      <span>We<b>.events</b></span>
+      <button class="btn btn-secundario btn-sm" id="eventos-sair" type="button">Sair</button>
+    </div>
     <h1 class="eventos-titulo">Seus eventos</h1>
     <p class="eventos-sub">Escolha um evento para abrir ou crie um novo. Cada evento tem seus próprios anfitriões, convidados, participantes e configurações.</p>
 

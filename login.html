@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<script>try{var t=localStorage.getItem('tema')==='dark'?'dark':'light';document.documentElement.dataset.theme=t;document.documentElement.style.background=t==='dark'?'#0c0c0d':'#f7f7f6';}catch(e){}</script>
+<title>Entrar — We.events</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/css/theme.css" />
+<style>
+  body { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
+  .login-card {
+    width: 100%; max-width: 360px; background: var(--superficie);
+    border: 1px solid var(--borda); border-radius: var(--raio-lg);
+    box-shadow: var(--sombra-md); padding: 30px 26px;
+  }
+  .login-marca { font-weight: 800; font-size: 1.15rem; letter-spacing: -.02em; margin-bottom: 20px; }
+  .login-marca b { color: var(--cor-laranja); }
+  .login-card h1 { font-size: 1.35rem; font-weight: 700; letter-spacing: -.02em; margin: 0 0 4px; }
+  .login-card > p { color: var(--texto-suave); font-size: .88rem; margin: 0 0 20px; }
+  .login-card .campo { margin-bottom: 12px; }
+  .login-card .btn { width: 100%; justify-content: center; margin-top: 6px; }
+  .login-erro { color: var(--erro); font-size: .82rem; margin: 4px 0 0; }
+  .login-alt { text-align: center; margin-top: 16px; font-size: .82rem; }
+  .login-alt a { color: var(--cor-laranja-forte); font-weight: 600; cursor: pointer; }
+</style>
+</head>
+<body>
+  <div class="login-card">
+    <div class="login-marca">We<b>.events</b></div>
+
+    <form id="form-login" hidden>
+      <h1 id="titulo">Entrar</h1>
+      <p id="sub">Acesse o painel da sua organização.</p>
+      <label class="campo"><span>E-mail</span>
+        <input class="input" id="email" type="email" autocomplete="username" required /></label>
+      <label class="campo" id="wrap-senha"><span>Senha</span>
+        <input class="input" id="senha" type="password" autocomplete="current-password" required /></label>
+      <p class="login-erro" id="erro" hidden></p>
+      <button class="btn btn-primario" type="submit" id="btn">Entrar</button>
+    </form>
+
+    <div id="carregando" class="vazio" style="padding:20px 0">Carregando…</div>
+  </div>
+<script type="module" src="assets/js/login.js"></script>
+</body>
+</html>

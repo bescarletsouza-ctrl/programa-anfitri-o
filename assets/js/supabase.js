@@ -47,8 +47,10 @@ export const getEvento = (id) =>
 export const salvarEvento = (patch) =>
   supabase.from("eventos").update(patch).eq("id", eventoId()).select().single().then(ok);
 
-export const criarEvento = (nome, data, local) =>
-  supabase.rpc("criar_evento", { p_nome: nome, p_data: data || null, p_local: local || null }).then(ok);
+export const criarEvento = (nome, orgId, data, local) =>
+  supabase.rpc("criar_evento", {
+    p_nome: nome, p_org_id: orgId, p_data: data || null, p_local: local || null,
+  }).then(ok);
 
 export const salvarEventoPorId = (id, patch) =>
   supabase.from("eventos").update(patch).eq("id", id).select().single().then(ok);
@@ -547,10 +549,32 @@ async function chamarEquipe(body) {
   if (data?.erro) throw new Error(data.erro);
   return data;
 }
-export const listarEquipe = () => chamarEquipe({ acao: "listar" }).then((d) => d.membros || []);
-export const criarMembroEquipe = (email, senha) => chamarEquipe({ acao: "criar", email, senha });
-export const trocarSenhaMembro = (id, senha) => chamarEquipe({ acao: "senha", id, senha });
-export const removerMembroEquipe = (id) => chamarEquipe({ acao: "remover", id });
+export const listarEquipe = (orgId) => chamarEquipe({ acao: "listar", org_id: orgId }).then((d) => d.membros || []);
+export const criarMembroEquipe = (orgId, dados) => chamarEquipe({ acao: "criar", org_id: orgId, ...dados });
+export const trocarSenhaMembro = (orgId, membroId, senha) => chamarEquipe({ acao: "senha", org_id: orgId, membro_id: membroId, senha });
+export const removerMembroEquipe = (orgId, membroId) => chamarEquipe({ acao: "remover", org_id: orgId, membro_id: membroId });
+
+/* ---- Plataforma (Edge Function "plataforma") — só a super-admin --------- */
+async function chamarPlataforma(body) {
+  const { data, error } = await supabase.functions.invoke("plataforma", { body });
+  if (error) {
+    throw new Error(
+      /Failed to (send|fetch)|not found|Function not found/i.test(error.message || "")
+        ? "Função não encontrada. Faça o deploy de supabase/functions/plataforma."
+        : error.message || "Falha na operação."
+    );
+  }
+  if (data?.erro) throw new Error(data.erro);
+  return data;
+}
+export const plataformaStatus = () => chamarPlataforma({ acao: "status" });
+export const bootstrapPlataforma = (email, senha) => chamarPlataforma({ acao: "bootstrap", email, senha });
+export const listarOrgs = () => chamarPlataforma({ acao: "listar_orgs" }).then((d) => d.orgs || []);
+export const criarOrg = (dados) => chamarPlataforma({ acao: "criar_org", ...dados });
+export const editarOrg = (id, patch) => chamarPlataforma({ acao: "editar_org", id, ...patch });
+export const removerOrg = (id) => chamarPlataforma({ acao: "remover_org", id });
+export const addMembroOrg = (orgId, dados) => chamarPlataforma({ acao: "add_membro", org_id: orgId, ...dados });
+export const removerMembroOrg = (membroId) => chamarPlataforma({ acao: "remover_membro", id: membroId });
 
 // Envia um payload de teste de uma integração específica. Aqui os erros sobem.
 export async function testarIntegracao(integracaoId) {

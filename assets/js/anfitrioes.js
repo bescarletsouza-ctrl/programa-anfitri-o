@@ -13,14 +13,14 @@ import {
 import { APP, TIPOS_ANFITRIAO } from "./config.js";
 import { parsearTabela } from "./tabela.js";
 
-iniciarPagina("anfitrioes");
+const _iniciando = iniciarPagina("anfitrioes");
 const el = (id) => document.getElementById(id);
 
 let estagios = [], grupos = [], responsaveis = [], lista = [];
 let aba = "todos";
 const filtros = { busca: "", grupo: "", estagio: "", presenca: "" };
 
-carregar();
+_iniciando.then((ctx) => { if (ctx) carregar(ctx); });
 
 async function carregar() {
   try {

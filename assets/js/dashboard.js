@@ -8,7 +8,7 @@ import {
 import { eventoId } from "./evento.js";
 import { APP } from "./config.js";
 
-iniciarPagina("painel");
+const _iniciando = iniciarPagina("painel");
 
 const el = (id) => document.getElementById(id);
 let dados = null;
@@ -18,7 +18,8 @@ let faixaModo = "Confirmado";
 el("data-hoje").textContent =
   dataPorExtenso().replace(/^\w/, (c) => c.toUpperCase());
 
-(async function () {
+_iniciando.then((ctx) => { if (ctx) iniciar(); });
+async function iniciar() {
   try {
     const [estagios, grupos, responsaveis, anfitrioes, convidados, evento] = await Promise.all([
       listEstagios(), listGrupos(), listResponsaveis(), listAnfitrioes(), listConvidados(), getEvento(eventoId()),
@@ -46,7 +47,7 @@ el("data-hoje").textContent =
       ? "Rode a migração <code>supabase/migrations/0005_eventos.sql</code> no SQL Editor do Supabase."
       : "Erro ao carregar: " + esc(e.message);
   }
-})();
+}
 
 /* -- filtros -- */
 const anfNoGrupo = () =>
