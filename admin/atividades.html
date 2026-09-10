@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="color-scheme" content="light dark" />
 <script>try{var t=localStorage.getItem('tema')==='dark'?'dark':'light';document.documentElement.dataset.theme=t;document.documentElement.style.background=t==='dark'?'#0c0c0d':'#f7f7f6';}catch(e){}</script>
-<title>Check-in — Programa Anfitrião</title>
+<title>Atividades — Programa Anfitrião</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&display=swap" rel="stylesheet" />
@@ -17,33 +17,24 @@
   <main class="conteudo">
     <div class="barra-topo">
       <div>
-        <h1 class="pagina-titulo">Check-in</h1>
-        <p class="pagina-sub">Credenciamento na entrada do evento.</p>
+        <h1 class="pagina-titulo">Atividades</h1>
+        <p class="pagina-sub">Palestras e sessões com vagas e categorias liberadas. O credenciamento em cada atividade é feito na tela de Check-in.</p>
       </div>
-      <button class="btn btn-secundario" id="btn-atualizar">Atualizar</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-secundario" id="btn-atualizar">Atualizar</button>
+        <button class="btn btn-primario" id="nova-atividade">+ Atividade</button>
+      </div>
     </div>
 
     <div id="carregando" class="vazio">Carregando…</div>
 
     <div id="painel" hidden>
-      <label class="campo" id="alvo-wrap" hidden style="max-width:460px">
-        <span>Credenciar em</span>
-        <select class="select" id="alvo"></select>
-      </label>
-
-      <div class="checkin-stats">
-        <div class="checkin-num"><b id="n-presentes">0</b> <span id="n-rotulo">de 0 presentes · 0 check-ins hoje</span></div>
-        <div class="checkin-barra"><i id="checkin-progresso" style="width:0%"></i></div>
-      </div>
-
-      <input class="input checkin-busca" id="busca" placeholder="Buscar por nome, e-mail, telefone ou código…" autocomplete="off" autofocus />
-
-      <div id="resultados" class="checkin-lista"></div>
-      <div id="dica" class="vazio">Digite para localizar o participante.</div>
+      <div id="lista" class="grid grid-2"></div>
+      <div id="vazio" class="vazio" hidden>Nenhuma atividade cadastrada. Crie a primeira em “+ Atividade”.</div>
     </div>
   </main>
 </div>
 <div id="cracha" hidden></div>
-<script type="module" src="../assets/js/checkin.js"></script>
+<script type="module" src="../assets/js/atividades.js"></script>
 </body>
 </html>

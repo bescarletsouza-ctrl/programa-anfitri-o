@@ -3,7 +3,7 @@
 // por hora e lista dos últimos check-ins. Tudo client-side, sem lib de gráfico.
 // =============================================================================
 import { iniciarPagina, esc, debounce, formatarData, toast } from "./ui.js";
-import { listParticipantes, listCheckins } from "./supabase.js";
+import { listParticipantes, listCheckins, listAtividades } from "./supabase.js";
 import { gerarCSV, baixarCSV } from "./tabela.js";
 
 iniciarPagina("relatorios");
@@ -11,6 +11,7 @@ const el = (id) => document.getElementById(id);
 
 let participantes = [];
 let checkins = [];
+let atividades = [];
 let buscaLog = "";
 
 carregar();
@@ -21,7 +22,9 @@ setInterval(() => { if (!document.hidden) carregar(); }, 30000);
 
 async function carregar() {
   try {
-    [participantes, checkins] = await Promise.all([listParticipantes(), listCheckins()]);
+    [participantes, checkins, atividades] = await Promise.all([
+      listParticipantes(), listCheckins(), listAtividades().catch(() => []),
+    ]);
     el("carregando").hidden = true;
     el("painel").hidden = false;
     render();
@@ -39,13 +42,38 @@ const hora = (iso) => {
   } catch { return ""; }
 };
 const hoje0 = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
+const nomeAtividade = (id) => (id && atividades.find((a) => a.id === id)?.nome) || "Evento";
 
 function render() {
   renderKpis();
   renderHoras();
   renderQuebra("rel-ingresso", (p) => p.ingresso || "Sem categoria");
   renderQuebra("rel-tipo", (p) => p.tipo || "—");
+  renderAtividades();
   renderLog();
+}
+
+function renderAtividades() {
+  const sec = el("sec-atividades");
+  if (!atividades.length) { sec.hidden = true; return; }
+  sec.hidden = false;
+  el("rel-atividades").innerHTML = atividades
+    .map((a) => {
+      const saldo = new Map();
+      checkins.forEach((c) => {
+        if (c.atividade_id !== a.id) return;
+        saldo.set(c.participante_id, (saldo.get(c.participante_id) || 0) + (c.acao === "entrada" ? 1 : -1));
+      });
+      const n = [...saldo.values()].filter((v) => v > 0).length;
+      const base = a.vagas || Math.max(n, 1);
+      const pct = Math.min(100, Math.round((n / base) * 100));
+      return `<div class="rel-barra">
+        <span class="rel-barra-nome" title="${esc(a.nome)}">${esc(a.nome)}</span>
+        <span class="rel-barra-trilha"><i style="width:${pct}%"></i></span>
+        <span class="rel-barra-valor">${a.vagas ? `${n}/${a.vagas}` : n}</span>
+      </div>`;
+    })
+    .join("");
 }
 
 function renderKpis() {
@@ -138,6 +166,7 @@ function renderLog() {
         <td><span class="badge ${ent ? "badge-ok" : "badge-erro"}">${ent ? "Entrada" : "Saída"}</span></td>
         <td><strong>${esc(p.nome || "—")}</strong>${p.tipo ? ` <span class="cel-tenue">· ${esc(p.tipo)}</span>` : ""}</td>
         <td>${esc(p.ingresso || "—")}</td>
+        <td>${esc(nomeAtividade(c.atividade_id))}</td>
         <td>${formatarData(c.at)} ${esc(hora(c.at))}</td>
       </tr>`;
     })
@@ -152,6 +181,7 @@ function exportar() {
     { rotulo: "Participante", valor: (c) => c.participante?.nome || "" },
     { rotulo: "Categoria", valor: (c) => c.participante?.ingresso || "" },
     { rotulo: "Tipo", valor: (c) => c.participante?.tipo || "" },
+    { rotulo: "Atividade", valor: (c) => nomeAtividade(c.atividade_id) },
     { rotulo: "E-mail", valor: (c) => c.participante?.email || "" },
     { rotulo: "Código", valor: (c) => c.participante?.codigo || "" },
     { rotulo: "Data", valor: (c) => formatarData(c.at) },

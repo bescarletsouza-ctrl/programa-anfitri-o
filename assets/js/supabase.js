@@ -31,6 +31,7 @@ function ok(res) {
 const TABELAS_EVENTO = new Set([
   "grupos", "responsaveis", "estagios", "anfitrioes", "convidados",
   "form_perguntas", "marcos", "etapas_participante", "participantes", "checkins",
+  "atividades",
 ]);
 
 // eid: id explícito (páginas públicas). Sem argumento → evento atual do admin.
@@ -131,6 +132,16 @@ export const listParticipantes = (eid) =>
     .order("created_at", { ascending: false })
     .then(ok);
 
+/* ---- Atividades (controle de acesso por sessão) ------------------- */
+export const listAtividades = (eid) =>
+  supabase
+    .from("atividades")
+    .select("*")
+    .eq("evento_id", ev(eid))
+    .order("dia", { ascending: true })
+    .order("inicio", { ascending: true })
+    .then(ok);
+
 /* ---- Check-in (histórico entrada/saída) ---------------------------- */
 export const listCheckins = (eid) =>
   supabase
@@ -140,9 +151,14 @@ export const listCheckins = (eid) =>
     .order("at", { ascending: false })
     .then(ok);
 
-// Grava a linha no log e atualiza o estado atual do participante.
-export async function registrarCheckin(participanteId, acao = "entrada", origem = "checkin") {
-  await salvar("checkins", { participante_id: participanteId, acao, origem });
+// Grava a linha no log. Modo evento (sem atividadeId): atualiza também o estado
+// atual do participante (presente / checkin_at). Modo atividade: só o log — a
+// presença na atividade é derivada das entradas/saídas.
+export async function registrarCheckin(participanteId, acao = "entrada", origem = "checkin", atividadeId = null) {
+  const linha = { participante_id: participanteId, acao, origem };
+  if (atividadeId) linha.atividade_id = atividadeId;
+  await salvar("checkins", linha);
+  if (atividadeId) return { id: participanteId };
   return salvar("participantes", {
     id: participanteId,
     presente: acao === "entrada",
