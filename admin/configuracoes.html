@@ -24,100 +24,128 @@
 
     <div id="carregando" class="vazio">Carregando…</div>
 
-    <div id="conteudo" hidden class="grid grid-2">
-      <section class="card">
-        <h3>Dados do evento</h3>
-        <form id="form-config">
-          <label class="campo"><span>Nome do evento *</span>
-            <input class="input" name="nome" required /></label>
-          <label class="campo"><span>Data</span>
-            <input class="input" name="data_evento" type="date" /></label>
-          <label class="campo"><span>Local</span>
-            <input class="input" name="local" /></label>
-          <label class="campo"><span>Meta de confirmados</span>
-            <input class="input" name="meta_confirmados" type="number" min="0" /></label>
-          <label class="campo"><span>Subtítulo do convite</span>
-            <input class="input" name="subtitulo_convite" /></label>
-          <label class="campo"><span>Texto de confirmação da aplicação (logo após enviar)</span>
-            <textarea class="input" name="texto_confirmacao" rows="2"></textarea></label>
-          <label class="campo"><span>Mensagem — inscrição em análise</span>
-            <textarea class="input" name="texto_em_analise" rows="2"></textarea></label>
-          <label class="campo"><span>Mensagem — inscrição aprovada</span>
-            <textarea class="input" name="texto_aprovado" rows="2"></textarea></label>
-          <label class="campo"><span>Mensagem — inscrição não aprovada</span>
-            <textarea class="input" name="texto_recusado" rows="2"></textarea></label>
-          <button class="btn btn-primario" type="submit">Salvar dados do evento</button>
-        </form>
-      </section>
-
-      <section class="card">
-        <div class="barra-topo" style="margin-bottom:12px">
-          <h3 style="margin:0">Grupos</h3>
-          <button class="btn btn-secundario" data-add="grupos">+ Grupo</button>
+    <div id="conteudo" hidden>
+      <section class="cfg-bloco">
+        <div class="cfg-bloco-cab">
+          <h2>Dados do evento</h2>
+          <p>Identificação do evento e as mensagens que o inscrito vê no formulário público.</p>
         </div>
-        <div id="lista-grupos"></div>
-      </section>
-
-      <section class="card">
-        <div class="barra-topo" style="margin-bottom:12px">
-          <h3 style="margin:0">Responsáveis</h3>
-          <button class="btn btn-secundario" data-add="responsaveis">+ Responsável</button>
-        </div>
-        <div id="lista-responsaveis"></div>
-      </section>
-
-      <section class="card">
-        <div class="barra-topo" style="margin-bottom:6px">
-          <h3 style="margin:0">Estágios do funil (anfitriões)</h3>
-          <button class="btn btn-secundario" data-add="estagios">+ Estágio</button>
-        </div>
-        <p class="pagina-sub" style="margin:0 0 10px">Funil da tela de Anfitriões e do Painel.</p>
-        <div id="lista-estagios"></div>
-      </section>
-
-      <section class="card">
-        <div class="barra-topo" style="margin-bottom:6px">
-          <h3 style="margin:0">Etapas do pipeline (participantes)</h3>
-          <button class="btn btn-secundario" data-add="etapas_participante">+ Etapa</button>
-        </div>
-        <p class="pagina-sub" style="margin:0 0 10px">Colunas do kanban na tela de Participantes.</p>
-        <div id="lista-etapas-part"></div>
-      </section>
-
-      <section class="card" style="grid-column: 1 / -1">
-        <div class="barra-topo" style="margin-bottom:6px">
-          <h3 style="margin:0">Marcos / Prêmios</h3>
-          <button class="btn btn-secundario" id="add-marco">+ Marco</button>
-        </div>
-        <p class="pagina-sub" style="margin:0 0 12px">
-          Cada marco é desbloqueado quando o anfitrião atinge o número de convidados
-          confirmados. Aparece na aba "Jornada" do painel dele.
-        </p>
-        <div id="lista-marcos"></div>
-      </section>
-
-      <section class="card" style="grid-column: 1 / -1">
-        <h3>Crachá / Etiqueta</h3>
-        <p class="pagina-sub" style="margin:0 0 14px">
-          O que aparece e o tamanho de cada linha no crachá impresso no check-in.
-          <b>Nome, Categoria e Nome do evento</b> são obrigatórios.
-        </p>
-        <div class="grid grid-2" style="align-items:start">
-          <div>
-            <div class="cracha-dims" style="margin-bottom:14px">
-              <label class="campo"><span>Largura (mm)</span><input class="input" id="cr-largura" type="number" min="30" max="200" /></label>
-              <label class="campo"><span>Altura (mm)</span><input class="input" id="cr-altura" type="number" min="20" max="200" /></label>
+        <section class="card">
+          <form id="form-config">
+            <div class="cfg-campos-2">
+              <label class="campo"><span>Nome do evento *</span>
+                <input class="input" name="nome" required /></label>
+              <label class="campo"><span>Data</span>
+                <input class="input" name="data_evento" type="date" /></label>
+              <label class="campo"><span>Local</span>
+                <input class="input" name="local" /></label>
+              <label class="campo"><span>Meta de confirmados</span>
+                <input class="input" name="meta_confirmados" type="number" min="0" /></label>
             </div>
-            <label class="campo" style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
-              <input type="checkbox" id="cr-qr" /> <span style="margin:0">Mostrar QR Code</span></label>
-            <div id="cr-linhas"></div>
-            <button class="btn btn-primario" id="cr-salvar" style="margin-top:14px">Salvar crachá</button>
-          </div>
-          <div>
-            <span class="campo"><span style="display:block;font-size:.78rem;font-weight:600;margin-bottom:6px;color:var(--texto-suave)">Prévia</span></span>
-            <div class="cracha-preview" id="cr-preview"></div>
-          </div>
+            <hr class="cfg-sep" />
+            <label class="campo"><span>Subtítulo do convite</span>
+              <input class="input" name="subtitulo_convite" /></label>
+            <label class="campo"><span>Texto de confirmação da aplicação (logo após enviar)</span>
+              <textarea class="input" name="texto_confirmacao" rows="2"></textarea></label>
+            <label class="campo"><span>Mensagem — inscrição em análise</span>
+              <textarea class="input" name="texto_em_analise" rows="2"></textarea></label>
+            <label class="campo"><span>Mensagem — inscrição aprovada</span>
+              <textarea class="input" name="texto_aprovado" rows="2"></textarea></label>
+            <label class="campo"><span>Mensagem — inscrição não aprovada</span>
+              <textarea class="input" name="texto_recusado" rows="2"></textarea></label>
+            <button class="btn btn-primario" type="submit">Salvar dados do evento</button>
+          </form>
+        </section>
+      </section>
+
+      <section class="cfg-bloco">
+        <div class="cfg-bloco-cab">
+          <h2>Equipe e organização</h2>
+          <p>Grupos de anfitriões e as pessoas responsáveis pelo acompanhamento.</p>
         </div>
+        <div class="grid grid-2">
+          <section class="card">
+            <div class="barra-topo" style="margin-bottom:12px">
+              <h3 style="margin:0">Grupos</h3>
+              <button class="btn btn-secundario btn-sm" data-add="grupos">+ Grupo</button>
+            </div>
+            <div id="lista-grupos"></div>
+          </section>
+
+          <section class="card">
+            <div class="barra-topo" style="margin-bottom:12px">
+              <h3 style="margin:0">Responsáveis</h3>
+              <button class="btn btn-secundario btn-sm" data-add="responsaveis">+ Responsável</button>
+            </div>
+            <div id="lista-responsaveis"></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="cfg-bloco">
+        <div class="cfg-bloco-cab">
+          <h2>Funil e pipeline</h2>
+          <p>As colunas dos quadros de Anfitriões e de Participantes.</p>
+        </div>
+        <div class="grid grid-2">
+          <section class="card">
+            <div class="barra-topo" style="margin-bottom:6px">
+              <h3 style="margin:0">Estágios do funil (anfitriões)</h3>
+              <button class="btn btn-secundario btn-sm" data-add="estagios">+ Estágio</button>
+            </div>
+            <p class="pagina-sub" style="margin:0 0 10px">Funil da tela de Anfitriões e do Painel.</p>
+            <div id="lista-estagios"></div>
+          </section>
+
+          <section class="card">
+            <div class="barra-topo" style="margin-bottom:6px">
+              <h3 style="margin:0">Etapas do pipeline (participantes)</h3>
+              <button class="btn btn-secundario btn-sm" data-add="etapas_participante">+ Etapa</button>
+            </div>
+            <p class="pagina-sub" style="margin:0 0 10px">Colunas do kanban na tela de Participantes.</p>
+            <div id="lista-etapas-part"></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="cfg-bloco">
+        <div class="cfg-bloco-cab">
+          <h2>Engajamento dos anfitriões</h2>
+          <p>Marcos desbloqueados conforme o anfitrião confirma convidados — aparecem na aba “Jornada” do painel dele.</p>
+        </div>
+        <section class="card">
+          <div class="barra-topo" style="margin-bottom:12px">
+            <h3 style="margin:0">Marcos / Prêmios</h3>
+            <button class="btn btn-secundario btn-sm" id="add-marco">+ Marco</button>
+          </div>
+          <div id="lista-marcos"></div>
+        </section>
+      </section>
+
+      <section class="cfg-bloco">
+        <div class="cfg-bloco-cab">
+          <h2>Check-in</h2>
+          <p>O que aparece e o tamanho de cada linha no crachá impresso. <b>Nome, Categoria e Nome do evento</b> são obrigatórios.</p>
+        </div>
+        <section class="card">
+          <h3>Crachá / Etiqueta</h3>
+          <div class="grid grid-2" style="align-items:start">
+            <div>
+              <div class="cracha-dims" style="margin-bottom:14px">
+                <label class="campo"><span>Largura (mm)</span><input class="input" id="cr-largura" type="number" min="30" max="200" /></label>
+                <label class="campo"><span>Altura (mm)</span><input class="input" id="cr-altura" type="number" min="20" max="200" /></label>
+              </div>
+              <label class="campo" style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+                <input type="checkbox" id="cr-qr" /> <span style="margin:0">Mostrar QR Code</span></label>
+              <div id="cr-linhas"></div>
+              <button class="btn btn-primario" id="cr-salvar" style="margin-top:14px">Salvar crachá</button>
+            </div>
+            <div>
+              <span class="campo"><span style="display:block;font-size:.78rem;font-weight:600;margin-bottom:6px;color:var(--texto-suave)">Prévia</span></span>
+              <div class="cracha-preview" id="cr-preview"></div>
+            </div>
+          </div>
+        </section>
       </section>
     </div>
   </main>

@@ -320,6 +320,16 @@ table.tabela tbody tr:last-child td { border-bottom: none; }
 .grid-4 { grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); }
 
 .barra-topo { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+
+/* ---- Configurações: blocos temáticos ---- */
+.cfg-bloco { margin-bottom: 34px; }
+.cfg-bloco:last-child { margin-bottom: 0; }
+.cfg-bloco-cab { margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--borda); }
+.cfg-bloco-cab h2 { margin: 0; font-size: 1.05rem; font-weight: 700; letter-spacing: -.015em; color: var(--texto); }
+.cfg-bloco-cab p { margin: 4px 0 0; color: var(--texto-suave); font-size: .85rem; line-height: 1.5; }
+.cfg-campos-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }
+.cfg-sep { border: none; border-top: 1px solid var(--cinza-100); margin: 6px 0 16px; }
+@media (max-width: 640px) { .cfg-campos-2 { grid-template-columns: 1fr; } }
 .filtros { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .filtros .select, .filtros .input { width: auto; min-width: 150px; }
 .filtros .input { flex: 1; min-width: 220px; max-width: 420px; }
