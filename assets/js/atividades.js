@@ -4,7 +4,7 @@
 // em si é feito na tela de Check-in (modo atividade).
 // =============================================================================
 import { iniciarPagina, esc, icone, toast, confirmar, abrirModal, abrirGaveta, debounce } from "./ui.js";
-import { listAtividades, listCheckins, listParticipantes, salvar, remover, registrarCheckin } from "./supabase.js";
+import { listAtividades, listCheckins, listParticipantes, salvar, remover, registrarCheckin, inserirLote } from "./supabase.js";
 
 iniciarPagina("atividades");
 const el = (id) => document.getElementById(id);
@@ -82,7 +82,8 @@ function render() {
     const atv = atividades.find((a) => a.id === card.dataset.id);
     card.querySelector("[data-editar]").onclick = () => editar(atv);
     card.querySelector("[data-excluir]").onclick = () => excluir(atv);
-    card.querySelector("[data-credenciados]").onclick = () => verCredenciados(atv);
+    card.querySelector("[data-credenciados]").onclick = () => abrirGavetaAtv(atv, "lista");
+    card.querySelector("[data-importar]").onclick = () => abrirGavetaAtv(atv, "add");
   });
 }
 
@@ -116,7 +117,10 @@ function cardHtml(atv) {
         ? cats.map((c) => `<span class="chip-cat">${esc(c)}</span>`).join("")
         : `<span class="cel-tenue" style="font-size:.78rem">Todas as categorias podem entrar</span>`}
     </div>
-    <button class="btn btn-secundario btn-sm" data-credenciados style="margin-top:12px">Ver credenciados</button>
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+      <button class="btn btn-secundario btn-sm" data-credenciados>Ver credenciados</button>
+      <button class="btn btn-primario btn-sm" data-importar>+ Adicionar participantes</button>
+    </div>
   </div>`;
 }
 
@@ -169,32 +173,50 @@ async function excluir(atv) {
   }
 }
 
-/* ---- Gaveta: credenciados de uma atividade ------------------------- */
+/* ---- Gaveta: credenciados / adicionar participantes --------------- */
 let gavetaAtv = null;
+let gavetaModo = "lista"; // "lista" | "add"
 let gavetaBusca = "";
+const selecionadosAdd = new Set();
 
-function verCredenciados(atv) {
+function abrirGavetaAtv(atv, modo) {
   gavetaAtv = atv;
+  gavetaModo = modo;
   gavetaBusca = "";
+  selecionadosAdd.clear();
   abrirGaveta(
-    `Credenciados — ${esc(atv.nome)}`,
-    `<input class="input" id="ga-busca" placeholder="Buscar…" style="margin-bottom:14px" autocomplete="off" />
-     <div id="ga-lista"></div>`
+    `${esc(atv.nome)}`,
+    `<div class="toggle-abas" style="margin-bottom:14px">
+       <button type="button" data-aba="lista" class="${modo === "lista" ? "ativo" : ""}">Credenciados</button>
+       <button type="button" data-aba="add" class="${modo === "add" ? "ativo" : ""}">Adicionar</button>
+     </div>
+     <input class="input" id="ga-busca" placeholder="Buscar…" style="margin-bottom:12px" autocomplete="off" />
+     <div id="ga-corpo"></div>`
   );
+  const g = document.getElementById("gaveta");
+  g.querySelectorAll("[data-aba]").forEach((b) => {
+    b.onclick = () => {
+      gavetaModo = b.dataset.aba;
+      g.querySelectorAll("[data-aba]").forEach((x) => x.classList.toggle("ativo", x === b));
+      renderGavetaCorpo();
+    };
+  });
   document.getElementById("ga-busca").addEventListener("input", debounce((e) => {
     gavetaBusca = e.target.value.trim().toLowerCase();
-    renderGaveta();
+    renderGavetaCorpo();
   }, 150));
-  renderGaveta();
+  renderGavetaCorpo();
 }
 
-function renderGaveta() {
-  const alvo = document.getElementById("ga-lista");
+function renderGavetaCorpo() {
+  gavetaModo === "add" ? renderAdd() : renderLista();
+}
+
+function renderLista() {
+  const alvo = document.getElementById("ga-corpo");
   if (!alvo || !gavetaAtv) return;
   let linhas = credenciadosDe(gavetaAtv.id);
-  if (gavetaBusca) {
-    linhas = linhas.filter((l) => `${l.nome} ${l.categoria}`.toLowerCase().includes(gavetaBusca));
-  }
+  if (gavetaBusca) linhas = linhas.filter((l) => `${l.nome} ${l.categoria}`.toLowerCase().includes(gavetaBusca));
   linhas.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
   if (!linhas.length) {
     alvo.innerHTML = `<p class="pagina-sub" style="margin:0">${gavetaBusca ? "Ninguém encontrado." : "Ninguém credenciado nesta atividade ainda."}</p>`;
@@ -219,12 +241,97 @@ function renderGaveta() {
   });
 }
 
+function renderAdd() {
+  const alvo = document.getElementById("ga-corpo");
+  if (!alvo || !gavetaAtv) return;
+  const dentro = new Set(credenciadosDe(gavetaAtv.id).map((l) => l.pid));
+  const cats = (gavetaAtv.categorias || []).filter(Boolean);
+  let fora = participantes.filter((p) => !dentro.has(p.id));
+  if (gavetaBusca) {
+    fora = fora.filter((p) => `${p.nome} ${p.email || ""} ${p.codigo || ""} ${p.ingresso || ""} ${p.tipo || ""}`.toLowerCase().includes(gavetaBusca));
+  }
+  fora.sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR"));
+  const lista = fora.slice(0, 80);
+
+  const atalhos = cats.length
+    ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+        ${cats.map((c) => `<button type="button" class="btn btn-secundario btn-sm" data-cat="${esc(c)}">+ Todos de ${esc(c)}</button>`).join("")}
+       </div>`
+    : "";
+
+  alvo.innerHTML = `
+    ${atalhos}
+    <div class="pagina-sub" style="margin:0 0 8px">${fora.length} fora da atividade${fora.length > lista.length ? ` · refine a busca (mostrando ${lista.length})` : ""}</div>
+    <div id="ga-add-lista">
+      ${lista.map((p) => `<label class="checkin-item" style="padding:9px 12px;cursor:pointer">
+        <div class="checkin-item-info" style="flex-direction:row;align-items:center;gap:10px">
+          <input type="checkbox" data-add="${p.id}" ${selecionadosAdd.has(p.id) ? "checked" : ""} />
+          <span>
+            <strong>${esc(p.nome)}</strong>
+            <span class="checkin-meta">
+              <span class="chip-cat">${esc(p.ingresso || p.tipo || "—")}</span>
+              <span class="chip-codigo">${esc(p.codigo || "—")}</span>
+            </span>
+          </span>
+        </div>
+      </label>`).join("") || `<p class="pagina-sub" style="margin:0">Todo mundo já está na atividade.</p>`}
+    </div>
+    <button class="btn btn-primario" id="ga-add-btn" style="margin-top:14px;width:100%">Adicionar selecionados</button>`;
+
+  alvo.querySelectorAll("[data-add]").forEach((cb) => {
+    cb.onchange = () => {
+      cb.checked ? selecionadosAdd.add(cb.dataset.add) : selecionadosAdd.delete(cb.dataset.add);
+      atualizarBotaoAdd();
+    };
+  });
+  alvo.querySelectorAll("[data-cat]").forEach((b) => {
+    b.onclick = () => {
+      const c = b.dataset.cat;
+      participantes.forEach((p) => { if (!dentro.has(p.id) && (p.ingresso || p.tipo) === c) selecionadosAdd.add(p.id); });
+      renderAdd();
+    };
+  });
+  document.getElementById("ga-add-btn").onclick = adicionarSelecionados;
+  atualizarBotaoAdd();
+}
+
+function atualizarBotaoAdd() {
+  const btn = document.getElementById("ga-add-btn");
+  if (!btn) return;
+  const n = selecionadosAdd.size;
+  btn.textContent = n ? `Adicionar ${n} à atividade` : "Adicionar selecionados";
+  btn.disabled = !n;
+}
+
+async function adicionarSelecionados() {
+  const ids = [...selecionadosAdd];
+  if (!ids.length) return;
+  const btn = document.getElementById("ga-add-btn");
+  btn.disabled = true;
+  try {
+    await inserirLote("checkins", ids.map((id) => ({
+      participante_id: id, acao: "entrada", origem: "atividades", atividade_id: gavetaAtv.id,
+    })));
+    selecionadosAdd.clear();
+    checkins = await listCheckins().catch(() => checkins);
+    gavetaModo = "lista";
+    const g = document.getElementById("gaveta");
+    g?.querySelectorAll("[data-aba]").forEach((x) => x.classList.toggle("ativo", x.dataset.aba === "lista"));
+    renderGavetaCorpo();
+    render();
+    toast(`${ids.length} participante(s) adicionado(s).`, "ok");
+  } catch (e) {
+    btn.disabled = false;
+    toast(e.message, "erro");
+  }
+}
+
 async function registrarSaida(pid, btn) {
   btn.disabled = true;
   try {
     await registrarCheckin(pid, "saida", "atividades", gavetaAtv.id);
     checkins = await listCheckins().catch(() => checkins);
-    renderGaveta();
+    renderGavetaCorpo();
     render();
     toast("Saída registrada.", "ok");
   } catch (e) {
