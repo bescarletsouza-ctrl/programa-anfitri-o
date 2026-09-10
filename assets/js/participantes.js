@@ -9,8 +9,9 @@ import {
   fecharGaveta, toast, confirmar, icone, abrirMenu,
 } from "./ui.js";
 import {
-  listParticipantes, listEtapasParticipante, listAnfitrioes, listEstagios,
+  listParticipantes, listEtapasParticipante,
   salvar, remover, inserirLote, atualizarEmLote, removerEmLote, registrarCheckin,
+  sincParticipanteAnfitriao, desvincularAoExcluirParticipante,
 } from "./supabase.js";
 import { eventoNome } from "./evento.js";
 import { imprimirCracha } from "./cracha.js";
@@ -34,7 +35,7 @@ const ALIAS_IMPORT = {
   "tipo de ingresso": "ingresso", empresa: "empresa", "razão social": "empresa",
 };
 
-let participantes = [], etapas = [], anfitrioes = [], estagios = [];
+let participantes = [], etapas = [];
 let vista = "lista";
 let pagina = 1;
 const selecionados = new Set();
@@ -65,9 +66,8 @@ carregar();
 
 async function carregar() {
   try {
-    [participantes, etapas, anfitrioes, estagios] = await Promise.all([
+    [participantes, etapas] = await Promise.all([
       listParticipantes(), listEtapasParticipante(),
-      listAnfitrioes().catch(() => []), listEstagios().catch(() => []),
     ]);
     opcoes(el("f-tipo"), TIPOS, "Todos os tipos");
     opcoes(el("f-tipo-pipe"), TIPOS, "Todos os tipos");
@@ -243,7 +243,7 @@ async function editarCelula(id, campo, td) {
     } else if (campo === "tipo") {
       const salvo = await salvar("participantes", { id, tipo: escolha });
       Object.assign(p, salvo);
-      await sincronizarAnfitriao(p, p);
+      await sincParticipanteAnfitriao(p).catch((e) => console.warn(e));
       participantes = await listParticipantes();
     } else {
       const salvo = await salvar("participantes", { id, pagamento: escolha });
@@ -282,6 +282,9 @@ async function acaoEmMassa(acao) {
   if (acao === "excluir") {
     if (!confirmar(`Excluir ${ids.length} participante(s) da lista?`)) return;
     try {
+      for (const id of ids) {
+        await desvincularAoExcluirParticipante(participantes.find((x) => x.id === id)).catch(() => {});
+      }
       await removerEmLote("participantes", ids);
       selecionados.clear();
       toast(`${ids.length} participante(s) excluído(s).`, "ok");
@@ -323,7 +326,7 @@ async function acaoEmMassa(acao) {
       await atualizarEmLote("participantes", ids, { tipo: escolha });
       participantes = await listParticipantes();
       for (const p of participantes.filter((x) => selecionados.has(x.id))) {
-        await sincronizarAnfitriao(p, p);
+        await sincParticipanteAnfitriao(p).catch((e) => console.warn(e));
       }
     }
     selecionados.clear();
@@ -439,36 +442,11 @@ function abrirForm(p) {
       };
       if (p) reg.id = p.id;
       const salvo = await salvar("participantes", reg);
-      await sincronizarAnfitriao(salvo, p);
+      await sincParticipanteAnfitriao(salvo).catch((e) => console.warn(e));
       toast(p ? "Participante atualizado." : "Participante cadastrado.", "ok");
       await recarregar();
     },
   });
-}
-
-// Cria/vincula anfitrião quando tipo = Anfitrião; limpa vínculo quando sai disso.
-async function sincronizarAnfitriao(salvo, anterior) {
-  if (salvo.tipo === "Anfitrião" && !salvo.anfitriao_id) {
-    const id = await resolverAnfitriao(salvo.nome, salvo.email, salvo.telefone);
-    await salvar("participantes", { id: salvo.id, anfitriao_id: id });
-  } else if (salvo.tipo !== "Anfitrião" && salvo.anfitriao_id) {
-    await salvar("participantes", { id: salvo.id, anfitriao_id: null });
-  }
-}
-
-async function resolverAnfitriao(nome, email, telefone) {
-  anfitrioes = await listAnfitrioes().catch(() => anfitrioes);
-  const e = (email || "").trim().toLowerCase();
-  if (e) {
-    const existe = anfitrioes.find((a) => (a.email || "").toLowerCase() === e);
-    if (existe) return existe.id;
-  }
-  const novo = await salvar("anfitrioes", {
-    nome, email: email || null, telefone: telefone || null,
-    tipo: "Titular", estagio_id: estagios[0]?.id || null,
-  });
-  anfitrioes.push(novo);
-  return novo.id;
 }
 
 async function recarregar() {
@@ -568,6 +546,7 @@ async function excluir(id) {
   const p = participantes.find((x) => x.id === id);
   if (!confirmar(`Excluir "${p?.nome}" da lista de participantes?`)) return;
   try {
+    await desvincularAoExcluirParticipante(p).catch(() => {});
     await remover("participantes", id);
     selecionados.delete(id);
     toast("Participante excluído.", "ok");
@@ -614,26 +593,23 @@ function modalImportar() {
       const validas = linhas.filter((l) => (l.nome || "").trim());
       if (!validas.length) { toast("Nenhuma linha com nome.", "erro"); return false; }
 
-      for (const l of validas) {
-        l._tipo = normTipo(l.tipo) || "Convidado";
-        l._anfitriao_id = l._tipo === "Anfitrião"
-          ? await resolverAnfitriao(l.nome.trim(), (l.email || "").trim(), (l.telefone || "").trim())
-          : null;
-      }
       const registros = validas.map((l) => ({
         nome: l.nome.trim(),
         email: (l.email || "").trim() || null,
         telefone: (l.telefone || "").trim() || null,
         empresa: (l.empresa || "").trim() || null,
-        tipo: l._tipo,
+        tipo: normTipo(l.tipo) || "Convidado",
         ingresso: (l.ingresso || "").trim() || null,
         faturamento: (l.faturamento || "").trim() || null,
         pagamento: normPag(l.pagamento) || "Gratuito",
         quantidade: Number(l.quantidade) || 1,
         etapa_id: etapas[0]?.id || null,
-        anfitriao_id: l._anfitriao_id,
       }));
-      await inserirLote("participantes", registros);
+      const criados = await inserirLote("participantes", registros);
+      // quem entrou como Anfitrião também vai para a aba Anfitriões (casa por e-mail)
+      for (const novo of criados.filter((p) => p.tipo === "Anfitrião")) {
+        await sincParticipanteAnfitriao(novo).catch((e) => console.warn(e));
+      }
       const ign = linhas.length - validas.length;
       toast(`${registros.length} participante(s) importado(s).` + (ign ? ` ${ign} ignorada(s).` : ""), "ok");
       await recarregar();

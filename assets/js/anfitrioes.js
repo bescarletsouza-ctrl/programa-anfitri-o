@@ -8,6 +8,7 @@ import {
 import {
   listEstagios, listGrupos, listResponsaveis, listAnfitrioes,
   listConvidadosDoAnfitriao, salvar, remover, inserirLote, reSincCategoriaAnfitriao,
+  sincAnfitriaoParticipante, desvincularAoExcluirAnfitriao,
 } from "./supabase.js";
 import { APP, TIPOS_ANFITRIAO } from "./config.js";
 import { parsearTabela } from "./tabela.js";
@@ -151,6 +152,7 @@ function modalNovo() {
         categoria_convidado: f.categoria_convidado.trim() || null,
         estagio_id: estagios[0]?.id || null,
       });
+      await sincAnfitriaoParticipante(novo).catch((e) => console.warn(e));
       toast("Anfitrião criado.", "ok");
       lista = await listAnfitrioes();
       render();
@@ -237,7 +239,11 @@ function modalImportar() {
         estagio_id: estagios[0]?.id || null,
       }));
 
-      await inserirLote("anfitrioes", registros);
+      const criados = await inserirLote("anfitrioes", registros);
+      // anfitrião que "vai ao evento" (padrão) também entra em Participantes
+      for (const novo of criados.filter((a) => a.vai !== false)) {
+        await sincAnfitriaoParticipante(novo).catch((e) => console.warn(e));
+      }
       const ignoradas = linhas.length - validas.length;
       toast(
         `${registros.length} anfitrião(ões) importado(s).` +
@@ -269,6 +275,7 @@ async function abrirGavetaDetalhe(id) {
     <div class="secao">
       <span class="badge badge-laranja">${esc(nomeEstagio(a.estagio_id))}</span>
       ${a.grupo_id ? `<span class="badge badge-neutro">${esc(nomeGrupo(a.grupo_id))}</span>` : ""}
+      ${a.participante_id ? `<span class="badge badge-info" title="Sincronizado pela chave e-mail">Também em Participantes</span>` : ""}
       <span class="badge badge-neutro">Criado em ${formatarData(a.created_at)}</span>
     </div>
 
@@ -332,7 +339,7 @@ async function abrirGavetaDetalhe(id) {
   g.querySelector("#d-salvar").onclick = async () => {
     try {
       const catConv = g.querySelector("#d-categoria-convidado").value.trim() || null;
-      await salvar("anfitrioes", {
+      const atualizado = await salvar("anfitrioes", {
         id: a.id,
         email: g.querySelector("#d-email").value.trim() || null,
         telefone: g.querySelector("#d-telefone").value.trim() || null,
@@ -347,6 +354,7 @@ async function abrirGavetaDetalhe(id) {
       if (catConv !== (a.categoria_convidado || null)) {
         await reSincCategoriaAnfitriao(a.id, catConv).catch(() => {});
       }
+      await sincAnfitriaoParticipante(atualizado).catch((e) => console.warn(e));
       toast("Anfitrião atualizado.", "ok");
       lista = await listAnfitrioes();
       render();
@@ -377,6 +385,7 @@ async function excluir(id) {
   const a = lista.find((x) => x.id === id);
   if (!confirmar(`Excluir "${a?.nome}" e seus convidados?`)) return;
   try {
+    await desvincularAoExcluirAnfitriao(a).catch(() => {});
     await remover("anfitrioes", id);
     toast("Anfitrião excluído.", "ok");
     fecharGaveta();
