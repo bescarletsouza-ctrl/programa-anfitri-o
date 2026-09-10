@@ -614,7 +614,10 @@ function renderPipeline() {
             ${esc(et ? et.nome : "Sem etapa")}<span class="ind-ordem">${ind}</span>
           </button>
           <span class="qtd">${itens.length}</span>
-          ${et ? `<button type="button" class="icone-btn coluna-editar" data-editar-etapa="${et.id}" title="Editar etapa">${icone("editar")}</button>` : ""}
+          ${et ? `<span class="linha-acoes coluna-acoes">
+            <button type="button" class="icone-btn" data-editar-etapa="${et.id}" title="Editar etapa">${icone("editar")}</button>
+            <button type="button" class="icone-btn" data-excluir-etapa="${et.id}" title="Excluir etapa">${icone("excluir")}</button>
+          </span>` : ""}
         </div>
         ${et?.situacao_alvo ? `<div class="coluna-vinculo" title="Ao mover para cá, a situação vira ${esc(et.situacao_alvo)}">→ situação: <b>${esc(et.situacao_alvo)}</b></div>` : ""}
         <div class="coluna-corpo">
@@ -631,6 +634,9 @@ function renderPipeline() {
   });
   el("kanban").querySelectorAll("[data-editar-etapa]").forEach((b) => {
     b.onclick = (e) => { e.stopPropagation(); modalEtapa(etapas.find((x) => x.id === b.dataset.editarEtapa)); };
+  });
+  el("kanban").querySelectorAll("[data-excluir-etapa]").forEach((b) => {
+    b.onclick = (e) => { e.stopPropagation(); excluirEtapa(etapas.find((x) => x.id === b.dataset.excluirEtapa)); };
   });
 
   el("kanban").querySelectorAll(".card-part").forEach((card) => {
@@ -707,18 +713,9 @@ function modalEtapa(et) {
         </select></label>
       ${et ? `<button type="button" class="btn btn-perigo btn-sm" id="etapa-excluir" style="margin-top:6px">Excluir etapa</button>` : ""}`,
     aoMontar: (root) => {
-      root.querySelector("#etapa-excluir")?.addEventListener("click", async () => {
-        const n = participantes.filter((p) => p.etapa_id === et.id).length;
-        if (!confirmar(`Excluir a etapa "${et.nome}"?${n ? ` ${n} participante(s) ficam sem etapa.` : ""}`)) return;
-        try {
-          await remover("etapas_participante", et.id);
-          delete ordemPipe[et.id]; salvarOrdemPipe();
-          toast("Etapa excluída.", "ok");
-          etapas = await listEtapasParticipante();
-          document.querySelector(".modal-fundo")?.remove();
-          atualizarSelectEtapas();
-          render();
-        } catch (e) { toast(e.message, "erro"); }
+      root.querySelector("#etapa-excluir")?.addEventListener("click", () => {
+        root.closest(".modal-fundo")?.remove();
+        excluirEtapa(et);
       });
     },
     onConfirmar: async (form) => {
@@ -740,6 +737,22 @@ function modalEtapa(et) {
       render();
     },
   });
+}
+
+async function excluirEtapa(et) {
+  if (!et) return;
+  const n = participantes.filter((p) => p.etapa_id === et.id).length;
+  if (!confirmar(`Excluir a etapa "${et.nome}"?${n ? ` ${n} participante(s) ficam sem etapa.` : ""}`)) return;
+  try {
+    await remover("etapas_participante", et.id);
+    delete ordemPipe[et.id];
+    salvarOrdemPipe();
+    toast("Etapa excluída.", "ok");
+    etapas = await listEtapasParticipante();
+    if (filtros.etapa === et.id) filtros.etapa = "";
+    atualizarSelectEtapas();
+    render();
+  } catch (e) { toast(e.message, "erro"); }
 }
 
 function atualizarSelectEtapas() {
