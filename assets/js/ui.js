@@ -29,6 +29,8 @@ const PATHS = {
   grafico: '<line x1="3" y1="21" x2="21" y2="21"/><rect x="5" y="12" width="4" height="7"/><rect x="11" y="7" width="4" height="12"/><rect x="17" y="3" width="4" height="16"/>',
   agenda: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
   ticket: '<path d="M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4z"/><line x1="13" y1="6" x2="13" y2="18" stroke-dasharray="2 2"/>',
+  recolher: '<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/>',
+  eventos: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01M12 14h.01M16 14h2"/>',
 };
 
 export function icone(nome, cls = "") {
@@ -49,48 +51,81 @@ function alternarTema() {
   aplicarTema(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
 }
 
-/* ---- Navegação -------------------------------------------------------- */
+/* ---- Navegação ------------------------------------------------------- */
+// Blocos ("clusters") do menu lateral. Configurações e Gerenciar eventos
+// ficam no rodapé (NAV_RODAPE).
 const NAV = [
-  { grupo: "Evento" },
-  { chave: "painel-evento", rotulo: "Painel",                  href: "painel-evento.html", ico: "painel" },
-  { chave: "ingressos",     rotulo: "Tipos de ingresso",       href: "ingressos.html",     ico: "ticket" },
-  { chave: "participantes", rotulo: "Participantes",           href: "participantes.html", ico: "participantes" },
-  { chave: "checkin",       rotulo: "Check-in",                href: "checkin.html",       ico: "check" },
-  { chave: "atividades",    rotulo: "Atividades",              href: "atividades.html",    ico: "agenda" },
-  { chave: "relatorios",    rotulo: "Relatórios",              href: "relatorios.html",    ico: "grafico" },
-  { chave: "config",        rotulo: "Configurações",           href: "configuracoes.html", ico: "config" },
-  { grupo: "Anfitriões" },
-  { chave: "painel",        rotulo: "Painel dos anfitriões",   href: "index.html",         ico: "grafico" },
-  { chave: "anfitrioes",    rotulo: APP.termoAnfitriaoPlural,  href: "anfitrioes.html",    ico: "anfitrioes" },
-  { chave: "convidados",    rotulo: APP.termoConvidadoPlural,  href: "convidados.html",    ico: "convidados" },
-  { chave: "formulario",    rotulo: "Formulário de inscrição", href: "formulario.html",    ico: "formulario" },
+  {
+    grupo: "Evento",
+    itens: [
+      { chave: "painel-evento", rotulo: "Painel",            href: "painel-evento.html", ico: "painel" },
+      { chave: "ingressos",     rotulo: "Tipos de ingresso",  href: "ingressos.html",     ico: "ticket" },
+      { chave: "participantes", rotulo: "Participantes",      href: "participantes.html", ico: "participantes" },
+      { chave: "checkin",       rotulo: "Check-in",           href: "checkin.html",       ico: "check" },
+      { chave: "atividades",    rotulo: "Atividades",         href: "atividades.html",    ico: "agenda" },
+      { chave: "relatorios",    rotulo: "Relatórios",         href: "relatorios.html",    ico: "grafico" },
+    ],
+  },
+  {
+    grupo: "Anfitriões",
+    itens: [
+      { chave: "painel",     rotulo: "Painel dos anfitriões",   href: "index.html",       ico: "grafico" },
+      { chave: "anfitrioes", rotulo: APP.termoAnfitriaoPlural,  href: "anfitrioes.html",  ico: "anfitrioes" },
+      { chave: "convidados", rotulo: APP.termoConvidadoPlural,  href: "convidados.html",  ico: "convidados" },
+      { chave: "formulario", rotulo: "Formulário de inscrição", href: "formulario.html",  ico: "formulario" },
+    ],
+  },
 ];
+
+const NAV_RODAPE = [
+  { chave: "config",  rotulo: "Configurações",     href: "configuracoes.html", ico: "config" },
+  { chave: "eventos", rotulo: "Gerenciar eventos", href: "eventos.html",       ico: "eventos" },
+];
+
+const RECOLHIDA_KEY = "side_recolhida";
+const lerRecolhida = () => {
+  try { return localStorage.getItem(RECOLHIDA_KEY) === "1"; } catch { return false; }
+};
+
+function alternarRecolhida() {
+  const el = document.getElementById("sidebar");
+  if (!el) return;
+  const nova = !el.classList.contains("recolhida");
+  el.classList.toggle("recolhida", nova);
+  try { localStorage.setItem(RECOLHIDA_KEY, nova ? "1" : "0"); } catch {}
+}
+
+const navLinkHtml = (n, ativo) =>
+  `<a class="nav-link ${n.chave === ativo ? "ativo" : ""}" href="${n.href}" title="${esc(n.rotulo)}">${icone(n.ico)}<span>${esc(n.rotulo)}</span></a>`;
 
 export function renderSidebar(ativo) {
   const el = document.getElementById("sidebar");
   if (!el) return;
-  el.className = "sidebar";
+  el.className = "sidebar" + (lerRecolhida() ? " recolhida" : "");
   el.innerHTML = `
-    <div class="marca">${APP.marcaHtml}</div>
+    <div class="marca">
+      <span class="marca-full">${APP.marcaHtml}</span>
+      <button class="side-recolher" data-recolher type="button" aria-label="Recolher / expandir menu" title="Recolher / expandir menu">${icone("recolher")}</button>
+    </div>
     <div class="evento-box">
       <select class="evento-sel" data-evento-sel aria-label="Evento">
         <option value="${esc(eventoId() || "")}">${esc(eventoNome() || "Selecionar evento")}</option>
       </select>
-      <a class="evento-gerenciar" href="eventos.html">Gerenciar eventos</a>
     </div>
     <nav>
-      ${NAV.map((n) =>
-        n.grupo
-          ? `<div class="nav-grupo">${esc(n.grupo)}</div>`
-          : `<a class="nav-link ${n.chave === ativo ? "ativo" : ""}" href="${n.href}">${icone(n.ico)}<span>${n.rotulo}</span></a>`
-      ).join("")}
+      ${NAV.map((bloco) => `
+        <div class="nav-bloco">
+          <div class="nav-grupo">${esc(bloco.grupo)}</div>
+          ${bloco.itens.map((n) => navLinkHtml(n, ativo)).join("")}
+        </div>`).join("")}
     </nav>
     <div class="rodape">
+      ${NAV_RODAPE.map((n) => navLinkHtml(n, ativo)).join("")}
       <button class="btn-tema" data-toggle-tema type="button"></button>
-      <div class="usuario">${APP.nomeProduto}</div>
     </div>`;
   aplicarTema(document.documentElement.dataset.theme === "dark" ? "dark" : "light");
   el.querySelector("[data-toggle-tema]").onclick = alternarTema;
+  el.querySelector("[data-recolher]").onclick = alternarRecolhida;
   montarTopbarMobile(el);
   popularSeletorEvento(el);
   prefetchNoHover(el);

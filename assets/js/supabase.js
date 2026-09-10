@@ -50,6 +50,14 @@ export const salvarEvento = (patch) =>
 export const criarEvento = (nome, data, local) =>
   supabase.rpc("criar_evento", { p_nome: nome, p_data: data || null, p_local: local || null }).then(ok);
 
+export const salvarEventoPorId = (id, patch) =>
+  supabase.from("eventos").update(patch).eq("id", id).select().single().then(ok);
+
+// Apaga o evento — o "on delete cascade" em evento_id leva junto anfitriões,
+// convidados, participantes, check-ins, atividades, ingressos e configurações.
+export const excluirEvento = (id) =>
+  supabase.from("eventos").delete().eq("id", id).then(ok);
+
 /* ---- Leitura (admin: escopo automático) ------------------------------ */
 export const listGrupos = (eid) =>
   supabase.from("grupos").select("*").eq("evento_id", ev(eid)).order("nome").then(ok);
