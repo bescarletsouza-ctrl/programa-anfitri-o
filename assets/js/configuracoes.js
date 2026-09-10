@@ -67,6 +67,7 @@ async function carregar() {
     el("carregando").hidden = true;
     el("conteudo").hidden = false;
     montarCrachaConfig();
+    montarCtaMobile();
     await Promise.allSettled([renderGrupos(), renderResponsaveis(), renderEstagios(), renderEtapasPart(), renderMarcos()]);
   } catch (e) {
     el("carregando").innerHTML = /evento_id|eventos|schema cache/.test(e.message || "")
@@ -284,6 +285,20 @@ async function salvarCracha() {
     config = salvo;
     toast("Crachá salvo.", "ok");
   } catch (e) { toast(e.message, "erro"); }
+}
+
+/* ---- CTA: check-in pelo celular (link + QR) ---- */
+function montarCtaMobile() {
+  const inp = el("ck-mobile-link");
+  if (!inp) return;
+  const link = new URL(`../checkin-app.html?evento=${eventoId()}`, location.href).href;
+  inp.value = link;
+  el("ck-mobile-abrir").href = link;
+  el("ck-mobile-copiar").onclick = () =>
+    navigator.clipboard.writeText(link).then(() => toast("Link copiado.", "ok"));
+  qrDataURL(link).then((uri) => {
+    if (uri) el("ck-mobile-qr").innerHTML = `<img src="${uri}" alt="QR do check-in no celular" />`;
+  });
 }
 
 /* ---- editar / criar ---- */

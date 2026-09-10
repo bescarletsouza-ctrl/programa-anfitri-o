@@ -327,6 +327,20 @@ export const listParticipantes = (eid) =>
     .order("created_at", { ascending: false })
     .then(ok);
 
+// Busca 1 participante pelo conteúdo do QR do crachá (código ou id) — usado no
+// check-in mobile. Aceita "IMER-0042" ou um uuid; tolera lixo antes/depois.
+export async function buscarParticipantePorQR(valor, eid) {
+  const bruto = String(valor || "").trim();
+  if (!bruto) return null;
+  const eventoU = ev(eid);
+  const uuid = bruto.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)?.[0];
+  const codigo = bruto.split(/\s+/).pop();
+  let q = supabase.from("participantes").select("*").eq("evento_id", eventoU).limit(1);
+  q = uuid ? q.or(`id.eq.${uuid},codigo.eq.${codigo}`) : q.eq("codigo", codigo);
+  const rows = await q.then(ok);
+  return rows[0] || null;
+}
+
 /* ---- Tipos de ingresso ------------------------------------------- */
 export const listTiposIngresso = (eid) =>
   supabase

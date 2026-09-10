@@ -346,6 +346,16 @@ table.tabela tbody tr:last-child td { border-bottom: none; }
 .cfg-sep { border: none; border-top: 1px solid var(--cinza-100); margin: 6px 0 16px; }
 @media (max-width: 640px) { .cfg-campos-2 { grid-template-columns: 1fr; } }
 
+.cfg-mobile { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+.cfg-mobile-qr {
+  flex-shrink: 0; width: 150px; height: 150px; border-radius: var(--raio); overflow: hidden;
+  background: #fff; border: 1px solid var(--borda); display: grid; place-items: center;
+}
+.cfg-mobile-qr img { width: 100%; height: 100%; image-rendering: pixelated; }
+.cfg-mobile-acoes { flex: 1; min-width: 220px; }
+.cfg-mobile-acoes .campo { margin-bottom: 10px; }
+.cfg-mobile-acoes .input { font-size: .82rem; }
+
 /* ---- Integrações ---- */
 .integ-conectores { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
 .integ-card {

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="light dark" />
+<meta name="theme-color" content="#0c0c0d" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Check-in" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="apple-touch-icon" href="assets/img/app-icon.svg" />
+<link rel="icon" href="assets/img/app-icon.svg" />
+<title>Check-in — We.events</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/css/theme.css" />
+<link rel="stylesheet" href="assets/css/checkin-app.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js" defer></script>
+</head>
+<body class="ck-app">
+
+  <!-- Splash / seleção de evento -->
+  <section id="tela-abrir" class="ck-tela ck-abrir">
+    <div class="ck-abrir-marca">We<b>.events</b></div>
+    <h1>Check-in</h1>
+    <p id="abrir-msg">Carregando o evento…</p>
+    <form id="form-evento" hidden>
+      <label>Código do evento
+        <input class="ck-input" id="in-evento" placeholder="cole o link ou o id do evento" required />
+      </label>
+      <button class="ck-btn ck-btn-primario" type="submit">Entrar</button>
+    </form>
+  </section>
+
+  <!-- App -->
+  <div id="app" hidden>
+    <header class="ck-topo">
+      <div class="ck-topo-info">
+        <span class="ck-topo-evento" id="topo-evento">—</span>
+        <span class="ck-topo-sub"><b id="topo-n">0</b> credenciados hoje</span>
+      </div>
+      <button class="ck-icone-btn" id="btn-buscar" aria-label="Buscar por nome">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      </button>
+    </header>
+
+    <main class="ck-scanner" id="scanner-wrap">
+      <div id="reader"></div>
+      <div class="ck-mira" id="mira">
+        <div class="ck-mira-quadro"><i></i><i></i><i></i><i></i></div>
+        <p class="ck-mira-txt" id="mira-txt">Aponte para o QR Code do crachá</p>
+      </div>
+      <div class="ck-cam-erro" id="cam-erro" hidden>
+        <p>Não consegui abrir a câmera.</p>
+        <button class="ck-btn ck-btn-primario" id="btn-cam-retry">Permitir câmera</button>
+        <button class="ck-btn ck-btn-fantasma" id="btn-cam-manual">Buscar por nome</button>
+      </div>
+    </main>
+
+    <div class="ck-rodape">
+      <button class="ck-btn ck-btn-grande" id="btn-manual-2">Buscar participante pelo nome</button>
+    </div>
+  </div>
+
+  <!-- Bottom sheet: resultado -->
+  <div class="ck-sheet-fundo" id="sheet-fundo" hidden></div>
+  <section class="ck-sheet" id="sheet" hidden aria-live="polite"></section>
+
+  <!-- Busca manual -->
+  <section class="ck-tela ck-busca" id="tela-busca" hidden>
+    <header class="ck-busca-topo">
+      <button class="ck-icone-btn" id="busca-voltar" aria-label="Voltar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <input class="ck-input" id="in-busca" placeholder="Nome, e-mail ou código" autocomplete="off" />
+    </header>
+    <div class="ck-busca-lista" id="busca-lista"></div>
+  </section>
+
+  <!-- Área de impressão do crachá (preenchida pelo cracha.js) -->
+  <div id="cracha" hidden></div>
+
+<script type="module" src="assets/js/checkin-app.js"></script>
+</body>
+</html>
