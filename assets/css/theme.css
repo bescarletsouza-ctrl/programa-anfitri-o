@@ -175,7 +175,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 }
 .evento-sel:focus { outline: none; border-color: var(--cor-laranja); }
 
-.sidebar nav { display: flex; flex-direction: column; gap: 4px; overflow-y: auto; }
+.sidebar nav { display: flex; flex-direction: column; gap: 4px; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .nav-bloco { display: flex; flex-direction: column; gap: 2px; }
 .nav-bloco + .nav-bloco { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--side-borda); }
 .nav-grupo {
