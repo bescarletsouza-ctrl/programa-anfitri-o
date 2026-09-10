@@ -208,9 +208,13 @@ function renderTrilha(atv) {
     rotuloTot = "Total";
     rotuloAus = "Ausentes";
   }
-  el("n-presentes").textContent = presentes;
-  el("n-total").textContent = atv && atv.vagas ? atv.vagas : total;
-  el("n-ausentes").textContent = atv && atv.vagas ? Math.max(0, atv.vagas - presentes) : ausentes;
+  const base = atv && atv.vagas ? atv.vagas : total;
+  const totalMostrado = base;
+  const ausMostrado = atv && atv.vagas ? Math.max(0, atv.vagas - presentes) : ausentes;
+  const pct = (n) => (base > 0 ? ` <small>${Math.round((n / base) * 100)}%</small>` : "");
+  el("n-presentes").innerHTML = presentes + pct(presentes);
+  el("n-total").textContent = totalMostrado;
+  el("n-ausentes").innerHTML = ausMostrado + pct(ausMostrado);
   el("lbl-presentes").textContent = rotuloPres;
   el("lbl-total").textContent = rotuloTot;
   el("lbl-ausentes").textContent = rotuloAus;
