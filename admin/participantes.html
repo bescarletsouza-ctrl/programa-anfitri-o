@@ -28,11 +28,12 @@
 
     <div id="carregando" class="vazio">Carregando…</div>
 
-    <!-- ================= LISTA ================= -->
-    <div id="vista-lista" hidden>
+    <!-- ================= BARRA + FILTROS (compartilhado) ================= -->
+    <div id="conteudo-part" hidden>
       <div class="barra-topo" style="margin-bottom:12px">
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-primario" id="btn-cadastrar">+ Cadastrar</button>
+          <button class="btn btn-secundario" id="btn-nova-etapa" hidden>+ Etapa</button>
           <button class="btn btn-secundario" id="btn-importar">Importar Excel</button>
           <button class="btn btn-secundario" id="btn-exportar">Exportar Excel</button>
           <button class="btn btn-secundario" id="btn-email">Enviar e-mail</button>
@@ -99,7 +100,10 @@
           </div>
         </div>
       </section>
+    </div>
 
+    <!-- ================= LISTA ================= -->
+    <div id="vista-lista" hidden>
       <div class="barra-acoes" id="barra-acoes" hidden>
         <span class="barra-acoes-cont" id="sel-cont">0 selecionados</span>
         <button class="btn btn-sm btn-secundario" data-acao="email">Enviar e-mail</button>
@@ -126,10 +130,6 @@
 
     <!-- ================= PIPELINE ================= -->
     <div id="vista-pipeline" hidden>
-      <div class="filtros" style="margin-bottom:14px">
-        <input class="input" id="busca-pipe" placeholder="Buscar…" />
-        <select class="select" id="f-tipo-pipe"><option value="">Todos os tipos</option></select>
-      </div>
       <div class="kanban" id="kanban"></div>
     </div>
   </main>

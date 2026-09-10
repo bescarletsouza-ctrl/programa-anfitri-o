@@ -72,9 +72,21 @@ const selecionados = new Set();
 const FILTROS_VAZIO = {
   busca: "", campo: "", situacao: "", tipo: "", pagamento: "", dataDe: "", dataAte: "",
   categoria: "", etapa: "", atividade: "", presAtv: "", presenca: "",
-  buscaPipe: "", tipoPipe: "",
 };
 const filtros = { ...FILTROS_VAZIO };
+
+// ordenação dos cards em cada coluna do pipeline (clique no cabeçalho da etapa)
+const ORDENACOES = [
+  { valor: "", rotulo: "Ordem padrão" },
+  { valor: "nome-asc", rotulo: "Nome (A → Z)" },
+  { valor: "nome-desc", rotulo: "Nome (Z → A)" },
+  { valor: "email-asc", rotulo: "E-mail (A → Z)" },
+  { valor: "cadastro-desc", rotulo: "Cadastro (mais novo)" },
+  { valor: "cadastro-asc", rotulo: "Cadastro (mais antigo)" },
+];
+let ordemPipe = {};
+try { ordemPipe = JSON.parse(localStorage.getItem("part_pipe_ordem") || "{}") || {}; } catch {}
+const salvarOrdemPipe = () => { try { localStorage.setItem("part_pipe_ordem", JSON.stringify(ordemPipe)); } catch {} };
 
 const badgeTipo = (t) => (t === "Anfitrião" ? "badge-laranja" : "badge-neutro");
 const badgePag = (p) =>
@@ -134,7 +146,6 @@ async function carregar() {
       listTiposIngresso().catch(() => []),
     ]);
     opcoes(el("f-tipo"), TIPOS, "Todos os tipos");
-    opcoes(el("f-tipo-pipe"), TIPOS, "Todos os tipos");
     opcoes(el("f-pagamento"), PAGAMENTOS, "Todos os pagamentos");
     opcoes(el("f-situacao"), SITUACOES, "Todas (menos desativados)");
     el("f-etapa").innerHTML = `<option value="">Todas</option>` +
@@ -144,6 +155,7 @@ async function carregar() {
     el("f-categoria").innerHTML = `<option value="">Todas</option>` +
       categoriasIngresso().map((c) => `<option>${esc(c)}</option>`).join("");
     el("carregando").hidden = true;
+    el("conteudo-part").hidden = false;
     ligarEventos();
     render();
   } catch (e) {
@@ -172,9 +184,6 @@ function ligarEventos() {
     };
   });
   const refiltra = (fn) => (e) => { fn(e); pagina = 1; render(); };
-  el("busca-pipe").addEventListener("input", debounce((e) => { filtros.buscaPipe = e.target.value.toLowerCase(); render(); }, 200));
-  el("f-tipo-pipe").onchange = (e) => { filtros.tipoPipe = e.target.value; render(); };
-
   el("f-busca").addEventListener("input", debounce(refiltra((e) => { filtros.busca = e.target.value.toLowerCase(); }), 200));
   el("f-campo").onchange = refiltra((e) => { filtros.campo = e.target.value; });
   el("f-situacao").onchange = refiltra((e) => { filtros.situacao = e.target.value; });
@@ -195,7 +204,7 @@ function ligarEventos() {
     el("btn-toggle-filtros").classList.toggle("ativo", filtrosAtivos());
   };
   el("btn-limpar-filtros").onclick = () => {
-    Object.assign(filtros, { ...FILTROS_VAZIO, buscaPipe: filtros.buscaPipe, tipoPipe: filtros.tipoPipe });
+    Object.assign(filtros, FILTROS_VAZIO);
     ["f-busca", "f-campo", "f-situacao", "f-tipo", "f-pagamento", "f-data-de", "f-data-ate",
      "f-categoria", "f-etapa", "f-atividade", "f-pres-atv", "f-presenca"].forEach((id) => (el(id).value = ""));
     pagina = 1;
@@ -204,6 +213,8 @@ function ligarEventos() {
 
   el("btn-cadastrar").innerHTML = icone("mais") + "Cadastrar";
   el("btn-cadastrar").onclick = () => abrirForm(null);
+  el("btn-nova-etapa").innerHTML = icone("mais") + "Etapa";
+  el("btn-nova-etapa").onclick = () => modalEtapa(null);
   el("btn-importar").innerHTML = icone("subir") + "Importar Excel";
   el("btn-importar").onclick = modalImportar;
   el("btn-exportar").innerHTML = icone("baixar") + "Exportar Excel";
@@ -233,9 +244,12 @@ function renderCabecalho() {
 
 /* ---- render ---- */
 function render() {
-  el("vista-lista").hidden = vista !== "lista";
-  el("vista-pipeline").hidden = vista !== "pipeline";
-  vista === "lista" ? renderLista() : renderPipeline();
+  const lista = vista === "lista";
+  el("vista-lista").hidden = !lista;
+  el("vista-pipeline").hidden = lista;
+  el("btn-colunas").hidden = !lista;
+  el("btn-nova-etapa").hidden = lista;
+  lista ? renderLista() : renderPipeline();
 }
 
 function filtrosAtivos() {
@@ -564,32 +578,59 @@ function renderPaginacao(total, totalPag) {
   box.querySelector('[data-pg="prox"]').onclick = () => { pagina = Math.min(totalPag, pagina + 1); render(); window.scrollTo({ top: 0 }); };
 }
 
-function renderPipeline() {
-  const dados = participantes.filter((p) => {
-    if (!ativo(p)) return false;
-    if (filtros.tipoPipe && p.tipo !== filtros.tipoPipe) return false;
-    if (filtros.buscaPipe) {
-      const alvo = `${p.nome} ${p.email || ""}`.toLowerCase();
-      if (!alvo.includes(filtros.buscaPipe)) return false;
-    }
-    return true;
+function ordenarCards(itens, chave) {
+  const modo = ordemPipe[chave] || "";
+  if (!modo) return itens;
+  const [campo, dir] = modo.split("-");
+  const mult = dir === "desc" ? -1 : 1;
+  const val = (p) => campo === "cadastro"
+    ? new Date(p.created_at).getTime()
+    : (p[campo] || "").toString().toLowerCase();
+  return [...itens].sort((a, b) => {
+    const x = val(a), y = val(b);
+    return (x < y ? -1 : x > y ? 1 : 0) * mult;
   });
+}
+
+function renderPipeline() {
+  const dados = filtrarLista();
+  const totalAtivos = participantes.filter(ativo).length;
+  el("contador").textContent = `${dados.length} de ${totalAtivos} participantes`;
+  el("btn-toggle-filtros").classList.toggle("ativo", filtrosAtivos());
+
   const semEtapa = dados.filter((p) => !p.etapa_id);
-  const colunas = etapas.map((et) => ({ et, itens: dados.filter((p) => p.etapa_id === et.id) }));
-  if (semEtapa.length) colunas.unshift({ et: null, itens: semEtapa });
+  const colunas = etapas.map((et) => ({ et, chave: et.id, itens: dados.filter((p) => p.etapa_id === et.id) }));
+  colunas.unshift({ et: null, chave: "sem", itens: semEtapa });
 
   el("kanban").innerHTML = colunas
-    .map(({ et, itens }) => {
+    .map(({ et, chave, itens }) => {
       const cor = et?.cor || "var(--cinza-400)";
+      const ind = ordemPipe[chave] ? (ordemPipe[chave].endsWith("desc") ? " ▼" : " ▲") : "";
+      const ordenados = ordenarCards(itens, chave);
       return `<div class="coluna">
-        <div class="coluna-topo"><span class="ponto" style="background:${esc(cor)}"></span>
-          ${esc(et ? et.nome : "Sem etapa")}<span class="qtd">${itens.length}</span></div>
+        <div class="coluna-topo">
+          <button type="button" class="coluna-titulo" data-ordenar="${esc(chave)}" title="Ordenar cards">
+            <span class="ponto" style="background:${esc(cor)}"></span>
+            ${esc(et ? et.nome : "Sem etapa")}<span class="ind-ordem">${ind}</span>
+          </button>
+          <span class="qtd">${itens.length}</span>
+          ${et ? `<button type="button" class="icone-btn coluna-editar" data-editar-etapa="${et.id}" title="Editar etapa">${icone("editar")}</button>` : ""}
+        </div>
         <div class="coluna-corpo">
-          ${itens.map((p) => cardPart(p)).join("") || `<p class="pagina-sub" style="margin:8px 0;font-size:.78rem">—</p>`}
+          ${ordenados.map((p) => cardPart(p)).join("") || `<p class="pagina-sub" style="margin:8px 0;font-size:.78rem">—</p>`}
         </div>
       </div>`;
     })
-    .join("");
+    .join("") +
+    `<button type="button" class="coluna coluna-nova" id="coluna-nova">${icone("mais")} Nova etapa</button>`;
+
+  el("kanban").querySelector("#coluna-nova").onclick = () => modalEtapa(null);
+  el("kanban").querySelectorAll("[data-ordenar]").forEach((b) => {
+    b.onclick = () => escolherOrdem(b, b.dataset.ordenar);
+  });
+  el("kanban").querySelectorAll("[data-editar-etapa]").forEach((b) => {
+    b.onclick = (e) => { e.stopPropagation(); modalEtapa(etapas.find((x) => x.id === b.dataset.editarEtapa)); };
+  });
 
   el("kanban").querySelectorAll(".card-part").forEach((card) => {
     const id = card.dataset.id;
@@ -604,6 +645,59 @@ function renderPipeline() {
     };
     card.querySelector(".card-corpo").onclick = () => abrirGavetaDetalhe(id);
   });
+}
+
+async function escolherOrdem(anchor, chave) {
+  const itens = ORDENACOES.map((o) => ({ ...o, atual: (ordemPipe[chave] || "") === o.valor }));
+  const escolha = await abrirMenu(anchor, itens);
+  if (escolha === null) return;
+  if (escolha) ordemPipe[chave] = escolha;
+  else delete ordemPipe[chave];
+  salvarOrdemPipe();
+  renderPipeline();
+}
+
+/* ---- Criar / editar etapa do pipeline ---- */
+function modalEtapa(et) {
+  abrirModal({
+    titulo: et ? "Editar etapa" : "Nova etapa",
+    textoConfirmar: et ? "Salvar" : "Criar",
+    corpoHtml: `
+      <label class="campo"><span>Nome *</span><input class="input" name="nome" required value="${esc(et?.nome || "")}" placeholder="Ex.: Novo, Em contato, Confirmado" /></label>
+      <label class="campo"><span>Ordem</span><input class="input" name="ordem" type="number" value="${et?.ordem ?? etapas.length}" /></label>
+      <label class="campo"><span>Cor</span><input class="input" name="cor" type="color" value="${esc(et?.cor || "#9aa0a6")}" style="height:40px;padding:4px" /></label>
+      ${et ? `<button type="button" class="btn btn-perigo btn-sm" id="etapa-excluir" style="margin-top:6px">Excluir etapa</button>` : ""}`,
+    aoMontar: (root) => {
+      root.querySelector("#etapa-excluir")?.addEventListener("click", async () => {
+        const n = participantes.filter((p) => p.etapa_id === et.id).length;
+        if (!confirmar(`Excluir a etapa "${et.nome}"?${n ? ` ${n} participante(s) ficam sem etapa.` : ""}`)) return;
+        try {
+          await remover("etapas_participante", et.id);
+          delete ordemPipe[et.id]; salvarOrdemPipe();
+          toast("Etapa excluída.", "ok");
+          etapas = await listEtapasParticipante();
+          document.querySelector(".modal-fundo")?.remove();
+          atualizarSelectEtapas();
+          render();
+        } catch (e) { toast(e.message, "erro"); }
+      });
+    },
+    onConfirmar: async (form) => {
+      const f = Object.fromEntries(new FormData(form));
+      const reg = { nome: f.nome.trim(), ordem: Number(f.ordem) || 0, cor: f.cor || null };
+      if (et) reg.id = et.id;
+      await salvar("etapas_participante", reg);
+      toast("Etapa salva.", "ok");
+      etapas = await listEtapasParticipante();
+      atualizarSelectEtapas();
+      render();
+    },
+  });
+}
+
+function atualizarSelectEtapas() {
+  el("f-etapa").innerHTML = `<option value="">Todas</option>` +
+    etapas.map((e) => `<option value="${e.id}" ${e.id === filtros.etapa ? "selected" : ""}>${esc(e.nome)}</option>`).join("");
 }
 
 function cardPart(p) {

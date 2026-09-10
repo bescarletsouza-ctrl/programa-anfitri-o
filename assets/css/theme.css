@@ -705,7 +705,25 @@ table.tabela tbody tr:last-child td { border-bottom: none; }
 }
 .kanban .coluna-topo .ponto { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .kanban .coluna-topo .qtd { margin-left: auto; font-size: .72rem; color: var(--texto-tenue); font-variant-numeric: tabular-nums; }
+.kanban .coluna-titulo {
+  display: flex; align-items: center; gap: 8px; background: none; border: none; padding: 0;
+  font: inherit; color: inherit; cursor: pointer; text-align: left; min-width: 0;
+}
+.kanban .coluna-titulo:hover { color: var(--cor-laranja-forte); }
+.kanban .coluna-titulo .ind-ordem { color: var(--cor-laranja); font-size: .7rem; }
+.kanban .coluna-editar { width: 24px; height: 24px; opacity: 0; transition: opacity .15s; }
+.kanban .coluna-topo:hover .coluna-editar { opacity: .6; }
+.kanban .coluna-editar:hover { opacity: 1; }
+.kanban .coluna-editar svg { width: 13px; height: 13px; }
 .kanban .coluna-corpo { padding: 10px; overflow-y: auto; display: grid; gap: 9px; }
+.kanban .coluna-nova {
+  flex: 0 0 190px; align-self: stretch; max-height: none;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  border: 1.5px dashed var(--borda-forte); background: transparent; color: var(--texto-suave);
+  font-weight: 600; font-size: .82rem; cursor: pointer;
+}
+.kanban .coluna-nova:hover { border-color: var(--cor-laranja); color: var(--cor-laranja-forte); }
+.kanban .coluna-nova svg { width: 15px; height: 15px; }
 .kanban .card-part {
   background: var(--superficie); border: 1px solid var(--borda);
   border-radius: var(--raio); padding: 12px; box-shadow: var(--sombra);
