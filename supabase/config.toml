@@ -7,3 +7,13 @@ project_id = "xiuhqkvkiexmbgwyvunr"
 # a chave e restringe os destinatários aos participantes do evento.
 [functions.enviar-email]
 verify_jwt = false
+
+# Dispara webhooks/conectores de saída. Chamada pelo admin com a chave
+# publishable; valida a chave e escopa pelo evento.
+[functions.integracoes]
+verify_jwt = false
+
+# Recebe inscrições de fora. Autenticada pelo token da integração de entrada
+# (querystring ?token= ou header x-webhook-token), não por JWT.
+[functions.webhook-in]
+verify_jwt = false

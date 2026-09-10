@@ -31,7 +31,7 @@ function ok(res) {
 const TABELAS_EVENTO = new Set([
   "grupos", "responsaveis", "estagios", "anfitrioes", "convidados",
   "form_perguntas", "marcos", "etapas_participante", "participantes", "checkins",
-  "atividades", "tipos_ingresso",
+  "atividades", "tipos_ingresso", "integracoes", "webhook_entregas",
 ]);
 
 // eid: id explícito (páginas públicas). Sem argumento → evento atual do admin.
@@ -129,7 +129,7 @@ export async function sincParticipanteConvidado(convidado) {
     .from("participantes").select("id").eq("convidado_id", convidado.id).then(ok);
   if (aprovado && !existentes.length) {
     const ingresso = convidado.anfitriao?.categoria_convidado || null;
-    return salvar("participantes", {
+    const novo = await salvar("participantes", {
       nome: convidado.nome,
       email: convidado.email || null,
       telefone: convidado.telefone || null,
@@ -141,6 +141,8 @@ export async function sincParticipanteConvidado(convidado) {
       etapa_id: await primeiraEtapaId(convidado.evento_id),
       convidado_id: convidado.id,
     });
+    dispararIntegracoes("convidado.aprovado", { participante_id: novo.id, participante: { nome: novo.nome, email: novo.email, telefone: novo.telefone }, convidado_id: convidado.id });
+    return novo;
   }
   if (!aprovado && existentes.length) {
     await supabase.from("participantes").delete().in("id", existentes.map((p) => p.id)).then(ok);
@@ -375,6 +377,11 @@ export async function registrarCheckin(participanteId, acao = "entrada", origem 
   const linha = { participante_id: participanteId, acao, origem };
   if (atividadeId) linha.atividade_id = atividadeId;
   await salvar("checkins", linha);
+  if (acao === "entrada") {
+    dispararIntegracoes(atividadeId ? "checkin.atividade" : "checkin.realizado", {
+      participante_id: participanteId, atividade_id: atividadeId || null,
+    });
+  }
   if (atividadeId) return { id: participanteId };
   return salvar("participantes", {
     id: participanteId,
@@ -470,4 +477,45 @@ export async function enviarEmail({ participanteIds, assunto, corpo, de }) {
   }
   if (data?.erro) throw new Error(data.erro);
   return data; // { enviados, falhas, total }
+}
+
+/* ---- Integrações e Webhooks (Edge Functions "integracoes" / "webhook-in") -- */
+export const listIntegracoes = (eid) =>
+  supabase.from("integracoes").select("*").eq("evento_id", ev(eid))
+    .order("tipo").order("created_at", { ascending: false }).then(ok);
+
+export const listWebhookEntregas = (eid) =>
+  supabase.from("webhook_entregas").select("*").eq("evento_id", ev(eid))
+    .order("at", { ascending: false }).limit(60).then(ok);
+
+// URL que ticketeiras / gateways chamam para criar participantes.
+export const webhookEntradaUrl = (token) =>
+  `${SUPABASE_URL}/functions/v1/webhook-in?evento_id=${encodeURIComponent(eventoId() || "")}&token=${encodeURIComponent(token || "")}`;
+
+// Dispara um gatilho para todas as integrações do evento. Silencioso por
+// natureza (não trava o fluxo do admin se a função não estiver no ar).
+export async function dispararIntegracoes(gatilho, dados = {}) {
+  try {
+    await supabase.functions.invoke("integracoes", {
+      body: { evento_id: eventoId(), gatilho, dados },
+    });
+  } catch (e) {
+    console.warn("[integracoes] não disparou:", e?.message || e);
+  }
+}
+
+// Envia um payload de teste de uma integração específica. Aqui os erros sobem.
+export async function testarIntegracao(integracaoId) {
+  const { data, error } = await supabase.functions.invoke("integracoes", {
+    body: { evento_id: eventoId(), integracao_id: integracaoId, teste: true },
+  });
+  if (error) {
+    throw new Error(
+      /Failed to (send|fetch)|not found|Function not found/i.test(error.message || "")
+        ? "Função não encontrada. Faça o deploy de supabase/functions/integracoes."
+        : error.message || "Falha ao testar."
+    );
+  }
+  if (data?.erro) throw new Error(data.erro);
+  return data; // { disparadas, entregas: [{ ok, status, erro }] }
 }

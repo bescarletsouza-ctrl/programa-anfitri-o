@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<script>try{var t=localStorage.getItem('tema')==='dark'?'dark':'light';document.documentElement.dataset.theme=t;document.documentElement.style.background=t==='dark'?'#0c0c0d':'#f7f7f6';}catch(e){}</script>
+<title>Integrações — We.events</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../assets/css/theme.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside id="sidebar" class="sidebar"></aside>
+  <main class="conteudo">
+    <div class="barra-topo">
+      <div>
+        <h1 class="pagina-titulo">Integrações e webhooks</h1>
+        <p class="pagina-sub">Conecte o We.events às plataformas do seu evento — automação, WhatsApp, e-mail marketing, ticketeiras e gateways de pagamento.</p>
+      </div>
+    </div>
+
+    <div id="carregando" class="vazio">Carregando…</div>
+
+    <div id="conteudo" hidden>
+      <div class="aviso" style="margin:0 0 26px">
+        <b>Antes de usar em produção:</b> as chaves e segredos ficam salvos no banco,
+        que hoje é aberto pela chave pública (o app ainda não tem login). Use chaves
+        de teste até o acesso ser restringido.
+      </div>
+
+      <section class="cfg-bloco">
+        <div class="cfg-bloco-cab">
+          <h2>Webhooks de saída</h2>
+          <p>O We.events envia um POST em JSON para a sua URL quando algo acontece no evento. Use com Zapier, Make, n8n ou um endpoint próprio.</p>
+        </div>
+        <section class="card">
+          <div class="barra-topo" style="margin-bottom:14px">
+            <h3 style="margin:0">Endpoints</h3>
+            <button class="btn btn-primario btn-sm" id="add-webhook">+ Webhook</button>
+          </div>
+          <div id="lista-webhooks"></div>
+        </section>
+      </section>
+
+      <section class="cfg-bloco">
+        <div class="cfg-bloco-cab">
+          <h2>Conectores</h2>
+          <p>Empurra os dados direto para a plataforma usando a API dela. Cadastre as credenciais uma vez.</p>
+        </div>
+        <div class="integ-conectores" id="conectores"></div>
+        <div id="lista-conectores" style="margin-top:16px"></div>
+      </section>
+
+      <section class="cfg-bloco">
+        <div class="cfg-bloco-cab">
+          <h2>Receber inscrições (webhook de entrada)</h2>
+          <p>Uma URL do We.events que ticketeiras e gateways chamam para criar ou atualizar participantes automaticamente. Cada origem tem sua própria URL com token.</p>
+        </div>
+        <section class="card">
+          <div class="barra-topo" style="margin-bottom:14px">
+            <h3 style="margin:0">Origens</h3>
+            <button class="btn btn-primario btn-sm" id="add-entrada">+ Origem</button>
+          </div>
+          <div id="lista-entradas"></div>
+        </section>
+      </section>
+
+      <section class="cfg-bloco">
+        <div class="cfg-bloco-cab">
+          <h2>Últimas entregas</h2>
+          <p>Registro das chamadas de saída e de entrada (mantém 30 dias).</p>
+        </div>
+        <section class="card">
+          <div class="tabela-wrap" id="wrap-log" hidden>
+            <table class="tabela">
+              <thead><tr><th>Quando</th><th>Integração</th><th>Gatilho</th><th>Resultado</th></tr></thead>
+              <tbody id="linhas-log"></tbody>
+            </table>
+          </div>
+          <div id="vazio-log" class="vazio">Nenhuma entrega ainda.</div>
+        </section>
+      </section>
+    </div>
+  </main>
+</div>
+<script type="module" src="../assets/js/integracoes.js"></script>
+</body>
+</html>

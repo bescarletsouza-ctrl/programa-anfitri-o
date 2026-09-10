@@ -11,7 +11,7 @@ import {
 import {
   listParticipantes, listEtapasParticipante, listAtividades, listCheckins, listTiposIngresso,
   salvar, remover, inserirLote, atualizarEmLote, removerEmLote, registrarCheckin,
-  sincParticipanteAnfitriao, desvincularAoExcluirParticipante,
+  sincParticipanteAnfitriao, desvincularAoExcluirParticipante, dispararIntegracoes,
 } from "./supabase.js";
 import { eventoNome } from "./evento.js";
 import { imprimirCracha } from "./cracha.js";
@@ -724,7 +724,13 @@ async function moverEtapa(id, etapaId) {
   renderPipeline();
   try {
     await salvar("participantes", { id, etapa_id: etapaId, ...(novaSit ? { situacao: novaSit } : {}) });
-    if (novaSit) toast(`${p.nome}: situação → ${novaSit}.`, "ok");
+    if (novaSit) {
+      toast(`${p.nome}: situação → ${novaSit}.`, "ok");
+      dispararIntegracoes("participante.situacao", {
+        participante_id: id, situacao: novaSit,
+        participante: { nome: p.nome, email: p.email, telefone: p.telefone, ingresso: p.ingresso, codigo: p.codigo },
+      });
+    }
   } catch (err) {
     Object.assign(p, anterior);
     renderPipeline();
@@ -869,6 +875,10 @@ function abrirForm(p) {
       if (p) reg.id = p.id;
       const salvo = await salvar("participantes", reg);
       await sincParticipanteAnfitriao(salvo).catch((e) => console.warn(e));
+      dispararIntegracoes(p ? "participante.atualizado" : "participante.criado", {
+        participante_id: salvo.id,
+        participante: { nome: salvo.nome, email: salvo.email, telefone: salvo.telefone, empresa: salvo.empresa, ingresso: salvo.ingresso, situacao: salvo.situacao, codigo: salvo.codigo },
+      });
       toast(p ? "Participante atualizado." : "Participante cadastrado.", "ok");
       await recarregar();
     },

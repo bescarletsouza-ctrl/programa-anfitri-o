@@ -31,6 +31,9 @@ const PATHS = {
   ticket: '<path d="M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4z"/><line x1="13" y1="6" x2="13" y2="18" stroke-dasharray="2 2"/>',
   recolher: '<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/>',
   eventos: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01M12 14h.01M16 14h2"/>',
+  integracoes: '<path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+  pausar: '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>',
+  play: '<polygon points="6 4 20 12 6 20 6 4"/>',
 };
 
 export function icone(nome, cls = "") {
@@ -78,8 +81,9 @@ const NAV = [
 ];
 
 const NAV_RODAPE = [
-  { chave: "config",  rotulo: "Configurações",     href: "configuracoes.html", ico: "config" },
-  { chave: "eventos", rotulo: "Gerenciar eventos", href: "eventos.html",       ico: "eventos" },
+  { chave: "config",      rotulo: "Configurações",      href: "configuracoes.html", ico: "config" },
+  { chave: "integracoes", rotulo: "Integrações",        href: "integracoes.html",   ico: "integracoes" },
+  { chave: "eventos",     rotulo: "Gerenciar eventos",  href: "eventos.html",       ico: "eventos" },
 ];
 
 const RECOLHIDA_KEY = "side_recolhida";

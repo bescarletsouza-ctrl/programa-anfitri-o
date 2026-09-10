@@ -76,6 +76,22 @@ Crie um projeto **novo** na Vercel para este painel:
 3. Em **Root Directory**, selecione `anfitriões`.
 4. Deploy. A raiz redireciona para `/admin/`.
 
+### 5. Migrações e Edge Functions
+
+As migrações em [`supabase/migrations/`](supabase/migrations/) são rodadas **manualmente**
+no SQL Editor, em ordem (`0001` → `0014`). Cada tela nova avisa qual migração falta.
+
+Edge Functions (opcionais — o cadastro funciona sem elas, o disparo não):
+
+```
+supabase functions deploy enviar-email     # e-mail (Resend) — precisa dos secrets RESEND_API_KEY / EMAIL_FROM
+supabase functions deploy integracoes      # dispara webhooks/conectores de saída
+supabase functions deploy webhook-in       # recebe inscrições de ticketeiras/gateways
+```
+
+`integracoes` e `webhook-in` não precisam de secret extra (usam as chaves já
+presentes no ambiente da função). Config em [`supabase/config.toml`](supabase/config.toml).
+
 ## Personalização
 
 - **Cores / fontes**: só [`assets/css/theme.css`](assets/css/theme.css) — as
