@@ -661,11 +661,13 @@ function renderPipeline() {
 
 async function moverEtapa(id, etapaId) {
   const p = participantes.find((x) => x.id === id);
-  if (!p || (p.etapa_id || null) === (etapaId || null)) return;
-  const anterior = { etapa_id: p.etapa_id, situacao: p.situacao };
+  if (!p) return;
   const et = etapas.find((e) => e.id === etapaId);
   const novaSit = et?.situacao_alvo && et.situacao_alvo !== situacaoDe(p) ? et.situacao_alvo : null;
+  const mudaEtapa = (p.etapa_id || null) !== (etapaId || null);
+  if (!mudaEtapa && !novaSit) return;
 
+  const anterior = { etapa_id: p.etapa_id, situacao: p.situacao };
   p.etapa_id = etapaId;                        // otimista: card pula na hora
   if (novaSit) p.situacao = novaSit;
   renderPipeline();
