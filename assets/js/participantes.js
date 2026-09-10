@@ -616,6 +616,7 @@ function renderPipeline() {
           <span class="qtd">${itens.length}</span>
           ${et ? `<button type="button" class="icone-btn coluna-editar" data-editar-etapa="${et.id}" title="Editar etapa">${icone("editar")}</button>` : ""}
         </div>
+        ${et?.situacao_alvo ? `<div class="coluna-vinculo" title="Ao mover para cá, a situação vira ${esc(et.situacao_alvo)}">→ situação: <b>${esc(et.situacao_alvo)}</b></div>` : ""}
         <div class="coluna-corpo">
           ${ordenados.map((p) => cardPart(p)).join("") || `<p class="pagina-sub" style="margin:8px 0;font-size:.78rem">—</p>`}
         </div>
@@ -661,13 +662,18 @@ function renderPipeline() {
 async function moverEtapa(id, etapaId) {
   const p = participantes.find((x) => x.id === id);
   if (!p || (p.etapa_id || null) === (etapaId || null)) return;
-  const anterior = p.etapa_id;
-  p.etapa_id = etapaId;            // otimista: card pula na hora
+  const anterior = { etapa_id: p.etapa_id, situacao: p.situacao };
+  const et = etapas.find((e) => e.id === etapaId);
+  const novaSit = et?.situacao_alvo && et.situacao_alvo !== situacaoDe(p) ? et.situacao_alvo : null;
+
+  p.etapa_id = etapaId;                        // otimista: card pula na hora
+  if (novaSit) p.situacao = novaSit;
   renderPipeline();
   try {
-    await salvar("participantes", { id, etapa_id: etapaId });
+    await salvar("participantes", { id, etapa_id: etapaId, ...(novaSit ? { situacao: novaSit } : {}) });
+    if (novaSit) toast(`${p.nome}: situação → ${novaSit}.`, "ok");
   } catch (err) {
-    p.etapa_id = anterior;
+    Object.assign(p, anterior);
     renderPipeline();
     toast(err.message, "erro");
   }
@@ -692,6 +698,11 @@ function modalEtapa(et) {
       <label class="campo"><span>Nome *</span><input class="input" name="nome" required value="${esc(et?.nome || "")}" placeholder="Ex.: Novo, Em contato, Confirmado" /></label>
       <label class="campo"><span>Ordem</span><input class="input" name="ordem" type="number" value="${et?.ordem ?? etapas.length}" /></label>
       <label class="campo"><span>Cor</span><input class="input" name="cor" type="color" value="${esc(et?.cor || "#9aa0a6")}" style="height:40px;padding:4px" /></label>
+      <label class="campo"><span>Ao mover um card para esta etapa, mudar a situação para</span>
+        <select class="select" name="situacao_alvo">
+          <option value="">Não mudar</option>
+          ${SITUACOES.map((s) => `<option ${s === (et?.situacao_alvo || "") ? "selected" : ""}>${s}</option>`).join("")}
+        </select></label>
       ${et ? `<button type="button" class="btn btn-perigo btn-sm" id="etapa-excluir" style="margin-top:6px">Excluir etapa</button>` : ""}`,
     aoMontar: (root) => {
       root.querySelector("#etapa-excluir")?.addEventListener("click", async () => {
@@ -710,9 +721,17 @@ function modalEtapa(et) {
     },
     onConfirmar: async (form) => {
       const f = Object.fromEntries(new FormData(form));
-      const reg = { nome: f.nome.trim(), ordem: Number(f.ordem) || 0, cor: f.cor || null };
+      const reg = { nome: f.nome.trim(), ordem: Number(f.ordem) || 0, cor: f.cor || null, situacao_alvo: f.situacao_alvo || null };
       if (et) reg.id = et.id;
-      await salvar("etapas_participante", reg);
+      try {
+        await salvar("etapas_participante", reg);
+      } catch (e) {
+        if (/situacao_alvo|schema cache|could not find/i.test(e.message || "")) {
+          delete reg.situacao_alvo;
+          await salvar("etapas_participante", reg);
+          toast("Etapa salva (rode a migração 0013 para vincular a situação).", "erro");
+        } else throw e;
+      }
       toast("Etapa salva.", "ok");
       etapas = await listEtapasParticipante();
       atualizarSelectEtapas();

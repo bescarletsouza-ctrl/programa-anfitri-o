@@ -715,6 +715,11 @@ table.tabela tbody tr:last-child td { border-bottom: none; }
 .kanban .coluna-topo:hover .coluna-editar { opacity: .6; }
 .kanban .coluna-editar:hover { opacity: 1; }
 .kanban .coluna-editar svg { width: 13px; height: 13px; }
+.kanban .coluna-vinculo {
+  padding: 4px 14px 8px; font-size: .68rem; color: var(--texto-tenue);
+  border-bottom: 1px solid var(--borda); background: var(--cinza-100);
+}
+.kanban .coluna-vinculo b { color: var(--cor-laranja-forte); }
 .kanban .coluna-corpo { padding: 10px; overflow-y: auto; display: grid; gap: 9px; }
 .kanban .coluna-nova {
   flex: 0 0 190px; align-self: stretch; max-height: none;
