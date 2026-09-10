@@ -2,23 +2,21 @@
 -- 0010 — Sincronismo Anfitrião <-> Participante (chave: e-mail)
 --  * participante com tipo = 'Anfitrião'      -> aparece também na aba Anfitriões
 --  * anfitrião com "vai ao evento" (vai=true) -> aparece também em Participantes
---  * sem duplicata: o vínculo é 1-para-1 pelos ids; o casamento é por e-mail
+--  * vínculo 1-para-1 (anfitrioes.participante_id / participantes.anfitriao_id)
 --  * origem_* marca quem foi criado automaticamente (só esses são removidos ao
 --    desfazer a condição)
 -- Rode no SQL Editor do mesmo projeto Supabase. Idempotente.
 -- =============================================================================
 
+-- -----------------------------------------------------------------------------
+-- 1. Colunas novas (sem os índices únicos ainda — os dados podem ter duplicata)
+-- -----------------------------------------------------------------------------
 alter table public.anfitrioes
   add column if not exists participante_id uuid references public.participantes(id) on delete set null,
   add column if not exists origem_participante boolean not null default false;
 
 alter table public.participantes
   add column if not exists origem_anfitriao boolean not null default false;
-
-create unique index if not exists anfitrioes_participante_uidx
-  on public.anfitrioes(participante_id) where participante_id is not null;
-create unique index if not exists participantes_anfitriao_uidx
-  on public.participantes(anfitriao_id) where anfitriao_id is not null;
 
 -- a view expande a.* na criação; recriar para incluir as colunas novas
 drop view if exists public.anfitrioes_com_stats;
@@ -40,12 +38,36 @@ left join (
 grant select on public.anfitrioes_com_stats to anon;
 
 -- -----------------------------------------------------------------------------
--- Backfill nos dois sentidos
+-- 2. Limpa vínculos antigos: se vários participantes apontam para o mesmo
+--    anfitrião (o código antigo não tinha índice único), mantém 1 e solta o resto
+-- -----------------------------------------------------------------------------
+with ranked as (
+  select id,
+    row_number() over (
+      partition by anfitriao_id
+      order by (tipo = 'Anfitrião') desc, created_at asc, id asc
+    ) as rn
+  from public.participantes
+  where anfitriao_id is not null
+)
+update public.participantes p
+set anfitriao_id = null
+from ranked
+where p.id = ranked.id and ranked.rn > 1;
+
+-- reverse-link: preenche anfitrioes.participante_id a partir do que sobrou
+update public.anfitrioes a
+set participante_id = p.id
+from public.participantes p
+where p.anfitriao_id = a.id and a.participante_id is null;
+
+-- -----------------------------------------------------------------------------
+-- 3. Backfill nos dois sentidos
 -- -----------------------------------------------------------------------------
 do $$
 declare r record; v_id uuid;
 begin
-  -- participante Anfitrião  ->  anfitrião
+  -- participante Anfitrião sem vínculo  ->  anfitrião (casa por e-mail / cria)
   for r in select * from public.participantes p
            where p.tipo = 'Anfitrião' and p.anfitriao_id is null loop
     v_id := null;
@@ -66,7 +88,7 @@ begin
     update public.participantes set anfitriao_id = v_id where id = r.id;
   end loop;
 
-  -- anfitrião vai=true  ->  participante
+  -- anfitrião vai=true sem participante  ->  participante (casa por e-mail / cria)
   for r in select * from public.anfitrioes a
            where a.vai is true and a.participante_id is null loop
     v_id := null;
@@ -87,3 +109,11 @@ begin
     update public.anfitrioes set participante_id = v_id where id = r.id;
   end loop;
 end $$;
+
+-- -----------------------------------------------------------------------------
+-- 4. Agora os dados estão 1-para-1 — cria os índices únicos parciais
+-- -----------------------------------------------------------------------------
+create unique index if not exists anfitrioes_participante_uidx
+  on public.anfitrioes(participante_id) where participante_id is not null;
+create unique index if not exists participantes_anfitriao_uidx
+  on public.participantes(anfitriao_id) where anfitriao_id is not null;
