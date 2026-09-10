@@ -23,25 +23,78 @@
 </head>
 <body class="ck-app">
 
-  <!-- Splash / seleção de evento -->
+  <!-- Splash -->
   <section id="tela-abrir" class="ck-tela ck-abrir">
     <div class="ck-abrir-marca">We<b>.events</b></div>
     <h1>Check-in</h1>
-    <p id="abrir-msg">Carregando o evento…</p>
-    <form id="form-evento" hidden>
-      <label>Código do evento
-        <input class="ck-input" id="in-evento" placeholder="cole o link ou o id do evento" required />
+    <p>Carregando…</p>
+  </section>
+
+  <!-- Login -->
+  <section id="tela-login" class="ck-tela ck-abrir" hidden>
+    <div class="ck-abrir-marca">We<b>.events</b></div>
+    <h1>Check-in</h1>
+    <p>Entre com a conta da equipe.</p>
+    <form id="form-login">
+      <label>E-mail
+        <input class="ck-input" id="login-email" type="email" autocomplete="username" required />
       </label>
-      <button class="ck-btn ck-btn-primario" type="submit">Entrar</button>
+      <label>Senha
+        <input class="ck-input" id="login-senha" type="password" autocomplete="current-password" required />
+      </label>
+      <p class="ck-form-erro" id="login-erro" hidden></p>
+      <button class="ck-btn ck-btn-primario" type="submit" id="login-btn">Entrar</button>
     </form>
   </section>
 
-  <!-- App -->
+  <!-- Seleção de evento -->
+  <section id="tela-eventos" class="ck-tela ck-lista-tela" hidden>
+    <header class="ck-lista-topo">
+      <div>
+        <strong>Escolha o evento</strong>
+        <span id="eventos-usuario" class="ck-lista-sub"></span>
+      </div>
+      <button class="ck-btn-txt" id="btn-sair">Sair</button>
+    </header>
+    <div class="ck-lista-corpo" id="eventos-lista"></div>
+  </section>
+
+  <!-- Tipo de check-in -->
+  <section id="tela-modo" class="ck-tela ck-lista-tela" hidden>
+    <header class="ck-lista-topo">
+      <button class="ck-icone-btn ck-icone-btn-claro" id="modo-voltar" aria-label="Voltar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <div>
+        <strong>Tipo de check-in</strong>
+        <span class="ck-lista-sub" id="modo-evento"></span>
+      </div>
+    </header>
+    <div class="ck-lista-corpo">
+      <button class="ck-modo-card" id="modo-evento-btn">
+        <span class="ck-modo-ic">◎</span>
+        <span class="ck-modo-txt"><strong>Check-in do evento</strong><span>Credencia e imprime o crachá</span></span>
+      </button>
+      <button class="ck-modo-card" id="modo-atividade-btn">
+        <span class="ck-modo-ic">▤</span>
+        <span class="ck-modo-txt"><strong>Check-in de atividade</strong><span>Controle de acesso a uma sessão / palestra</span></span>
+      </button>
+      <div id="modo-atividades" hidden>
+        <p class="ck-lista-rotulo">Qual atividade?</p>
+        <div id="modo-atividades-lista"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Scanner -->
   <div id="app" hidden>
     <header class="ck-topo">
+      <button class="ck-icone-btn" id="btn-trocar" aria-label="Trocar evento / modo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
       <div class="ck-topo-info">
         <span class="ck-topo-evento" id="topo-evento">—</span>
-        <span class="ck-topo-sub"><b id="topo-n">0</b> credenciados hoje</span>
+        <span class="ck-topo-sub" id="topo-ctx">—</span>
       </div>
       <button class="ck-icone-btn" id="btn-buscar" aria-label="Buscar por nome">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -66,7 +119,7 @@
     </div>
   </div>
 
-  <!-- Bottom sheet: resultado -->
+  <!-- Bottom sheet -->
   <div class="ck-sheet-fundo" id="sheet-fundo" hidden></div>
   <section class="ck-sheet" id="sheet" hidden aria-live="polite"></section>
 
@@ -81,7 +134,7 @@
     <div class="ck-busca-lista" id="busca-lista"></div>
   </section>
 
-  <!-- Área de impressão do crachá (preenchida pelo cracha.js) -->
+  <!-- Impressão do crachá -->
   <div id="cracha" hidden></div>
 
 <script type="module" src="assets/js/checkin-app.js"></script>

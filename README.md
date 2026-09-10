@@ -79,7 +79,7 @@ Crie um projeto **novo** na Vercel para este painel:
 ### 5. Migrações e Edge Functions
 
 As migrações em [`supabase/migrations/`](supabase/migrations/) são rodadas **manualmente**
-no SQL Editor, em ordem (`0001` → `0014`). Cada tela nova avisa qual migração falta.
+no SQL Editor, em ordem (`0001` → `0015`). Cada tela nova avisa qual migração falta.
 
 Edge Functions (opcionais — o cadastro funciona sem elas, o disparo não):
 
@@ -94,9 +94,18 @@ presentes no ambiente da função). Config em [`supabase/config.toml`](supabase/
 
 ### 6. Check-in no celular como "app"
 
-`checkin-app.html` já é um **PWA**: no Chrome do Android (ou Safari do iPhone) →
+`checkin-app.html` é um **PWA**: no Chrome do Android (ou Safari do iPhone) →
 menu → *Adicionar à tela inicial*. Abre em tela cheia, com ícone, sem barra do
 navegador. É o caminho recomendado — zero build.
+
+Fluxo: **login** (Supabase Auth) → escolher o evento → escolher o tipo (evento
+geral ou uma atividade) → escanear o QR do crachá. Para ativar:
+
+1. Rode `supabase/migrations/0015_auth_checkin.sql` (libera o papel
+   `authenticated` na RLS — sem isso o app loga mas não lê nada).
+2. Crie as contas da equipe em **Supabase Studio → Authentication → Users →
+   Add user**. Em *Authentication → Providers → Email*, desligue *Confirm email*
+   para a pessoa entrar direto.
 
 Para gerar um **`.apk` / `.aab` de verdade** (Play Store ou instalação manual),
 empacote o PWA numa TWA:
