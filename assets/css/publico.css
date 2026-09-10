@@ -18,6 +18,9 @@ body.publico {
 }
 .pub-marca b { color: var(--cor-laranja); }
 
+.pub-credito { margin: 40px 0 0; font-size: .72rem; color: rgba(255, 255, 255, .38); text-align: center; }
+.pub-credito b { font-weight: 600; color: rgba(255, 255, 255, .62); }
+
 .pub-card {
   background: #fff; color: var(--texto);
   border-radius: var(--raio-lg);

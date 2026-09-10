@@ -11,9 +11,11 @@ export const SUPABASE_ANON_KEY = "sb_publishable_lN_V-9dOHmzuwtszglhG3g_Skk0SIaC
 
 // Textos e rótulos do produto — trocar aqui reflete em todo o admin.
 export const APP = {
-  nomeProduto: "Programa Anfitrião",
+  nomeProduto: "We.events",
   // usado no wordmark: a parte em <b> fica laranja
-  marcaHtml: 'Programa <b>Anfitrião</b>',
+  marcaHtml: 'We<b>.events</b>',
+  // crédito pequeno no rodapé
+  creditoHtml: 'desenvolvido por <b>@mirapontocom</b>',
   termoAnfitriao: "Anfitrião",
   termoAnfitriaoPlural: "Anfitriões",
   termoConvidado: "Convidado",

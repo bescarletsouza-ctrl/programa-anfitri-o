@@ -122,6 +122,7 @@ export function renderSidebar(ativo) {
     <div class="rodape">
       ${NAV_RODAPE.map((n) => navLinkHtml(n, ativo)).join("")}
       <button class="btn-tema" data-toggle-tema type="button"></button>
+      <div class="side-credito">${APP.creditoHtml}</div>
     </div>`;
   aplicarTema(document.documentElement.dataset.theme === "dark" ? "dark" : "light");
   el.querySelector("[data-toggle-tema]").onclick = alternarTema;
