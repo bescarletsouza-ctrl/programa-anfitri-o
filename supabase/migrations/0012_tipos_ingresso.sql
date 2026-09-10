@@ -16,8 +16,25 @@ create table if not exists public.tipos_ingresso (
   ordem         int  not null default 0,
   ativo         boolean not null default true,
   oculto        boolean not null default false,   -- só via link direto
+  -- configurações --------------------------------------------------------------
+  lista_espera     boolean not null default false, -- ao lotar, novos vão p/ "Fila de espera"
+  acesso_dias      text    not null default 'todos', -- 'todos' | 'um_dia'
+  situacao_padrao  text    not null default 'Confirmado', -- situação de quem entra por este tipo
+  max_por_compra   int     not null default 0,     -- 0 = sem limite
+  pagina_inscritos boolean not null default false,
+  termo            jsonb,                          -- { on, titulo, texto }
   created_at    timestamptz not null default now()
 );
+
+-- para quem já rodou a versão anterior desta migração
+alter table public.tipos_ingresso
+  add column if not exists lista_espera     boolean not null default false,
+  add column if not exists acesso_dias      text    not null default 'todos',
+  add column if not exists situacao_padrao  text    not null default 'Confirmado',
+  add column if not exists max_por_compra   int     not null default 0,
+  add column if not exists pagina_inscritos boolean not null default false,
+  add column if not exists termo            jsonb;
+
 create index if not exists tipos_ingresso_evento_idx on public.tipos_ingresso(evento_id, ordem);
 create unique index if not exists tipos_ingresso_evento_nome_uidx
   on public.tipos_ingresso(evento_id, lower(nome));

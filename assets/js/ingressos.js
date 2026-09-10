@@ -81,6 +81,7 @@ function linhaHtml(t) {
       <strong>${esc(t.nome)}</strong>
       ${periodo ? `<span class="cel-sub">${esc(periodo)}</span>` : ""}
       ${t.oculto ? `<span class="cel-sub">🔒 oculto (só via link direto)</span>` : ""}
+      ${cfgChips(t)}
     </td>
     <td>${esc(t.preco || "Gratuito")}</td>
     <td>
@@ -102,6 +103,18 @@ const badgeSit = (s) =>
   ({ Confirmado: "badge-ok", Pendente: "badge-alerta", "Fila de espera": "badge-info",
      "Pré-inscrito": "badge-neutro", Desativado: "badge-erro" }[s] || "badge-neutro");
 
+// mini-resumo das configs que mudam comportamento
+function cfgChips(t) {
+  const c = [];
+  if (t.lista_espera) c.push("fila de espera ao lotar");
+  if (t.acesso_dias === "um_dia") c.push("acesso: 1 dia");
+  if ((t.situacao_padrao || "Confirmado") !== "Confirmado") c.push(`entra como ${String(t.situacao_padrao).toLowerCase()}`);
+  if (Number(t.max_por_compra) > 0) c.push(`máx ${t.max_por_compra}/compra`);
+  if (t.pagina_inscritos) c.push("página de inscritos");
+  if (t.termo?.on) c.push("termo de adesão");
+  return c.length ? `<span class="cel-sub">${c.map(esc).join(" · ")}</span>` : "";
+}
+
 function editar(t) {
   abrirModal({
     titulo: t ? "Editar tipo de ingresso" : "Novo tipo de ingresso",
@@ -118,9 +131,48 @@ function editar(t) {
       <label class="campo" style="display:flex;gap:8px;align-items:center">
         <input type="checkbox" name="ativo" ${t?.ativo !== false ? "checked" : ""} /> <span style="margin:0">Ativo</span></label>
       <label class="campo" style="display:flex;gap:8px;align-items:center">
-        <input type="checkbox" name="oculto" ${t?.oculto ? "checked" : ""} /> <span style="margin:0">Oculto (só quem tem o link direto vê)</span></label>`,
+        <input type="checkbox" name="oculto" ${t?.oculto ? "checked" : ""} /> <span style="margin:0">Oculto (só quem tem o link direto vê)</span></label>
+
+      <div class="secao" style="border-top:1px solid var(--borda);margin-top:6px;padding-top:14px">
+        <h4 style="margin:0 0 10px;font-size:.7rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--texto-tenue)">Configurações</h4>
+
+        <label class="campo"><span>Situação de quem entra por este tipo</span>
+          <select class="select" name="situacao_padrao">
+            ${["Confirmado", "Pré-inscrito", "Pendente"].map((s) => `<option ${s === (t?.situacao_padrao || "Confirmado") ? "selected" : ""}>${s}</option>`).join("")}
+          </select></label>
+
+        <label class="campo"><span>Acesso ao evento</span>
+          <select class="select" name="acesso_dias">
+            <option value="todos" ${t?.acesso_dias !== "um_dia" ? "selected" : ""}>Todos os dias, sem restrição</option>
+            <option value="um_dia" ${t?.acesso_dias === "um_dia" ? "selected" : ""}>Apenas 1 dia</option>
+          </select></label>
+
+        <label class="campo"><span>Quantidade máxima por compra (0 = sem limite)</span>
+          <input class="input" name="max_por_compra" type="number" min="0" value="${t?.max_por_compra ?? 0}" /></label>
+
+        <label class="campo" style="display:flex;gap:8px;align-items:center">
+          <input type="checkbox" name="lista_espera" ${t?.lista_espera ? "checked" : ""} />
+          <span style="margin:0">Lista de espera — ao lotar as vagas, novos entram como “Fila de espera”</span></label>
+
+        <label class="campo" style="display:flex;gap:8px;align-items:center">
+          <input type="checkbox" name="pagina_inscritos" ${t?.pagina_inscritos ? "checked" : ""} />
+          <span style="margin:0">Habilitar página de visualização de inscritos</span></label>
+
+        <label class="campo" style="display:flex;gap:8px;align-items:center">
+          <input type="checkbox" name="termo_on" ${t?.termo?.on ? "checked" : ""} />
+          <span style="margin:0">Exibir termo de adesão</span></label>
+        <div id="termo-box" ${t?.termo?.on ? "" : "hidden"}>
+          <label class="campo"><span>Título do termo</span><input class="input" name="termo_titulo" value="${esc(t?.termo?.titulo || "")}" /></label>
+          <label class="campo"><span>Texto do termo</span><textarea class="input" name="termo_texto" rows="3">${esc(t?.termo?.texto || "")}</textarea></label>
+        </div>
+      </div>`,
+    aoMontar: (root) => {
+      const chk = root.querySelector('[name="termo_on"]');
+      chk.onchange = () => { root.querySelector("#termo-box").hidden = !chk.checked; };
+    },
     onConfirmar: async (form) => {
       const f = Object.fromEntries(new FormData(form));
+      const termoOn = form.querySelector('[name="termo_on"]').checked;
       const reg = {
         nome: f.nome.trim(),
         preco: f.preco.trim() || null,
@@ -130,6 +182,14 @@ function editar(t) {
         ordem: Number(f.ordem) || 0,
         ativo: form.querySelector('[name="ativo"]').checked,
         oculto: form.querySelector('[name="oculto"]').checked,
+        situacao_padrao: f.situacao_padrao || "Confirmado",
+        acesso_dias: f.acesso_dias || "todos",
+        max_por_compra: Math.max(0, Number(f.max_por_compra) || 0),
+        lista_espera: form.querySelector('[name="lista_espera"]').checked,
+        pagina_inscritos: form.querySelector('[name="pagina_inscritos"]').checked,
+        termo: termoOn
+          ? { on: true, titulo: (f.termo_titulo || "").trim(), texto: (f.termo_texto || "").trim() }
+          : { on: false },
       };
       if (t) reg.id = t.id;
       try {

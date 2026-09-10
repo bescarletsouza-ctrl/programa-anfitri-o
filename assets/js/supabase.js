@@ -80,6 +80,27 @@ export const listConvidados = (eid) =>
     .order("created_at", { ascending: false })
     .then(ok);
 
+// Situação inicial de quem entra por um tipo de ingresso: respeita
+// situacao_padrao; se lista_espera está ligada e as vagas lotaram → "Fila de espera".
+async function situacaoDoTipo(eventoId, ingresso) {
+  const nome = (ingresso || "").trim();
+  if (!nome || !eventoId) return "Confirmado";
+  let t;
+  try {
+    t = await supabase.from("tipos_ingresso").select("*")
+      .eq("evento_id", eventoId).ilike("nome", nome).limit(1).then((r) => (r.data || [])[0]);
+  } catch { return "Confirmado"; }
+  if (!t) return "Confirmado";
+  if (t.lista_espera && t.vagas) {
+    const usados = await supabase.from("participantes")
+      .select("id", { count: "exact", head: true })
+      .eq("evento_id", eventoId).ilike("ingresso", nome).neq("situacao", "Desativado")
+      .then((r) => r.count || 0).catch(() => 0);
+    if (usados >= t.vagas) return "Fila de espera";
+  }
+  return t.situacao_padrao || "Confirmado";
+}
+
 // Mantém a lista de Participantes em dia com a decisão do convidado:
 // aprovado → cria o participante (categoria = a do anfitrião); reprovado/pendente
 // → remove o participante gerado (sempre, mesmo com check-in).
@@ -88,6 +109,7 @@ export async function sincParticipanteConvidado(convidado) {
   const existentes = await supabase
     .from("participantes").select("id").eq("convidado_id", convidado.id).then(ok);
   if (aprovado && !existentes.length) {
+    const ingresso = convidado.anfitriao?.categoria_convidado || null;
     return salvar("participantes", {
       nome: convidado.nome,
       email: convidado.email || null,
@@ -95,7 +117,8 @@ export async function sincParticipanteConvidado(convidado) {
       empresa: convidado.empresa || null,
       tipo: "Convidado",
       pagamento: "Convidado",
-      ingresso: convidado.anfitriao?.categoria_convidado || null,
+      ingresso,
+      situacao: await situacaoDoTipo(convidado.evento_id, ingresso),
       convidado_id: convidado.id,
     });
   }
