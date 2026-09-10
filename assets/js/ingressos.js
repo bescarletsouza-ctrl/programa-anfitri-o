@@ -192,10 +192,25 @@ function editar(t) {
           : { on: false },
       };
       if (t) reg.id = t.id;
+      const BASE = ["id", "nome", "preco", "vagas", "inicio_vendas", "fim_vendas", "ordem", "ativo", "oculto"];
       try {
         await salvar("tipos_ingresso", reg);
       } catch (e) {
-        toast(/uidx|duplicate|unique/.test(e.message || "") ? "Já existe um tipo com esse nome." : e.message, "erro");
+        const msg = e.message || "";
+        if (/uidx|duplicate|unique/.test(msg)) {
+          toast("Já existe um tipo com esse nome.", "erro");
+          return false;
+        }
+        if (/could not find the .* column|schema cache/i.test(msg)) {
+          // colunas de config ainda não existem → salva só o básico
+          try {
+            await salvar("tipos_ingresso", Object.fromEntries(Object.entries(reg).filter(([k]) => BASE.includes(k))));
+            toast("Salvo (sem as configs — rode de novo a migração 0012 no Supabase).", "erro");
+            carregar();
+            return;
+          } catch (e2) { toast(e2.message, "erro"); return false; }
+        }
+        toast(msg, "erro");
         return false;
       }
       toast("Salvo.", "ok");
