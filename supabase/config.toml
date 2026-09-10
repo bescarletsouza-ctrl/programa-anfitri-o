@@ -18,6 +18,15 @@ verify_jwt = false
 [functions.webhook-in]
 verify_jwt = false
 
-# Cria/lista/remove os logins da equipe de check-in (auth.admin via service role).
+# Cria/lista/remove os usuários de uma organização (auth.admin via service role).
 [functions.equipe]
+verify_jwt = false
+
+# Gestão de organizações (clientes) e seus admins. Só a super-admin usa.
+[functions.plataforma]
+verify_jwt = false
+
+# Serve os dados das páginas públicas (convite/painel/status) por slug/id, sem
+# expor o banco pela chave anon.
+[functions.publico]
 verify_jwt = false
