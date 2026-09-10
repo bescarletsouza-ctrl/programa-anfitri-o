@@ -26,20 +26,41 @@
     <div id="carregando" class="vazio">Carregando…</div>
 
     <div id="painel" hidden>
-      <label class="campo" id="alvo-wrap" hidden style="max-width:460px">
-        <span>Credenciar em</span>
-        <select class="select" id="alvo"></select>
-      </label>
+      <div class="ck-layout" id="ck-layout">
+        <div class="ck-main">
+          <div class="ck-busca-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input class="input" id="busca" placeholder="Procure por nome, e-mail, telefone, código ou empresa" autocomplete="off" autofocus />
+          </div>
+          <div id="resultados" class="checkin-lista"></div>
+          <div id="dica" class="ck-vazio">Digite algo para buscar…</div>
+        </div>
 
-      <div class="checkin-stats">
-        <div class="checkin-num"><b id="n-presentes">0</b> <span id="n-rotulo">de 0 presentes · 0 check-ins hoje</span></div>
-        <div class="checkin-barra"><i id="checkin-progresso" style="width:0%"></i></div>
+        <aside class="ck-rail">
+          <label class="campo" id="alvo-wrap" hidden>
+            <span>Credenciar em</span>
+            <select class="select" id="alvo"></select>
+          </label>
+
+          <button type="button" class="ck-stat ck-stat-ok" data-fstat="presentes">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+            <span id="lbl-presentes">Presentes</span> <b id="n-presentes">0</b>
+          </button>
+          <button type="button" class="ck-stat ck-stat-alerta" data-fstat="">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+            <span id="lbl-total">Total</span> <b id="n-total">0</b>
+          </button>
+          <button type="button" class="ck-stat ck-stat-neutro" data-fstat="ausentes">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2h12M6 22h12M6 2v5a6 6 0 0 0 4 5.7 6 6 0 0 0-4 5.7V22M18 2v5a6 6 0 0 1-4 5.7 6 6 0 0 1 4 5.7V22"/></svg>
+            <span id="lbl-ausentes">Ausentes</span> <b id="n-ausentes">0</b>
+          </button>
+
+          <div class="ck-cats-titulo">Categorias de ingresso</div>
+          <div class="ck-cats" id="ck-cats"></div>
+
+          <label class="ck-toggle"><input type="checkbox" id="ck-detalhes" /> Exibir detalhes de contato</label>
+        </aside>
       </div>
-
-      <input class="input checkin-busca" id="busca" placeholder="Buscar por nome, e-mail, telefone ou código…" autocomplete="off" autofocus />
-
-      <div id="resultados" class="checkin-lista"></div>
-      <div id="dica" class="vazio">Digite para localizar o participante.</div>
     </div>
   </main>
 </div>
