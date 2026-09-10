@@ -85,9 +85,10 @@ Deno.serve(async (req) => {
           if (!userId) return json({ erro: "Não foi possível localizar o usuário." }, 400);
         } else userId = data.user!.id;
       } else {
-        let g = await sb.auth.admin.generateLink({ type: "invite", email: mail, options: { redirectTo: SITE ? `${SITE}/login.html` : undefined } });
+        const rt = SITE ? `${SITE}/login.html?definir=1` : undefined;
+        let g = await sb.auth.admin.generateLink({ type: "invite", email: mail, options: { redirectTo: rt } });
         if (g.error && /already/i.test(g.error.message))
-          g = await sb.auth.admin.generateLink({ type: "magiclink", email: mail, options: { redirectTo: SITE ? `${SITE}/login.html` : undefined } });
+          g = await sb.auth.admin.generateLink({ type: "magiclink", email: mail, options: { redirectTo: rt } });
         if (g.error) return json({ erro: g.error.message }, 400);
         userId = g.data.user!.id;
         link = g.data.properties?.action_link || null;

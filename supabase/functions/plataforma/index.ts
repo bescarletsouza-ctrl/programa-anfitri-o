@@ -24,7 +24,7 @@ const json = (o: unknown, s = 200) =>
   new Response(JSON.stringify(o), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
 
 const SITE = (Deno.env.get("SITE_URL") || "").replace(/\/+$/, "");
-const redirectTo = () => (SITE ? `${SITE}/login.html` : undefined);
+const redirectTo = () => (SITE ? `${SITE}/login.html?definir=1` : undefined);
 
 const svc = () =>
   createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {

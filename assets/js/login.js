@@ -19,18 +19,30 @@ el("form-login").addEventListener("submit", enviar);
 boot();
 
 async function boot() {
-  // 1. já logado? (e não é fluxo de definir senha)
+  // Fluxo de convite/recuperação: o link do Supabase chega ou com
+  // #type=invite|recovery (fluxo implícito) ou como ?code= + ?definir=1 que a
+  // gente adiciona no redirectTo (fluxo PKCE, que não traz o "type").
   const hash = location.hash || "";
-  const ehRecuperacao = /type=(invite|recovery)/.test(hash);
+  const ehRecuperacao = /type=(invite|recovery)/.test(hash) || params.get("definir") === "1";
 
-  const { data: { session } } = await supabase.auth.getSession();
+  // dá um tempinho pro supabase-js trocar o ?code= por sessão (detectSessionInUrl)
+  let session = null;
+  for (let i = 0; i < 8; i++) {
+    session = (await supabase.auth.getSession()).data.session;
+    if (session || !location.search.includes("code=")) break;
+    await new Promise((r) => setTimeout(r, 200));
+  }
 
   if (session && !ehRecuperacao) return irParaDestino();
 
-  if (ehRecuperacao || (session && ehRecuperacao)) {
-    // supabase-js já trocou o código pela sessão (detectSessionInUrl)
+  if (ehRecuperacao && session) {
     modo = "definir-senha";
     return mostrarDefinirSenha();
+  }
+  if (ehRecuperacao && !session) {
+    // link expirado / já usado
+    erro("Este link de acesso expirou ou já foi usado. Peça um novo convite.");
+    return mostrarLogin();
   }
 
   // 2. precisa de bootstrap?
