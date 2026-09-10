@@ -28,6 +28,7 @@ async function carregar() {
       listCheckins().catch(() => []),
       listParticipantes().catch(() => []),
     ]);
+    participantes = participantes.filter((p) => p.situacao !== "Desativado");
     el("carregando").hidden = true;
     el("painel").hidden = false;
     render();

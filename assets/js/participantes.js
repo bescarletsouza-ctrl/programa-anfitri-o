@@ -9,19 +9,21 @@ import {
   fecharGaveta, toast, confirmar, icone, abrirMenu,
 } from "./ui.js";
 import {
-  listParticipantes, listEtapasParticipante,
+  listParticipantes, listEtapasParticipante, listAtividades, listCheckins,
   salvar, remover, inserirLote, atualizarEmLote, removerEmLote, registrarCheckin,
   sincParticipanteAnfitriao, desvincularAoExcluirParticipante,
 } from "./supabase.js";
 import { eventoNome } from "./evento.js";
 import { imprimirCracha } from "./cracha.js";
 import { parsearTabela, gerarCSV, baixarCSV } from "./tabela.js";
+import { abrirEnvioEmail } from "./email.js";
 
 iniciarPagina("participantes");
 const el = (id) => document.getElementById(id);
 
 const TIPOS = ["Convidado", "Anfitrião", "Acompanhante", "Comprador", "Cliente", "Outro"];
 const PAGAMENTOS = ["Gratuito", "Pago", "Convidado", "Cancelado", "Reembolsado"];
+const SITUACOES = ["Confirmado", "Pendente", "Fila de espera", "Pré-inscrito", "Desativado"];
 const FAIXAS = [
   "Não faturo ainda", "Até 50 mil/mês", "50 mil – 150 mil/mês", "150 mil – 500 mil/mês",
   "500 mil – 1 milhão/mês", "1 milhão – 5 milhões/mês", "5 milhões – 10 milhões/mês",
@@ -33,18 +35,45 @@ const ALIAS_IMPORT = {
   fone: "telefone", turma: "tipo", categoria: "tipo", "forma de pagamento": "pagamento",
   status: "pagamento", qtd: "quantidade", quantidade: "quantidade",
   "tipo de ingresso": "ingresso", empresa: "empresa", "razão social": "empresa",
+  "situação": "situacao", situacao: "situacao",
+};
+const normSituacao = (v) => {
+  const n = String(v || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+  return SITUACOES.find((s) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "") === n) || null;
 };
 
-let participantes = [], etapas = [];
+let participantes = [], etapas = [], atividades = [], checkins = [];
 let vista = "lista";
 let pagina = 1;
 const selecionados = new Set();
-const filtros = { busca: "", tipo: "", pagamento: "", etapa: "", presenca: "", buscaPipe: "", tipoPipe: "" };
+const FILTROS_VAZIO = {
+  busca: "", campo: "", situacao: "", tipo: "", pagamento: "", dataDe: "", dataAte: "",
+  categoria: "", etapa: "", atividade: "", presAtv: "", presenca: "",
+  buscaPipe: "", tipoPipe: "",
+};
+const filtros = { ...FILTROS_VAZIO };
 
 const badgeTipo = (t) => (t === "Anfitrião" ? "badge-laranja" : "badge-neutro");
 const badgePag = (p) =>
   ({ Gratuito: "badge-neutro", Pago: "badge-ok", Convidado: "badge-info",
      Cancelado: "badge-erro", Reembolsado: "badge-alerta" }[p] || "badge-neutro");
+const badgeSituacao = (s) =>
+  ({ Confirmado: "badge-ok", Pendente: "badge-alerta", "Fila de espera": "badge-info",
+     "Pré-inscrito": "badge-neutro", Desativado: "badge-erro" }[s] || "badge-neutro");
+const situacaoDe = (p) => p.situacao || "Confirmado";
+const ativo = (p) => situacaoDe(p) !== "Desativado";
+
+// participante credenciado numa atividade (saldo de entradas > 0)
+function credenciadoNaAtv(pid, atvId) {
+  let n = 0;
+  for (const c of checkins) {
+    if (c.participante_id !== pid || c.atividade_id !== atvId) continue;
+    n += c.acao === "entrada" ? 1 : -1;
+  }
+  return n > 0;
+}
+const categoriasIngresso = () =>
+  [...new Set(participantes.map((p) => (p.ingresso || "").trim()).filter(Boolean))].sort();
 const nomeEtapa = (id) => etapas.find((e) => e.id === id)?.nome || "—";
 const horaCurta = (iso) => {
   if (!iso) return "";
@@ -66,14 +95,20 @@ carregar();
 
 async function carregar() {
   try {
-    [participantes, etapas] = await Promise.all([
+    [participantes, etapas, atividades, checkins] = await Promise.all([
       listParticipantes(), listEtapasParticipante(),
+      listAtividades().catch(() => []), listCheckins().catch(() => []),
     ]);
     opcoes(el("f-tipo"), TIPOS, "Todos os tipos");
     opcoes(el("f-tipo-pipe"), TIPOS, "Todos os tipos");
     opcoes(el("f-pagamento"), PAGAMENTOS, "Todos os pagamentos");
-    el("f-etapa").innerHTML = `<option value="">Todas as etapas</option>` +
+    opcoes(el("f-situacao"), SITUACOES, "Todas (menos desativados)");
+    el("f-etapa").innerHTML = `<option value="">Todas</option>` +
       etapas.map((e) => `<option value="${e.id}">${esc(e.nome)}</option>`).join("");
+    el("f-atividade").innerHTML = `<option value="">Não filtrar</option>` +
+      atividades.map((a) => `<option value="${a.id}">${esc(a.nome)}</option>`).join("");
+    el("f-categoria").innerHTML = `<option value="">Todas</option>` +
+      categoriasIngresso().map((c) => `<option>${esc(c)}</option>`).join("");
     el("carregando").hidden = true;
     ligarEventos();
     render();
@@ -103,19 +138,44 @@ function ligarEventos() {
     };
   });
   const refiltra = (fn) => (e) => { fn(e); pagina = 1; render(); };
-  el("busca").addEventListener("input", debounce(refiltra((e) => { filtros.busca = e.target.value.toLowerCase(); }), 200));
   el("busca-pipe").addEventListener("input", debounce((e) => { filtros.buscaPipe = e.target.value.toLowerCase(); render(); }, 200));
+  el("f-tipo-pipe").onchange = (e) => { filtros.tipoPipe = e.target.value; render(); };
+
+  el("f-busca").addEventListener("input", debounce(refiltra((e) => { filtros.busca = e.target.value.toLowerCase(); }), 200));
+  el("f-campo").onchange = refiltra((e) => { filtros.campo = e.target.value; });
+  el("f-situacao").onchange = refiltra((e) => { filtros.situacao = e.target.value; });
   el("f-tipo").onchange = refiltra((e) => { filtros.tipo = e.target.value; });
   el("f-pagamento").onchange = refiltra((e) => { filtros.pagamento = e.target.value; });
+  el("f-data-de").onchange = refiltra((e) => { filtros.dataDe = e.target.value; });
+  el("f-data-ate").onchange = refiltra((e) => { filtros.dataAte = e.target.value; });
+  el("f-categoria").onchange = refiltra((e) => { filtros.categoria = e.target.value; });
   el("f-etapa").onchange = refiltra((e) => { filtros.etapa = e.target.value; });
+  el("f-atividade").onchange = refiltra((e) => { filtros.atividade = e.target.value; });
+  el("f-pres-atv").onchange = refiltra((e) => { filtros.presAtv = e.target.value; });
   el("f-presenca").onchange = refiltra((e) => { filtros.presenca = e.target.value; });
-  el("f-tipo-pipe").onchange = (e) => { filtros.tipoPipe = e.target.value; render(); };
+
+  el("btn-toggle-filtros").onclick = () => {
+    const painel = el("filtros-painel");
+    painel.hidden = !painel.hidden;
+    el("btn-toggle-filtros").setAttribute("aria-expanded", String(!painel.hidden));
+    el("btn-toggle-filtros").classList.toggle("ativo", filtrosAtivos());
+  };
+  el("btn-limpar-filtros").onclick = () => {
+    Object.assign(filtros, { ...FILTROS_VAZIO, buscaPipe: filtros.buscaPipe, tipoPipe: filtros.tipoPipe });
+    ["f-busca", "f-campo", "f-situacao", "f-tipo", "f-pagamento", "f-data-de", "f-data-ate",
+     "f-categoria", "f-etapa", "f-atividade", "f-pres-atv", "f-presenca"].forEach((id) => (el(id).value = ""));
+    pagina = 1;
+    render();
+  };
+
   el("btn-cadastrar").innerHTML = icone("mais") + "Cadastrar";
   el("btn-cadastrar").onclick = () => abrirForm(null);
   el("btn-importar").innerHTML = icone("subir") + "Importar Excel";
   el("btn-importar").onclick = modalImportar;
   el("btn-exportar").innerHTML = icone("baixar") + "Exportar Excel";
   el("btn-exportar").onclick = () => exportar(filtrarLista());
+  el("btn-email").innerHTML = icone("inbox") + "Enviar e-mail";
+  el("btn-email").onclick = () => abrirEmailPara(filtrarLista());
   el("check-todos").onchange = (e) => {
     const dados = filtrarLista();
     if (e.target.checked) dados.forEach((p) => selecionados.add(p.id));
@@ -134,26 +194,55 @@ function render() {
   vista === "lista" ? renderLista() : renderPipeline();
 }
 
+function filtrosAtivos() {
+  return ["busca", "campo", "situacao", "tipo", "pagamento", "dataDe", "dataAte",
+    "categoria", "etapa", "atividade", "presAtv", "presenca"].some((k) => filtros[k]);
+}
+
 function filtrarLista() {
+  const diaDe = filtros.dataDe ? new Date(filtros.dataDe + "T00:00:00") : null;
+  const diaAte = filtros.dataAte ? new Date(filtros.dataAte + "T23:59:59") : null;
   return participantes.filter((p) => {
+    // desativados: escondidos, a não ser que o filtro peça exatamente eles
+    if (situacaoDe(p) === "Desativado" && filtros.situacao !== "Desativado") return false;
+    if (filtros.situacao && situacaoDe(p) !== filtros.situacao) return false;
     if (filtros.tipo && p.tipo !== filtros.tipo) return false;
     if (filtros.pagamento && p.pagamento !== filtros.pagamento) return false;
+    if (filtros.categoria && (p.ingresso || "").trim() !== filtros.categoria) return false;
     if (filtros.etapa && p.etapa_id !== filtros.etapa) return false;
     if (filtros.presenca === "sim" && !p.presente) return false;
     if (filtros.presenca === "nao" && p.presente) return false;
+    if (filtros.atividade && filtros.presAtv) {
+      const dentro = credenciadoNaAtv(p.id, filtros.atividade);
+      if (filtros.presAtv === "sim" && !dentro) return false;
+      if (filtros.presAtv === "nao" && dentro) return false;
+    }
+    if (diaDe && new Date(p.created_at) < diaDe) return false;
+    if (diaAte && new Date(p.created_at) > diaAte) return false;
     if (filtros.busca) {
-      const alvo = `${p.nome} ${p.email || ""} ${p.telefone || ""} ${p.empresa || ""} ${p.codigo || ""}`.toLowerCase();
+      const campos = filtros.campo
+        ? [p[filtros.campo]]
+        : [p.nome, p.email, p.telefone, p.empresa, p.codigo];
+      const alvo = campos.filter(Boolean).join(" ").toLowerCase();
       if (!alvo.includes(filtros.busca)) return false;
     }
     return true;
   });
 }
 
+function abrirEmailPara(dados) {
+  const comEmail = dados.filter((p) => (p.email || "").includes("@"));
+  if (!comEmail.length) { toast("Nenhum destinatário com e-mail.", "erro"); return; }
+  abrirEnvioEmail(comEmail, eventoNome());
+}
+
 function renderLista() {
   const dados = filtrarLista();
   const presentes = dados.filter((p) => p.presente).length;
+  const totalAtivos = participantes.filter(ativo).length;
   el("contador").textContent =
-    `${dados.length} de ${participantes.length} participantes · ${presentes} presente${presentes === 1 ? "" : "s"}`;
+    `${dados.length} de ${totalAtivos} participantes · ${presentes} presente${presentes === 1 ? "" : "s"}`;
+  el("btn-toggle-filtros").classList.toggle("ativo", filtrosAtivos());
 
   el("wrap").hidden = dados.length === 0;
   el("vazio").hidden = dados.length !== 0;
@@ -184,6 +273,9 @@ function linhaHtml(p) {
     <td><span class="chip-codigo">${esc(p.codigo || "—")}</span></td>
     <td class="celula-edit" data-campo="tipo" title="Alterar tipo">
       <span class="badge ${badgeTipo(p.tipo)}">${esc(p.tipo)}</span>${lapis()}
+    </td>
+    <td class="celula-edit" data-campo="situacao" title="Alterar situação">
+      <span class="badge ${badgeSituacao(situacaoDe(p))}">${esc(situacaoDe(p))}</span>${lapis()}
     </td>
     <td class="celula-edit" data-campo="pagamento" title="Alterar pagamento">
       <span class="badge ${badgePag(p.pagamento)}">${esc(p.pagamento)}</span>${lapis()}
@@ -228,6 +320,7 @@ async function editarCelula(id, campo, td) {
   let itens, atualValor;
   if (campo === "tipo") { itens = TIPOS.map((t) => ({ valor: t, rotulo: t })); atualValor = p.tipo; }
   else if (campo === "pagamento") { itens = PAGAMENTOS.map((t) => ({ valor: t, rotulo: t })); atualValor = p.pagamento; }
+  else if (campo === "situacao") { itens = SITUACOES.map((t) => ({ valor: t, rotulo: t })); atualValor = situacaoDe(p); }
   else {
     itens = [{ valor: "", rotulo: "Sem etapa" }, ...etapas.map((e) => ({ valor: e.id, rotulo: e.nome }))];
     atualValor = p.etapa_id || "";
@@ -246,7 +339,7 @@ async function editarCelula(id, campo, td) {
       await sincParticipanteAnfitriao(p).catch((e) => console.warn(e));
       participantes = await listParticipantes();
     } else {
-      const salvo = await salvar("participantes", { id, pagamento: escolha });
+      const salvo = await salvar("participantes", { id, [campo]: escolha });
       Object.assign(p, salvo);
     }
     toast("Atualizado.", "ok");
@@ -279,6 +372,11 @@ async function acaoEmMassa(acao) {
     return;
   }
 
+  if (acao === "email") {
+    abrirEmailPara(participantes.filter((p) => selecionados.has(p.id)));
+    return;
+  }
+
   if (acao === "excluir") {
     if (!confirmar(`Excluir ${ids.length} participante(s) da lista?`)) return;
     try {
@@ -308,10 +406,11 @@ async function acaoEmMassa(acao) {
     return;
   }
 
-  // tipo / pagamento / etapa → menu ancorado no botão
+  // situacao / tipo / pagamento / etapa → menu ancorado no botão
   const btn = el("barra-acoes").querySelector(`[data-acao="${acao}"]`);
   let itens;
   if (acao === "tipo") itens = TIPOS.map((t) => ({ valor: t, rotulo: t }));
+  else if (acao === "situacao") itens = SITUACOES.map((t) => ({ valor: t, rotulo: t }));
   else if (acao === "pagamento") itens = PAGAMENTOS.map((t) => ({ valor: t, rotulo: t }));
   else itens = [{ valor: "", rotulo: "Sem etapa" }, ...etapas.map((e) => ({ valor: e.id, rotulo: e.nome }))];
   const escolha = await abrirMenu(btn, itens);
@@ -319,8 +418,8 @@ async function acaoEmMassa(acao) {
   try {
     if (acao === "etapa") {
       await atualizarEmLote("participantes", ids, { etapa_id: escolha || null });
-    } else if (acao === "pagamento") {
-      await atualizarEmLote("participantes", ids, { pagamento: escolha });
+    } else if (acao === "pagamento" || acao === "situacao") {
+      await atualizarEmLote("participantes", ids, { [acao]: escolha });
     } else {
       // tipo: pode virar Anfitrião → precisa criar/limpar vínculo por linha
       await atualizarEmLote("participantes", ids, { tipo: escolha });
@@ -349,6 +448,7 @@ function renderPaginacao(total, totalPag) {
 
 function renderPipeline() {
   const dados = participantes.filter((p) => {
+    if (!ativo(p)) return false;
     if (filtros.tipoPipe && p.tipo !== filtros.tipoPipe) return false;
     if (filtros.buscaPipe) {
       const alvo = `${p.nome} ${p.email || ""}`.toLowerCase();
@@ -423,6 +523,8 @@ function abrirForm(p) {
       <label class="campo"><span>Tipo *</span>
         <select class="select" name="tipo">${TIPOS.map((t) => `<option ${t === (p?.tipo || "Convidado") ? "selected" : ""}>${t}</option>`).join("")}</select></label>
       <label class="campo"><span>Ingresso</span><input class="input" name="ingresso" value="${esc(p?.ingresso || "")}" placeholder="Convite, GOLD…" /></label>
+      <label class="campo"><span>Situação *</span>
+        <select class="select" name="situacao">${SITUACOES.map((s) => `<option ${s === (p?.situacao || "Confirmado") ? "selected" : ""}>${s}</option>`).join("")}</select></label>
       <label class="campo"><span>Faturamento</span>
         <select class="select" name="faturamento"><option value="">—</option>
           ${FAIXAS.map((f) => `<option ${f === p?.faturamento ? "selected" : ""}>${f}</option>`).join("")}</select></label>
@@ -438,6 +540,7 @@ function abrirForm(p) {
         nome: f.nome.trim(), email: f.email.trim() || null, telefone: f.telefone.trim() || null,
         empresa: f.empresa.trim() || null,
         tipo: f.tipo, ingresso: f.ingresso.trim() || null, faturamento: f.faturamento || null,
+        situacao: f.situacao || "Confirmado",
         pagamento: f.pagamento, quantidade: Number(f.quantidade) || 1, etapa_id: f.etapa_id || null,
       };
       if (p) reg.id = p.id;
@@ -463,6 +566,7 @@ function abrirGavetaDetalhe(id) {
     `
     <div class="secao">
       <span class="badge ${badgeTipo(p.tipo)}">${esc(p.tipo)}</span>
+      <span class="badge ${badgeSituacao(situacaoDe(p))}">${esc(situacaoDe(p))}</span>
       <span class="badge ${badgePag(p.pagamento)}">${esc(p.pagamento)}</span>
       <span class="badge badge-neutro">${esc(nomeEtapa(p.etapa_id))}</span>
       <span class="chip-codigo">${esc(p.codigo || "—")}</span>
@@ -472,6 +576,7 @@ function abrirGavetaDetalhe(id) {
       <p style="margin:4px 0">${esc(p.telefone || "—")}</p>
       ${p.empresa ? `<p style="margin:4px 0">${esc(p.empresa)}</p>` : ""}
       <p class="pagina-sub" style="margin:4px 0">Cadastrado em ${formatarData(p.created_at, true)}</p>
+      ${(p.email || "").includes("@") ? `<button class="btn btn-secundario btn-sm" id="g-email" style="margin-top:8px">Enviar e-mail</button>` : ""}
     </div>
     <div class="secao">
       <h4>Credenciamento</h4>
@@ -494,6 +599,11 @@ function abrirGavetaDetalhe(id) {
     }
     <div class="secao">
       <button class="btn btn-primario" id="g-editar">Editar dados</button>
+    </div>
+    <div class="secao">
+      <h4>Situação</h4>
+      <select class="select" id="g-situacao">
+        ${SITUACOES.map((s) => `<option ${s === situacaoDe(p) ? "selected" : ""}>${s}</option>`).join("")}</select>
     </div>
     <div class="secao">
       <h4>Etapa do pipeline</h4>
@@ -524,6 +634,15 @@ function abrirGavetaDetalhe(id) {
     } catch (e) { toast(e.message, "erro"); }
   };
   g.querySelector("#g-cracha").onclick = () => imprimirCracha(p, eventoNome());
+  g.querySelector("#g-email")?.addEventListener("click", () => abrirEnvioEmail([p], eventoNome()));
+  g.querySelector("#g-situacao").onchange = async (e) => {
+    try {
+      await salvar("participantes", { id: p.id, situacao: e.target.value });
+      p.situacao = e.target.value;
+      toast("Situação atualizada.", "ok");
+      await recarregar();
+    } catch (err) { toast(err.message, "erro"); }
+  };
   g.querySelector("#g-etapa").onchange = async (e) => {
     try {
       await salvar("participantes", { id: p.id, etapa_id: e.target.value || null });
@@ -601,6 +720,7 @@ function modalImportar() {
         tipo: normTipo(l.tipo) || "Convidado",
         ingresso: (l.ingresso || "").trim() || null,
         faturamento: (l.faturamento || "").trim() || null,
+        situacao: normSituacao(l.situacao) || "Confirmado",
         pagamento: normPag(l.pagamento) || "Gratuito",
         quantidade: Number(l.quantidade) || 1,
         etapa_id: etapas[0]?.id || null,
@@ -627,6 +747,7 @@ function exportar(dados) {
     { chave: "telefone", rotulo: "Telefone" },
     { chave: "empresa", rotulo: "Empresa" },
     { chave: "tipo", rotulo: "Tipo" },
+    { rotulo: "Situação", valor: (p) => situacaoDe(p) },
     { chave: "ingresso", rotulo: "Ingresso" },
     { chave: "faturamento", rotulo: "Faturamento" },
     { chave: "pagamento", rotulo: "Pagamento" },

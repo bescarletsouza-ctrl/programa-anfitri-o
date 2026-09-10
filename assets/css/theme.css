@@ -300,6 +300,24 @@ table.tabela tbody tr:last-child td { border-bottom: none; }
 .filtros .select, .filtros .input { width: auto; min-width: 150px; }
 .filtros .input { flex: 1; min-width: 220px; max-width: 420px; }
 
+/* Painel de filtros recolhível (tela de Participantes) */
+#btn-toggle-filtros.ativo { border-color: var(--cor-laranja); color: var(--cor-laranja-forte); }
+.filtros-painel {
+  border: 1px solid var(--borda); border-radius: var(--raio-lg);
+  background: var(--superficie); padding: 16px 18px; margin-bottom: 14px;
+}
+.filtros-cab { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.filtros-cab strong { font-size: .82rem; text-transform: uppercase; letter-spacing: .05em; color: var(--texto-suave); }
+.filtros-grupo { padding: 10px 0; border-top: 1px solid var(--cinza-100); }
+.filtros-grupo:first-of-type { border-top: none; }
+.filtros-grupo > h5 {
+  margin: 0 0 8px; font-size: .7rem; font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--texto-tenue);
+}
+.filtros-linha { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px 14px; }
+.filtros-linha .campo { margin: 0; }
+.filtros-linha .campo > span { font-size: .72rem; }
+
 /* ---- KPI ---- */
 .kpi { display: flex; flex-direction: column; gap: 3px; }
 .kpi .valor { font-size: 1.8rem; font-weight: 700; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }

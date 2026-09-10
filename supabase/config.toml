@@ -1,0 +1,9 @@
+# Configuração local do Supabase CLI (só o que o projeto usa).
+# project_id é o ref do seu projeto (Studio → Settings → General).
+project_id = "xiuhqkvkiexmbgwyvunr"
+
+# A Edge Function de e-mail é chamada pelo admin com a chave publishable
+# (não é um JWT), então a verificação de JWT fica desligada — a função valida
+# a chave e restringe os destinatários aos participantes do evento.
+[functions.enviar-email]
+verify_jwt = false

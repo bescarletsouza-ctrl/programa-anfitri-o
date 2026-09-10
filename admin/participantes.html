@@ -30,30 +30,81 @@
 
     <!-- ================= LISTA ================= -->
     <div id="vista-lista" hidden>
-      <div class="filtros" style="margin-bottom:12px">
-        <input class="input" id="busca" placeholder="Buscar por nome, e-mail, telefone, empresa ou código…" />
-        <select class="select" id="f-tipo"><option value="">Todos os tipos</option></select>
-        <select class="select" id="f-pagamento"><option value="">Todos os pagamentos</option></select>
-        <select class="select" id="f-etapa"><option value="">Todas as etapas</option></select>
-        <select class="select" id="f-presenca">
-          <option value="">Presença: todos</option>
-          <option value="sim">Presentes</option>
-          <option value="nao">Ausentes</option>
-        </select>
-      </div>
-      <div class="barra-topo">
+      <div class="barra-topo" style="margin-bottom:12px">
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-primario" id="btn-cadastrar">+ Cadastrar</button>
           <button class="btn btn-secundario" id="btn-importar">Importar Excel</button>
           <button class="btn btn-secundario" id="btn-exportar">Exportar Excel</button>
+          <button class="btn btn-secundario" id="btn-email">Enviar e-mail</button>
         </div>
-        <span class="pagina-sub" id="contador" style="margin:0"></span>
+        <div style="display:flex;gap:10px;align-items:center">
+          <span class="pagina-sub" id="contador" style="margin:0"></span>
+          <button class="btn btn-sm btn-secundario" id="btn-toggle-filtros" aria-expanded="false">Filtros</button>
+        </div>
       </div>
+
+      <section class="filtros-painel" id="filtros-painel" hidden>
+        <div class="filtros-cab">
+          <strong>Filtros</strong>
+          <button class="btn btn-sm btn-fantasma" id="btn-limpar-filtros">Limpar tudo</button>
+        </div>
+
+        <div class="filtros-grupo">
+          <h5>Pesquisa</h5>
+          <div class="filtros-linha">
+            <label class="campo"><span>Pesquisar</span>
+              <input class="input" id="f-busca" placeholder="Nome, e-mail, telefone, empresa ou código…" /></label>
+            <label class="campo"><span>Limitar aos campos</span>
+              <select class="select" id="f-campo">
+                <option value="">Todos os campos</option>
+                <option value="nome">Nome</option>
+                <option value="email">E-mail</option>
+                <option value="telefone">Telefone</option>
+                <option value="empresa">Empresa</option>
+                <option value="codigo">Código</option>
+              </select></label>
+          </div>
+        </div>
+
+        <div class="filtros-grupo">
+          <h5>Situação &amp; datas</h5>
+          <div class="filtros-linha">
+            <label class="campo"><span>Situação</span><select class="select" id="f-situacao"></select></label>
+            <label class="campo"><span>Tipo</span><select class="select" id="f-tipo"></select></label>
+            <label class="campo"><span>Pagamento</span><select class="select" id="f-pagamento"></select></label>
+            <label class="campo"><span>Cadastro de</span><input class="input" id="f-data-de" type="date" /></label>
+            <label class="campo"><span>Cadastro até</span><input class="input" id="f-data-ate" type="date" /></label>
+          </div>
+        </div>
+
+        <div class="filtros-grupo">
+          <h5>Inscrições &amp; presença</h5>
+          <div class="filtros-linha">
+            <label class="campo"><span>Categoria de ingresso</span><select class="select" id="f-categoria"><option value="">Todas</option></select></label>
+            <label class="campo"><span>Etapa do pipeline</span><select class="select" id="f-etapa"><option value="">Todas</option></select></label>
+            <label class="campo"><span>Atividade</span><select class="select" id="f-atividade"><option value="">Não filtrar</option></select></label>
+            <label class="campo"><span>Pres. atividade</span>
+              <select class="select" id="f-pres-atv">
+                <option value="">Não filtrar</option>
+                <option value="sim">Credenciado</option>
+                <option value="nao">Não credenciado</option>
+              </select></label>
+            <label class="campo"><span>Pres. evento</span>
+              <select class="select" id="f-presenca">
+                <option value="">Não filtrar</option>
+                <option value="sim">Presente</option>
+                <option value="nao">Ausente</option>
+              </select></label>
+          </div>
+        </div>
+      </section>
 
       <div class="barra-acoes" id="barra-acoes" hidden>
         <span class="barra-acoes-cont" id="sel-cont">0 selecionados</span>
+        <button class="btn btn-sm btn-secundario" data-acao="email">Enviar e-mail</button>
         <button class="btn btn-sm btn-secundario" data-acao="presente">Marcar presente</button>
         <button class="btn btn-sm btn-secundario" data-acao="ausente">Marcar ausente</button>
+        <button class="btn btn-sm btn-secundario" data-acao="situacao">Situação</button>
         <button class="btn btn-sm btn-secundario" data-acao="tipo">Tipo</button>
         <button class="btn btn-sm btn-secundario" data-acao="pagamento">Pagamento</button>
         <button class="btn btn-sm btn-secundario" data-acao="etapa">Etapa</button>
@@ -66,7 +117,7 @@
         <table class="tabela tabela-part">
           <thead><tr>
             <th class="col-check"><input type="checkbox" id="check-todos" aria-label="Selecionar todos" /></th>
-            <th>Nome</th><th>Código</th><th>Tipo</th><th>Pagamento</th>
+            <th>Nome</th><th>Código</th><th>Tipo</th><th>Situação</th><th>Pagamento</th>
             <th>Etapa</th><th>Presença</th><th>Cadastro</th><th></th>
           </tr></thead>
           <tbody id="linhas"></tbody>

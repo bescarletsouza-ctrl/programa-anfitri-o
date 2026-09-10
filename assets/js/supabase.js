@@ -399,3 +399,21 @@ export async function inserirLote(tabela, registros) {
   const rs = registros.map((r) => comEvento(tabela, r));
   return ok(await supabase.from(tabela).insert(rs).select());
 }
+
+/* ---- E-mail (Edge Function "enviar-email" + Resend) ------------------ */
+// participanteIds: ids do evento atual. A function busca os e-mails no banco,
+// personaliza ({nome}/{codigo}/{email}/{evento}) e dispara pelo Resend.
+export async function enviarEmail({ participanteIds, assunto, corpo, de }) {
+  const { data, error } = await supabase.functions.invoke("enviar-email", {
+    body: { evento_id: eventoId(), participante_ids: participanteIds, assunto, corpo, de: de || null },
+  });
+  if (error) {
+    throw new Error(
+      /Failed to (send|fetch)|not found|Function not found/i.test(error.message || "")
+        ? "Função de e-mail não encontrada. Faça o deploy de supabase/functions/enviar-email e configure os secrets."
+        : error.message || "Falha ao enviar."
+    );
+  }
+  if (data?.erro) throw new Error(data.erro);
+  return data; // { enviados, falhas, total }
+}

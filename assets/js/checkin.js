@@ -48,6 +48,7 @@ async function carregar() {
       listCheckins().catch(() => []),
       listAtividades().catch(() => []),
     ]);
+    participantes = participantes.filter((p) => p.situacao !== "Desativado");
     montarSeletor();
     el("carregando").hidden = true;
     el("painel").hidden = false;

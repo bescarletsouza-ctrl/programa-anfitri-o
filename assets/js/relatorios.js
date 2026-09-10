@@ -25,6 +25,7 @@ async function carregar() {
     [participantes, checkins, atividades] = await Promise.all([
       listParticipantes(), listCheckins(), listAtividades().catch(() => []),
     ]);
+    participantes = participantes.filter((p) => p.situacao !== "Desativado");
     el("carregando").hidden = true;
     el("painel").hidden = false;
     render();
