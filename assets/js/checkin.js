@@ -7,10 +7,12 @@
 // credencia numa atividade específica — não imprime crachá nem mexe na presença
 // geral; categoria não liberada / atividade lotada = alerta, não bloqueia.
 // =============================================================================
-import { iniciarPagina, esc, debounce, toast } from "./ui.js";
+import { iniciarPagina, esc, debounce, toast, icone, abrirMenu } from "./ui.js";
 import { listParticipantes, listCheckins, listAtividades, registrarCheckin, salvar, remover } from "./supabase.js";
 import { eventoNome } from "./evento.js";
 import { imprimirCracha } from "./cracha.js";
+
+const AVATAR = `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="8.5" r="4"/><path d="M4 21a8 8 0 0 1 16 0z"/></svg>`;
 
 iniciarPagina("checkin");
 const el = (id) => document.getElementById(id);
@@ -152,14 +154,42 @@ function render() {
     return;
   }
 
+  el("resultados").className = "ck-cards";
   el("resultados").innerHTML = achados.map((p) => (atv ? cardAtvHtml(p, atv) : cardEventoHtml(p))).join("");
-  el("resultados").querySelectorAll(".checkin-item").forEach((row) => {
+  el("resultados").querySelectorAll(".ck-card").forEach((row) => {
     const p = participantes.find((x) => x.id === row.dataset.id);
-    row.querySelector("[data-credenciar]")?.addEventListener("click", () => acao(p, "entrada"));
+    row.querySelector("[data-credenciar]")?.addEventListener("click", () => acao(p, "entrada", true));
+    row.querySelector("[data-checkin]")?.addEventListener("click", () => acao(p, "entrada", false));
     row.querySelector("[data-saida]")?.addEventListener("click", () => acao(p, "saida"));
     row.querySelector("[data-reimprimir]")?.addEventListener("click", () => imprimirCracha(p, eventoNome()));
     row.querySelector("[data-desfazer]")?.addEventListener("click", () => desfazer(p));
+    row.querySelector("[data-atividades]")?.addEventListener("click", (e) => addAtividade(p, e.currentTarget));
+    row.querySelector("[data-mais]")?.addEventListener("click", (e) => {
+      const box = row.querySelector(".ck-card-extra");
+      box.hidden = !box.hidden;
+      e.currentTarget.textContent = box.hidden ? "Ver mais dados ▾" : "Ver menos ▴";
+    });
   });
+}
+
+// abre um menu com as atividades para credenciar o participante numa delas
+async function addAtividade(p, anchor) {
+  if (!atividades.length) { toast("Nenhuma atividade cadastrada.", "erro"); return; }
+  const itens = atividades.map((a) => ({
+    valor: a.id,
+    rotulo: `${a.nome}${a.vagas ? ` · ${credenciadosNaAtv(a.id).length}/${a.vagas}` : ""}`,
+    atual: !!credenciadosNaAtv(a.id).find((x) => x.pid === p.id),
+  }));
+  const escolha = await abrirMenu(anchor, itens);
+  if (!escolha) return;
+  const a = atividades.find((x) => x.id === escolha);
+  try {
+    await registrarCheckin(p.id, "entrada", "atividades", escolha);
+    checkins = await listCheckins().catch(() => checkins);
+    montarSeletor();
+    render();
+    toast(`${p.nome} credenciado(a) em ${a.nome}.`, "ok");
+  } catch (e) { toast(e.message, "erro"); }
 }
 
 function renderTrilha(atv) {
@@ -213,35 +243,57 @@ function renderCategorias() {
   });
 }
 
+// nº de atividades em que o participante está credenciado
+const atividadesDoPart = (pid) => atividades.filter((a) => credenciadosNaAtv(a.id).some((x) => x.pid === pid)).length;
+
+function cabecalhoCard(p) {
+  const categoria = (p.ingresso || p.tipo || "").trim();
+  const nAtv = atividadesDoPart(p.id);
+  const extra = [
+    p.empresa && ["Empresa", p.empresa],
+    p.telefone && ["Telefone", p.telefone],
+    p.codigo && ["Código", p.codigo],
+    p.faturamento && ["Faturamento", p.faturamento],
+    p.quantidade && p.quantidade !== 1 && ["Ingressos", p.quantidade],
+  ].filter(Boolean);
+  return `
+    <div class="ck-card-avatar">${AVATAR}</div>
+    <strong class="ck-card-nome">${esc(p.nome)}</strong>
+    <div class="ck-card-linha forte">${esc(categoria || "Sem categoria")}</div>
+    <div class="ck-card-linha">${nAtv ? `${nAtv} atividade${nAtv > 1 ? "s" : ""} credenciada${nAtv > 1 ? "s" : ""}` : "Nenhuma atividade extra"}</div>
+    ${p.email ? `<div class="ck-card-linha">${esc(p.email)}</div>` : ""}
+    ${extra.length ? `<button type="button" class="ck-card-mais" data-mais>Ver mais dados ▾</button>
+      <div class="ck-card-extra" hidden>${extra.map(([k, v]) => `<div class="ck-card-linha">${esc(k)}: ${esc(v)}</div>`).join("")}</div>` : ""}
+    <div class="ck-card-linha ${situ(p) === "Confirmado" ? "ok" : ""}">
+      ${situ(p) === "Confirmado" ? "✓ Inscrição confirmada" : esc(situ(p))}
+    </div>`;
+}
+const situ = (p) => p.situacao || "Confirmado";
+
 function cardEventoHtml(p) {
-  const categoria = p.ingresso || p.tipo;
-  const sub = [p.empresa, p.email, p.telefone].filter(Boolean).join(" · ");
   const reentrada = !p.presente && entradasHoje(p.id) > 0;
-  return `<div class="checkin-item ${p.presente ? "presente" : ""}" data-id="${p.id}">
-    <div class="checkin-item-info">
-      <strong>${esc(p.nome)}</strong>
-      <span class="checkin-meta">
-        <span class="badge ${p.tipo === "Anfitrião" ? "badge-laranja" : "badge-neutro"}">${esc(p.tipo)}</span>
-        ${categoria && categoria !== p.tipo ? `<span class="chip-cat">${esc(categoria)}</span>` : ""}
-        <span class="chip-codigo">${esc(p.codigo || "—")}</span>
-      </span>
-      ${sub ? `<span class="checkin-sub">${esc(sub)}</span>` : ""}
-      ${reentrada ? `<span class="checkin-reentrada">↻ Reentrada — já esteve presente hoje</span>` : ""}
-    </div>
-    <div class="checkin-item-acao">
+  return `<div class="ck-card ${p.presente ? "presente" : ""}" data-id="${p.id}">
+    ${cabecalhoCard(p)}
+    <div class="ck-card-linha ${p.presente ? "presente-badge" : ""}">
       ${p.presente
-        ? `<span class="checkin-ok">✓ Presente desde ${esc(hora(p.checkin_at)) || "hoje"}</span>
-           <button class="btn btn-secundario btn-sm" data-reimprimir>Reimprimir crachá</button>
-           <button class="btn btn-fantasma btn-sm" data-saida>Registrar saída</button>
-           <button class="btn btn-fantasma btn-sm" data-desfazer title="Desfazer check-in">Desfazer</button>`
-        : `<button class="btn btn-primario" data-credenciar>Credenciar e imprimir</button>`}
+        ? `✓ Já fez check-in${hora(p.checkin_at) ? ` às ${esc(hora(p.checkin_at))}` : ""}`
+        : "Ainda não entrou"}
+    </div>
+    ${reentrada ? `<div class="ck-card-linha alerta">↻ Reentrada — já esteve presente hoje</div>` : ""}
+    <div class="ck-card-acoes">
+      ${p.presente
+        ? `<button class="btn btn-secundario btn-sm" data-reimprimir>${icone("baixar")} Reimprimir crachá</button>
+           <button class="btn btn-secundario btn-sm" data-saida>Registrar saída</button>
+           <button class="btn btn-fantasma btn-sm" data-desfazer>Desfazer check-in</button>`
+        : `<button class="btn btn-primario" data-credenciar>${icone("check")} Check-in e imprimir etiqueta</button>
+           <button class="btn btn-secundario btn-sm" data-checkin>${icone("check")} Apenas fazer check-in</button>
+           <button class="btn btn-secundario btn-sm" data-reimprimir>${icone("baixar")} Reimprimir crachá</button>`}
+      ${atividades.length ? `<button class="btn btn-secundario btn-sm" data-atividades>${icone("agenda")} Adicionar em atividade</button>` : ""}
     </div>
   </div>`;
 }
 
 function cardAtvHtml(p, atv) {
-  const categoria = p.ingresso || p.tipo;
-  const sub = [p.empresa, p.email, p.telefone].filter(Boolean).join(" · ");
   const dentro = naAtv(p.id);
   const cats = (atv.categorias || []).filter(Boolean);
   const catLiberada = !cats.length || cats.includes(p.ingresso || p.tipo);
@@ -249,27 +301,22 @@ function cardAtvHtml(p, atv) {
   const alertas = [];
   if (!catLiberada) alertas.push("⚠ Categoria não liberada nesta atividade");
   if (!dentro && lotada) alertas.push("⚠ Atividade lotada");
-  return `<div class="checkin-item ${dentro ? "presente" : ""}" data-id="${p.id}">
-    <div class="checkin-item-info">
-      <strong>${esc(p.nome)}</strong>
-      <span class="checkin-meta">
-        <span class="badge ${p.tipo === "Anfitrião" ? "badge-laranja" : "badge-neutro"}">${esc(p.tipo)}</span>
-        ${categoria && categoria !== p.tipo ? `<span class="chip-cat">${esc(categoria)}</span>` : ""}
-        <span class="chip-codigo">${esc(p.codigo || "—")}</span>
-      </span>
-      ${sub ? `<span class="checkin-sub">${esc(sub)}</span>` : ""}
-      ${alertas.map((a) => `<span class="checkin-reentrada">${a}</span>`).join("")}
+  return `<div class="ck-card ${dentro ? "presente" : ""}" data-id="${p.id}">
+    ${cabecalhoCard(p)}
+    <div class="ck-card-linha ${dentro ? "presente-badge" : ""}">
+      ${dentro ? `✓ Na atividade desde ${esc(hora(dentro.desde)) || "hoje"}` : "Fora desta atividade"}
     </div>
-    <div class="checkin-item-acao">
+    ${alertas.map((a) => `<div class="ck-card-linha alerta">${a}</div>`).join("")}
+    <div class="ck-card-acoes">
       ${dentro
-        ? `<span class="checkin-ok">✓ Na atividade desde ${esc(hora(dentro.desde)) || "hoje"}</span>
-           <button class="btn btn-fantasma btn-sm" data-saida>Registrar saída</button>`
-        : `<button class="btn btn-primario" data-credenciar>Credenciar</button>`}
+        ? `<button class="btn btn-secundario btn-sm" data-saida>Registrar saída</button>`
+        : `<button class="btn btn-primario" data-credenciar>${icone("check")} Credenciar na atividade</button>`}
+      <button class="btn btn-secundario btn-sm" data-reimprimir>${icone("baixar")} Reimprimir crachá</button>
     </div>
   </div>`;
 }
 
-async function acao(p, tipo) {
+async function acao(p, tipo, imprimir = false) {
   const atv = atvAtual();
   try {
     const salvo = await registrarCheckin(p.id, tipo, atv ? "atividades" : "checkin", atv?.id || null);
@@ -278,12 +325,8 @@ async function acao(p, tipo) {
     montarSeletor();
     render();
     if (tipo === "entrada") {
-      if (atv) {
-        toast(`${p.nome} credenciado(a) em ${atv.nome}.`, "ok");
-      } else {
-        toast(`${p.nome} credenciado(a).`, "ok");
-        imprimirCracha(p, eventoNome());
-      }
+      toast(atv ? `${p.nome} credenciado(a) em ${atv.nome}.` : `${p.nome} credenciado(a).`, "ok");
+      if (imprimir && !atv) imprimirCracha(p, eventoNome());
     } else {
       toast(`Saída registrada para ${p.nome}.`, "ok");
     }

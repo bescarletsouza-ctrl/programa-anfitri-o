@@ -552,12 +552,44 @@ table.tabela tbody tr:last-child td { border-bottom: none; }
 .ck-toggle { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: .8rem; font-weight: 600; color: var(--texto-suave); cursor: pointer; }
 .ck-toggle input { width: 15px; height: 15px; accent-color: var(--cor-laranja); }
 
-.ck-layout.sem-detalhes .checkin-sub { display: none; }
+.ck-layout.sem-detalhes .checkin-sub,
+.ck-layout.sem-detalhes .ck-card-mais,
+.ck-layout.sem-detalhes .ck-card-extra { display: none; }
 
 @media (max-width: 900px) {
   .ck-layout { grid-template-columns: 1fr; }
   .ck-rail { position: static; order: -1; }
 }
+
+/* resultados da busca em cartões */
+.ck-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.ck-card {
+  border: 1px solid var(--borda); border-radius: var(--raio-lg); background: var(--superficie);
+  box-shadow: var(--sombra); padding: 18px 16px; display: flex; flex-direction: column;
+  align-items: center; gap: 7px;
+}
+.ck-card.presente { border-color: color-mix(in srgb, var(--ok-solid) 45%, transparent); }
+.ck-card-avatar {
+  width: 74px; height: 74px; border-radius: 50%; background: var(--cinza-100);
+  display: flex; align-items: flex-end; justify-content: center; overflow: hidden; margin-bottom: 2px;
+}
+.ck-card-avatar svg { width: 58px; height: 58px; color: var(--texto-tenue); }
+.ck-card-nome { font-size: 1.02rem; font-weight: 700; text-align: center; letter-spacing: -.01em; line-height: 1.25; }
+.ck-card-linha {
+  width: 100%; text-align: center; font-size: .8rem; color: var(--texto-suave);
+  background: var(--cinza-100); border-radius: var(--raio); padding: 7px 10px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ck-card-linha.forte { font-weight: 700; letter-spacing: .05em; text-transform: uppercase; font-size: .72rem; color: var(--texto); }
+.ck-card-linha.ok { background: var(--ok-bg); color: var(--ok); font-weight: 600; }
+.ck-card-linha.presente-badge { background: color-mix(in srgb, var(--ok-solid) 20%, transparent); color: var(--ok); font-weight: 700; }
+.ck-card-linha.alerta { background: var(--erro-bg); color: var(--erro); font-weight: 600; white-space: normal; }
+.ck-card-mais { background: none; border: none; color: var(--texto-suave); font-size: .73rem; font-weight: 600; cursor: pointer; padding: 1px; }
+.ck-card-extra { width: 100%; display: grid; gap: 4px; }
+.ck-card-acoes { width: 100%; display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.ck-card-acoes .btn { width: 100%; }
+.ck-card-acoes .btn-primario { height: 44px; font-size: .9rem; }
+.ck-card-acoes .btn svg { width: 15px; height: 15px; }
 
 .checkin-stats { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; max-width: 460px; }
 .checkin-num { font-size: 1rem; color: var(--texto-suave); }
