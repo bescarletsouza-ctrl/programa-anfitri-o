@@ -59,6 +59,12 @@ function alternarTema() {
 // ficam no rodapé (NAV_RODAPE).
 const NAV = [
   {
+    grupo: "Geral",
+    itens: [
+      { chave: "geral", rotulo: "Visão geral", href: "geral.html", ico: "grafico" },
+    ],
+  },
+  {
     grupo: "Evento",
     itens: [
       { chave: "painel-evento", rotulo: "Painel",            href: "painel-evento.html", ico: "painel" },

@@ -735,6 +735,15 @@ table.tabela tbody tr:last-child td { border-bottom: none; }
 .atv-vagas .checkin-num { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
 .atv-cats { display: flex; flex-wrap: wrap; gap: 6px; }
 
+/* ---- Visão geral (compilado de todos os eventos) ---- */
+.geral-divisor {
+  font-size: 1.2rem; font-weight: 700; letter-spacing: -.02em;
+  margin: 34px 0 16px; padding-top: 22px; border-top: 1px solid var(--borda);
+}
+.tabela th.num, .tabela td.num { text-align: right; }
+#linhas-eventos tr:hover { background: transparent; cursor: default; }
+#linhas-eventos .rel-barra-trilha { height: 14px; }
+
 /* ---- Relatórios ---- */
 .rel-secao { margin-bottom: 26px; }
 .rel-secao > h2 { font-size: 1rem; font-weight: 650; letter-spacing: -.01em; margin: 0 0 12px; }

@@ -58,6 +58,22 @@ export const salvarEventoPorId = (id, patch) =>
 export const excluirEvento = (id) =>
   supabase.from("eventos").delete().eq("id", id).then(ok);
 
+/* ---- Visão geral (todos os eventos, SEM escopo) --------------------- */
+export const listParticipantesTodos = () =>
+  supabase.from("participantes")
+    .select("id, evento_id, situacao, presente, tipo, ingresso, pagamento, quantidade, created_at, checkin_at")
+    .then(ok);
+
+export const listCheckinsTodos = () =>
+  supabase.from("checkins").select("evento_id, participante_id, acao, at, atividade_id").then(ok);
+
+export const listAnfitrioesTodos = () =>
+  supabase.from("anfitrioes_com_stats")
+    .select("id, evento_id, nome, tipo, vai, enviados, aprovados, confirmados").then(ok);
+
+export const listTiposIngressoTodos = () =>
+  supabase.from("tipos_ingresso").select("evento_id, nome, preco").then(ok);
+
 /* ---- Leitura (admin: escopo automático) ------------------------------ */
 export const listGrupos = (eid) =>
   supabase.from("grupos").select("*").eq("evento_id", ev(eid)).order("nome").then(ok);

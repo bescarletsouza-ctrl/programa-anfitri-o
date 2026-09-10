@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<script>try{var t=localStorage.getItem('tema')==='dark'?'dark':'light';document.documentElement.dataset.theme=t;document.documentElement.style.background=t==='dark'?'#0c0c0d':'#f7f7f6';}catch(e){}</script>
+<title>Visão geral — We.events</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../assets/css/theme.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside id="sidebar" class="sidebar"></aside>
+  <main class="conteudo">
+    <div class="barra-topo">
+      <div>
+        <h1 class="pagina-titulo">Visão geral</h1>
+        <p class="pagina-sub">Resumo compilado de todos os eventos cadastrados — participantes, presença, anfitriões e faturamento.</p>
+      </div>
+      <button class="btn btn-secundario" id="btn-atualizar">Atualizar</button>
+    </div>
+
+    <div id="carregando" class="vazio">Carregando…</div>
+
+    <div id="painel" hidden>
+      <div class="grid grid-4" id="kpis" style="margin-bottom:26px"></div>
+
+      <div class="rel-secao">
+        <h2>Por evento</h2>
+        <div class="tabela-wrap">
+          <table class="tabela">
+            <thead><tr>
+              <th>Evento</th><th>Data</th><th class="num">Inscritos</th>
+              <th class="num">Presentes</th><th class="num">Ausentes</th>
+              <th>Presença</th><th class="num">Faturamento</th>
+            </tr></thead>
+            <tbody id="linhas-eventos"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="grid grid-2">
+        <div class="rel-secao">
+          <h2>Inscritos por evento</h2>
+          <div id="rel-inscritos-evento"></div>
+        </div>
+        <div class="rel-secao">
+          <h2>Presença por evento</h2>
+          <div id="rel-presenca-evento"></div>
+        </div>
+      </div>
+
+      <div class="rel-secao">
+        <h2>Check-ins por dia <span class="rel-secao-sub">(todos os eventos, últimos 30 dias)</span></h2>
+        <div class="rel-horas" id="rel-dias"></div>
+      </div>
+
+      <div class="grid grid-3">
+        <div class="rel-secao">
+          <h2>Situação</h2>
+          <div id="rel-situacao"></div>
+        </div>
+        <div class="rel-secao">
+          <h2>Tipo de participante</h2>
+          <div id="rel-tipo"></div>
+        </div>
+        <div class="rel-secao">
+          <h2>Categoria de ingresso</h2>
+          <div id="rel-categoria"></div>
+        </div>
+      </div>
+
+      <h2 class="geral-divisor">Anfitriões</h2>
+      <div class="grid grid-4" id="kpis-anf" style="margin-bottom:22px"></div>
+
+      <div class="grid grid-2">
+        <div class="rel-secao">
+          <h2>Funil de convidados</h2>
+          <div id="rel-funil"></div>
+        </div>
+        <div class="rel-secao">
+          <h2>Anfitriões por evento</h2>
+          <div id="rel-anf-evento"></div>
+        </div>
+      </div>
+
+      <div class="rel-secao">
+        <h2>Top anfitriões <span class="rel-secao-sub">(por convidados confirmados, todos os eventos)</span></h2>
+        <div id="rel-top-anf"></div>
+      </div>
+    </div>
+  </main>
+</div>
+<script type="module" src="../assets/js/geral.js"></script>
+</body>
+</html>
