@@ -668,20 +668,22 @@ table.tabela tbody tr:last-child td { border-bottom: none; }
 #cracha { position: fixed; inset: 0; background: #fff; z-index: 200; display: flex; align-items: center; justify-content: center; }
 #cracha[hidden] { display: none; }
 .cracha-cartao {
-  box-sizing: border-box; padding: 2.5mm 3mm; border: 1px solid #111; border-radius: 3mm;
-  text-align: center; color: #111; font-family: Inter, system-ui, sans-serif;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1mm;
-  background: #fff; overflow: hidden;
+  box-sizing: border-box; padding: 6mm; border: 1px solid #111; border-radius: 3mm;
+  text-align: left; color: #111; font-family: Inter, system-ui, sans-serif;
+  display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 1mm;
+  background: #fff; overflow: hidden; position: relative;
 }
-.cracha-cartao > div { max-width: 100%; overflow-wrap: anywhere; line-height: 1.1; }
-.cracha-evento { font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #555; }
-.cracha-nome { font-weight: 800; letter-spacing: -.01em; }
+.cracha-texto { display: flex; flex-direction: column; gap: 1mm; max-width: 100%; }
+.cracha-cartao.tem-qr .cracha-texto { padding-right: 27mm; }
+.cracha-cartao > div, .cracha-texto > div { max-width: 100%; overflow-wrap: anywhere; line-height: 1.08; }
+.cracha-evento { font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: #666; margin-bottom: .5mm; }
+.cracha-nome { font-weight: 800; letter-spacing: -.02em; line-height: 1; }
 .cracha-linha { color: #333; }
-.cracha-tipo { display: inline-block; padding: 1mm 4mm; border-radius: 999px; background: #111; color: #fff; font-weight: 700; }
-.cracha-qr { margin: 0.5mm 0; flex-shrink: 0; line-height: 0; }
-.cracha-qr img { width: 20mm; height: 20mm; image-rendering: pixelated; }
-.cracha-semqr { font-weight: 800; letter-spacing: .08em; padding: 4mm 0; }
-.cracha-codigo { font-weight: 700; letter-spacing: .1em; font-variant-numeric: tabular-nums; }
+.cracha-tipo { color: #ea580c; font-weight: 700; }
+.cracha-qr { position: absolute; right: 6mm; bottom: 6mm; line-height: 0; }
+.cracha-qr img { width: 23mm; height: 23mm; image-rendering: pixelated; }
+.cracha-semqr { font-weight: 800; letter-spacing: .08em; }
+.cracha-codigo { font-weight: 700; letter-spacing: .12em; font-variant-numeric: tabular-nums; color: #444; margin-top: 1.5mm; }
 
 @media print {
   body { background: #fff !important; }

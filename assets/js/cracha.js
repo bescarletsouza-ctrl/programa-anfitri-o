@@ -95,8 +95,9 @@ export function montarCrachaHtml(participante, nomeEvento = "", config = CRACHA_
   const classe = { evento: "cracha-evento", nome: "cracha-nome", categoria: "cracha-tipo", codigo: "cracha-codigo" };
 
   const linhas = (cfg.linhas || CRACHA_PADRAO.linhas).filter((l) => l.on !== false);
-  const antesQr = linhas.filter((l) => l.campo !== "codigo");
+  const antesCodigo = linhas.filter((l) => l.campo !== "codigo");
   const linhaCodigo = linhas.find((l) => l.campo === "codigo");
+  const temQr = cfg.qr !== false;
 
   const linhaHtml = (l) => {
     const v = valor(l.campo, l);
@@ -104,14 +105,18 @@ export function montarCrachaHtml(participante, nomeEvento = "", config = CRACHA_
     return `<div class="${classe[l.campo] || "cracha-linha"}" style="font-size:${Number(l.tam) || 14}px">${esc(v)}</div>`;
   };
 
-  return `<div class="cracha-cartao" style="width:${Number(cfg.largura_mm) || 90}mm;min-height:${Number(cfg.altura_mm) || 55}mm">
-    ${antesQr.map(linhaHtml).join("")}
-    ${cfg.qr !== false
+  // Layout: bloco de texto no canto superior esquerdo, QR fixo no canto
+  // inferior direito (posição absoluta via CSS).
+  return `<div class="cracha-cartao ${temQr ? "tem-qr" : ""}" style="width:${Number(cfg.largura_mm) || 90}mm;min-height:${Number(cfg.altura_mm) || 55}mm">
+    <div class="cracha-texto">
+      ${antesCodigo.map(linhaHtml).join("")}
+      ${linhaCodigo ? linhaHtml(linhaCodigo) : ""}
+    </div>
+    ${temQr
       ? `<div class="cracha-qr">${qrUri
           ? `<img src="${qrUri}" alt="QR ${esc(p.codigo || "")}" />`
           : `<div class="cracha-semqr">${esc(p.codigo || "")}</div>`}</div>`
       : ""}
-    ${linhaCodigo ? linhaHtml(linhaCodigo) : ""}
   </div>`;
 }
 
