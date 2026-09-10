@@ -1,4 +1,5 @@
 {
+  "id": "/checkin-app.html",
   "name": "We.events — Check-in",
   "short_name": "Check-in",
   "description": "Credenciamento pelo celular: lê o QR do crachá, faz o check-in e imprime a credencial.",
@@ -8,7 +9,12 @@
   "orientation": "portrait",
   "background_color": "#0c0c0d",
   "theme_color": "#0c0c0d",
+  "lang": "pt-BR",
+  "categories": ["business", "productivity", "utilities"],
   "icons": [
-    { "src": "/assets/img/app-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    { "src": "/assets/img/app-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/img/app-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/img/app-icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/assets/img/app-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
   ]
 }

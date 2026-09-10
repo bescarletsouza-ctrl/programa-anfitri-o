@@ -92,6 +92,27 @@ supabase functions deploy webhook-in       # recebe inscrições de ticketeiras/
 `integracoes` e `webhook-in` não precisam de secret extra (usam as chaves já
 presentes no ambiente da função). Config em [`supabase/config.toml`](supabase/config.toml).
 
+### 6. Check-in no celular como "app"
+
+`checkin-app.html` já é um **PWA**: no Chrome do Android (ou Safari do iPhone) →
+menu → *Adicionar à tela inicial*. Abre em tela cheia, com ícone, sem barra do
+navegador. É o caminho recomendado — zero build.
+
+Para gerar um **`.apk` / `.aab` de verdade** (Play Store ou instalação manual),
+empacote o PWA numa TWA:
+
+1. [pwabuilder.com](https://www.pwabuilder.com) → cole a URL do check-in
+   (`https://SEU-DOMINIO/checkin-app.html`) → *Package for stores* → Android.
+2. Baixe o pacote. Ele traz um `assetlinks.json` com a impressão digital (SHA-256)
+   da chave de assinatura.
+3. Suba esse conteúdo em `https://SEU-DOMINIO/.well-known/assetlinks.json`
+   (crie a pasta `.well-known/` na raiz do projeto e faça deploy). Isso remove a
+   barra de URL e liga o app ao site.
+4. Instale o `.apk` no aparelho, ou publique o `.aab` no Play Console.
+
+O manifest ([`manifest.webmanifest`](manifest.webmanifest)) e os ícones em
+`assets/img/app-icon-*.png` já estão prontos para o empacotador.
+
 ## Personalização
 
 - **Cores / fontes**: só [`assets/css/theme.css`](assets/css/theme.css) — as
