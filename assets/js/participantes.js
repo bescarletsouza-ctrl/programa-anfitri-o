@@ -600,7 +600,7 @@ function renderPipeline() {
 
   const semEtapa = dados.filter((p) => !p.etapa_id);
   const colunas = etapas.map((et) => ({ et, chave: et.id, itens: dados.filter((p) => p.etapa_id === et.id) }));
-  colunas.unshift({ et: null, chave: "sem", itens: semEtapa });
+  if (semEtapa.length) colunas.unshift({ et: null, chave: "sem", itens: semEtapa });
 
   el("kanban").innerHTML = colunas
     .map(({ et, chave, itens }) => {
@@ -609,6 +609,7 @@ function renderPipeline() {
       const ordenados = ordenarCards(itens, chave);
       return `<div class="coluna" data-chave="${esc(chave)}">
         <div class="coluna-topo">
+          ${et ? `<span class="coluna-grip" draggable="true" title="Arraste para reordenar">⠿</span>` : ""}
           <button type="button" class="coluna-titulo" data-ordenar="${esc(chave)}" title="Ordenar cards">
             <span class="ponto" style="background:${esc(cor)}"></span>
             ${esc(et ? et.nome : "Sem etapa")}<span class="ind-ordem">${ind}</span>
@@ -652,17 +653,61 @@ function renderPipeline() {
     card.addEventListener("dragend", () => card.classList.remove("arrastando"));
   });
 
+  el("kanban").querySelectorAll(".coluna-grip").forEach((g) => {
+    const col = g.closest(".coluna");
+    g.addEventListener("dragstart", (e) => {
+      arrastandoEtapaId = col.dataset.chave;
+      e.dataTransfer.effectAllowed = "move";
+      col.classList.add("etapa-arrastando");
+    });
+    g.addEventListener("dragend", () => {
+      arrastandoEtapaId = null;
+      el("kanban").querySelectorAll(".etapa-arrastando").forEach((c) => c.classList.remove("etapa-arrastando"));
+    });
+  });
+
   el("kanban").querySelectorAll(".coluna[data-chave]").forEach((col) => {
     col.addEventListener("dragover", (e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; col.classList.add("drop-alvo"); });
     col.addEventListener("dragleave", (e) => { if (!col.contains(e.relatedTarget)) col.classList.remove("drop-alvo"); });
     col.addEventListener("drop", (e) => {
       e.preventDefault();
       col.classList.remove("drop-alvo");
-      const id = e.dataTransfer.getData("text/plain");
       const chave = col.dataset.chave;
-      moverEtapa(id, chave === "sem" ? null : chave);
+      if (arrastandoEtapaId) {
+        reordenarEtapa(arrastandoEtapaId, chave);
+        arrastandoEtapaId = null;
+        return;
+      }
+      const id = e.dataTransfer.getData("text/plain");
+      if (id) moverEtapa(id, chave === "sem" ? null : chave);
     });
   });
+}
+
+let arrastandoEtapaId = null;
+
+async function reordenarEtapa(dragChave, alvoChave) {
+  if (dragChave === alvoChave || dragChave === "sem") return;
+  const lista = [...etapas].sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+  const from = lista.findIndex((e) => e.id === dragChave);
+  if (from < 0) return;
+  const [movida] = lista.splice(from, 1);
+  let to = alvoChave === "sem" ? 0 : lista.findIndex((e) => e.id === alvoChave);
+  if (to < 0) to = lista.length;
+  lista.splice(to, 0, movida);
+
+  const mudou = [];
+  lista.forEach((e, i) => { if ((e.ordem || 0) !== i) { e.ordem = i; mudou.push(e); } });
+  etapas = lista;
+  renderPipeline();
+  try {
+    for (const e of mudou) await salvar("etapas_participante", { id: e.id, ordem: e.ordem });
+    atualizarSelectEtapas();
+  } catch (err) {
+    toast(err.message, "erro");
+    etapas = await listEtapasParticipante();
+    renderPipeline();
+  }
 }
 
 async function moverEtapa(id, etapaId) {
@@ -811,7 +856,7 @@ function abrirForm(p) {
       <label class="campo"><span>Quantidade</span><input class="input" name="quantidade" type="number" min="1" value="${p?.quantidade ?? 1}" /></label>
       <label class="campo"><span>Etapa do pipeline</span>
         <select class="select" name="etapa_id"><option value="">Sem etapa</option>
-          ${etapas.map((e) => `<option value="${e.id}" ${e.id === p?.etapa_id ? "selected" : ""}>${esc(e.nome)}</option>`).join("")}</select></label>`,
+          ${etapas.map((e) => `<option value="${e.id}" ${(p ? e.id === p.etapa_id : e.id === etapas[0]?.id) ? "selected" : ""}>${esc(e.nome)}</option>`).join("")}</select></label>`,
     onConfirmar: async (form) => {
       const f = Object.fromEntries(new FormData(form));
       const reg = {

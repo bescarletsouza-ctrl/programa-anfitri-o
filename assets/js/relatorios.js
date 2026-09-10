@@ -47,6 +47,7 @@ const nomeAtividade = (id) => (id && atividades.find((a) => a.id === id)?.nome) 
 
 function render() {
   renderKpis();
+  renderDias();
   renderHoras();
   renderQuebra("rel-ingresso", (p) => p.ingresso || "Sem categoria");
   renderQuebra("rel-tipo", (p) => p.tipo || "—");
@@ -94,6 +95,35 @@ function renderKpis() {
     kpi(hoje, "Check-ins hoje") +
     kpi(ultimaHora, "Na última hora") +
     kpi(taxa + "%", "Taxa de presença");
+}
+
+function renderDias() {
+  const entradas = checkins.filter((c) => c.acao === "entrada");
+  if (!entradas.length) {
+    el("rel-dias").innerHTML = `<p class="pagina-sub" style="margin:auto">Nenhum check-in registrado ainda.</p>`;
+    return;
+  }
+  const hoje = hoje0();
+  const MAX_DIAS = 30;
+  let primeiro = new Date(Math.min(...entradas.map((c) => new Date(c.at).getTime())));
+  primeiro.setHours(0, 0, 0, 0);
+  if ((hoje - primeiro) / 86400000 > MAX_DIAS) primeiro = new Date(hoje.getTime() - MAX_DIAS * 86400000);
+
+  const dias = [];
+  for (let d = new Date(primeiro); d <= hoje; d.setDate(d.getDate() + 1)) dias.push({ d: new Date(d), n: 0 });
+  entradas.forEach((c) => {
+    const t = new Date(c.at); t.setHours(0, 0, 0, 0);
+    const slot = dias.find((x) => x.d.getTime() === t.getTime());
+    if (slot) slot.n++;
+  });
+  const max = Math.max(1, ...dias.map((x) => x.n));
+  el("rel-dias").innerHTML = dias
+    .map(({ d, n }) => `<div class="rel-hora" title="${n} check-in(s) em ${formatarData(d.toISOString())}">
+      <span class="rel-hora-n">${n || ""}</span>
+      <div class="rel-hora-barra" style="height:${Math.round((n / max) * 92)}%"></div>
+      <span class="rel-hora-h">${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}</span>
+    </div>`)
+    .join("");
 }
 
 function renderHoras() {

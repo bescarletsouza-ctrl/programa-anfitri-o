@@ -101,6 +101,17 @@ async function situacaoDoTipo(eventoId, ingresso) {
   return t.situacao_padrao || "Confirmado";
 }
 
+// Primeira etapa do pipeline (a de menor "ordem") — todo participante novo
+// entra por ela. Retorna null se o evento ainda não tem etapas.
+async function primeiraEtapaId(eventoId) {
+  if (!eventoId) return null;
+  try {
+    const r = await supabase.from("etapas_participante").select("id")
+      .eq("evento_id", eventoId).order("ordem").limit(1);
+    return (r.data || [])[0]?.id || null;
+  } catch { return null; }
+}
+
 // Mantém a lista de Participantes em dia com a decisão do convidado:
 // aprovado → cria o participante (categoria = a do anfitrião); reprovado/pendente
 // → remove o participante gerado (sempre, mesmo com check-in).
@@ -119,6 +130,7 @@ export async function sincParticipanteConvidado(convidado) {
       pagamento: "Convidado",
       ingresso,
       situacao: await situacaoDoTipo(convidado.evento_id, ingresso),
+      etapa_id: await primeiraEtapaId(convidado.evento_id),
       convidado_id: convidado.id,
     });
   }
@@ -251,6 +263,7 @@ export async function sincAnfitriaoParticipante(anfitriao) {
       evento_id: a.evento_id,
       nome: a.nome, email: a.email || null, telefone: a.telefone || null,
       tipo: "Anfitrião", pagamento: "Gratuito", anfitriao_id: a.id, origem_anfitriao: true,
+      etapa_id: await primeiraEtapaId(a.evento_id),
     });
     await salvar("anfitrioes", { id: a.id, participante_id: novo.id });
     return novo.id;
