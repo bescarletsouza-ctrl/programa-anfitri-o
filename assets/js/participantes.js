@@ -77,6 +77,13 @@ const categoriasIngresso = () =>
     ...participantes.map((p) => (p.ingresso || "").trim()),
     ...tiposIngresso.map((t) => (t.nome || "").trim()),
   ].filter(Boolean))].sort();
+
+// <option>s do select de Ingresso: tipos cadastrados + o valor atual (se
+// for uma categoria antiga que não está mais na lista).
+function opcoesIngresso(atual) {
+  const lista = [...new Set([...categoriasIngresso(), (atual || "").trim()].filter(Boolean))].sort();
+  return lista.map((c) => `<option ${c === (atual || "").trim() ? "selected" : ""}>${esc(c)}</option>`).join("");
+}
 const nomeEtapa = (id) => etapas.find((e) => e.id === id)?.nome || "—";
 const horaCurta = (iso) => {
   if (!iso) return "";
@@ -527,8 +534,11 @@ function abrirForm(p) {
       <label class="campo"><span>Tipo *</span>
         <select class="select" name="tipo">${TIPOS.map((t) => `<option ${t === (p?.tipo || "Convidado") ? "selected" : ""}>${t}</option>`).join("")}</select></label>
       <label class="campo"><span>Ingresso</span>
-        <input class="input" name="ingresso" list="lista-ingressos" value="${esc(p?.ingresso || "")}" placeholder="Convite, GOLD…" />
-        <datalist id="lista-ingressos">${categoriasIngresso().map((c) => `<option value="${esc(c)}">`).join("")}</datalist></label>
+        <select class="select" name="ingresso">
+          <option value="">— sem tipo —</option>
+          ${opcoesIngresso(p?.ingresso)}
+        </select>
+        ${tiposIngresso.length ? "" : `<span class="cel-tenue" style="font-size:.72rem">Cadastre os tipos em “Tipos de ingresso”.</span>`}</label>
       <label class="campo"><span>Situação *</span>
         <select class="select" name="situacao">${SITUACOES.map((s) => `<option ${s === (p?.situacao || "Confirmado") ? "selected" : ""}>${s}</option>`).join("")}</select></label>
       <label class="campo"><span>Faturamento</span>
@@ -559,6 +569,7 @@ function abrirForm(p) {
 }
 
 async function recarregar() {
+  tiposIngresso = await listTiposIngresso().catch(() => tiposIngresso);
   participantes = await listParticipantes();
   render();
 }
