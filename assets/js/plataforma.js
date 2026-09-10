@@ -111,13 +111,33 @@ function modalOrg(o) {
       if (novo) {
         if (!dados.email) { toast("E-mail do responsável é obrigatório.", "erro"); return false; }
         const r = await criarOrg({ ...dados, responsavel_nome: f.responsavel_nome || null });
-        toast(r.convite?.enviado ? "Organização criada e convite enviado." : "Organização criada — copie o link do convite.", "ok");
-        if (r.convite && !r.convite.enviado && r.convite.link) prompt("Link de convite (copie e envie ao responsável):", r.convite.link);
+        if (r.convite?.enviado) {
+          toast("Organização criada e convite enviado por e-mail.", "ok");
+        } else if (r.convite?.link) {
+          mostrarLinkConvite(r.convite.link, dados.email);
+        } else {
+          toast("Organização criada.", "ok");
+        }
       } else {
         await editarOrg(o.id, { ...dados, ativo: !!f.ativo });
         toast("Organização atualizada.", "ok");
       }
       carregar();
+    },
+  });
+}
+
+function mostrarLinkConvite(link, email) {
+  abrirModal({
+    titulo: "Convite gerado",
+    textoConfirmar: "Copiar e fechar",
+    corpoHtml: `
+      <p class="pagina-sub" style="margin:0 0 10px">Ainda sem e-mail configurado. Envie este link para <b>${esc(email)}</b> definir a senha:</p>
+      <label class="campo"><span>Link de acesso</span>
+        <input class="input" id="lc" readonly value="${esc(link)}" onclick="this.select()" /></label>`,
+    aoMontar: (root) => { root.querySelector("#lc").select?.(); },
+    onConfirmar: async () => {
+      try { await navigator.clipboard.writeText(link); toast("Link copiado.", "ok"); } catch {}
     },
   });
 }
