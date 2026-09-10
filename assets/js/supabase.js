@@ -31,7 +31,7 @@ function ok(res) {
 const TABELAS_EVENTO = new Set([
   "grupos", "responsaveis", "estagios", "anfitrioes", "convidados",
   "form_perguntas", "marcos", "etapas_participante", "participantes", "checkins",
-  "atividades",
+  "atividades", "tipos_ingresso",
 ]);
 
 // eid: id explícito (páginas públicas). Sem argumento → evento atual do admin.
@@ -279,6 +279,16 @@ export const listParticipantes = (eid) =>
     .select("*")
     .eq("evento_id", ev(eid))
     .order("created_at", { ascending: false })
+    .then(ok);
+
+/* ---- Tipos de ingresso ------------------------------------------- */
+export const listTiposIngresso = (eid) =>
+  supabase
+    .from("tipos_ingresso")
+    .select("*")
+    .eq("evento_id", ev(eid))
+    .order("ordem", { ascending: true })
+    .order("nome", { ascending: true })
     .then(ok);
 
 /* ---- Atividades (controle de acesso por sessão) ------------------- */

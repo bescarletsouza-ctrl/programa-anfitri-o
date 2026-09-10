@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<script>try{var t=localStorage.getItem('tema')==='dark'?'dark':'light';document.documentElement.dataset.theme=t;document.documentElement.style.background=t==='dark'?'#0c0c0d':'#f7f7f6';}catch(e){}</script>
+<title>Tipos de ingresso — Programa Anfitrião</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../assets/css/theme.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside id="sidebar" class="sidebar"></aside>
+  <main class="conteudo">
+    <div class="barra-topo">
+      <div>
+        <h1 class="pagina-titulo">Tipos de ingresso</h1>
+        <p class="pagina-sub">As categorias de inscrição do evento (VIP, GOLD…). Cada participante fica ligado a um tipo pelo nome.</p>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-secundario" id="btn-exportar">Exportar</button>
+        <button class="btn btn-primario" id="btn-novo">+ Novo ingresso</button>
+      </div>
+    </div>
+
+    <div id="carregando" class="vazio">Carregando…</div>
+
+    <div id="painel" hidden>
+      <div class="filtros" style="margin-bottom:12px">
+        <input class="input" id="busca" placeholder="Buscar por nome…" />
+      </div>
+      <div class="tabela-wrap" id="wrap" hidden>
+        <table class="tabela tabela-part">
+          <thead><tr>
+            <th>Nome</th><th>Preço</th><th>Vagas</th><th>Análise</th><th>Situação</th><th></th>
+          </tr></thead>
+          <tbody id="linhas"></tbody>
+        </table>
+      </div>
+      <div id="vazio" class="vazio" hidden>Nenhum tipo de ingresso. Crie o primeiro em “+ Novo ingresso”.</div>
+    </div>
+  </main>
+</div>
+<script type="module" src="../assets/js/ingressos.js"></script>
+</body>
+</html>

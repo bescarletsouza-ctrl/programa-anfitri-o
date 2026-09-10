@@ -9,7 +9,7 @@ import {
   fecharGaveta, toast, confirmar, icone, abrirMenu,
 } from "./ui.js";
 import {
-  listParticipantes, listEtapasParticipante, listAtividades, listCheckins,
+  listParticipantes, listEtapasParticipante, listAtividades, listCheckins, listTiposIngresso,
   salvar, remover, inserirLote, atualizarEmLote, removerEmLote, registrarCheckin,
   sincParticipanteAnfitriao, desvincularAoExcluirParticipante,
 } from "./supabase.js";
@@ -42,7 +42,7 @@ const normSituacao = (v) => {
   return SITUACOES.find((s) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "") === n) || null;
 };
 
-let participantes = [], etapas = [], atividades = [], checkins = [];
+let participantes = [], etapas = [], atividades = [], checkins = [], tiposIngresso = [];
 let vista = "lista";
 let pagina = 1;
 const selecionados = new Set();
@@ -73,7 +73,10 @@ function credenciadoNaAtv(pid, atvId) {
   return n > 0;
 }
 const categoriasIngresso = () =>
-  [...new Set(participantes.map((p) => (p.ingresso || "").trim()).filter(Boolean))].sort();
+  [...new Set([
+    ...participantes.map((p) => (p.ingresso || "").trim()),
+    ...tiposIngresso.map((t) => (t.nome || "").trim()),
+  ].filter(Boolean))].sort();
 const nomeEtapa = (id) => etapas.find((e) => e.id === id)?.nome || "—";
 const horaCurta = (iso) => {
   if (!iso) return "";
@@ -95,9 +98,10 @@ carregar();
 
 async function carregar() {
   try {
-    [participantes, etapas, atividades, checkins] = await Promise.all([
+    [participantes, etapas, atividades, checkins, tiposIngresso] = await Promise.all([
       listParticipantes(), listEtapasParticipante(),
       listAtividades().catch(() => []), listCheckins().catch(() => []),
+      listTiposIngresso().catch(() => []),
     ]);
     opcoes(el("f-tipo"), TIPOS, "Todos os tipos");
     opcoes(el("f-tipo-pipe"), TIPOS, "Todos os tipos");
@@ -522,7 +526,9 @@ function abrirForm(p) {
       <label class="campo"><span>Empresa</span><input class="input" name="empresa" value="${esc(p?.empresa || "")}" /></label>
       <label class="campo"><span>Tipo *</span>
         <select class="select" name="tipo">${TIPOS.map((t) => `<option ${t === (p?.tipo || "Convidado") ? "selected" : ""}>${t}</option>`).join("")}</select></label>
-      <label class="campo"><span>Ingresso</span><input class="input" name="ingresso" value="${esc(p?.ingresso || "")}" placeholder="Convite, GOLD…" /></label>
+      <label class="campo"><span>Ingresso</span>
+        <input class="input" name="ingresso" list="lista-ingressos" value="${esc(p?.ingresso || "")}" placeholder="Convite, GOLD…" />
+        <datalist id="lista-ingressos">${categoriasIngresso().map((c) => `<option value="${esc(c)}">`).join("")}</datalist></label>
       <label class="campo"><span>Situação *</span>
         <select class="select" name="situacao">${SITUACOES.map((s) => `<option ${s === (p?.situacao || "Confirmado") ? "selected" : ""}>${s}</option>`).join("")}</select></label>
       <label class="campo"><span>Faturamento</span>
