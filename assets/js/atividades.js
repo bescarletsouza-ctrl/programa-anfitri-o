@@ -3,8 +3,12 @@
 // liberadas) e painel de quem está credenciado em cada uma. O credenciamento
 // em si é feito na tela de Check-in (modo atividade).
 // =============================================================================
-import { iniciarPagina, esc, icone, toast, confirmar, abrirModal, abrirGaveta, debounce } from "./ui.js";
-import { listAtividades, listCheckins, listParticipantes, salvar, remover, registrarCheckin, inserirLote } from "./supabase.js";
+import { iniciarPagina, esc, icone, toast, confirmar, abrirModal, abrirGaveta, debounce, formatarData } from "./ui.js";
+import {
+  listAtividades, listCheckins, listParticipantes, salvar, remover,
+  registrarCheckin, inserirLote, removerCheckinsAtividade,
+} from "./supabase.js";
+import { parsearTabela, gerarCSV, baixarCSV } from "./tabela.js";
 
 iniciarPagina("atividades");
 const el = (id) => document.getElementById(id);
@@ -65,7 +69,15 @@ function credenciadosDe(atvId) {
   }
   return [...estado.entries()]
     .filter(([, v]) => v.saldo > 0)
-    .map(([pid, v]) => ({ pid, nome: v.p.nome || "—", categoria: v.p.ingresso || v.p.tipo || "", desde: v.desde }));
+    .map(([pid, v]) => ({
+      pid,
+      nome: v.p.nome || "—",
+      categoria: v.p.ingresso || v.p.tipo || "",
+      email: v.p.email || "",
+      empresa: v.p.empresa || "",
+      codigo: v.p.codigo || "",
+      desde: v.desde,
+    }));
 }
 
 const categoriasUsadas = () => {
@@ -184,6 +196,7 @@ function abrirGavetaAtv(atv, modo) {
   gavetaModo = modo;
   gavetaBusca = "";
   selecionadosAdd.clear();
+  selecionadosLista.clear();
   abrirGaveta(
     `${esc(atv.nome)}`,
     `<div class="toggle-abas" style="margin-bottom:14px">
@@ -212,33 +225,106 @@ function renderGavetaCorpo() {
   gavetaModo === "add" ? renderAdd() : renderLista();
 }
 
+const selecionadosLista = new Set();
+
 function renderLista() {
   const alvo = document.getElementById("ga-corpo");
   if (!alvo || !gavetaAtv) return;
-  let linhas = credenciadosDe(gavetaAtv.id);
-  if (gavetaBusca) linhas = linhas.filter((l) => `${l.nome} ${l.categoria}`.toLowerCase().includes(gavetaBusca));
+  const todos = credenciadosDe(gavetaAtv.id);
+  let linhas = todos;
+  if (gavetaBusca) linhas = linhas.filter((l) => `${l.nome} ${l.categoria} ${l.email} ${l.codigo}`.toLowerCase().includes(gavetaBusca));
   linhas.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+
   if (!linhas.length) {
-    alvo.innerHTML = `<p class="pagina-sub" style="margin:0">${gavetaBusca ? "Ninguém encontrado." : "Ninguém credenciado nesta atividade ainda."}</p>`;
+    alvo.innerHTML = `<div id="ga-bar"></div><p class="pagina-sub" style="margin:0">${gavetaBusca ? "Ninguém encontrado." : "Ninguém credenciado nesta atividade ainda."}</p>`;
+    sincBarraLista(todos);
     return;
   }
-  alvo.innerHTML = linhas
-    .map((l) => `<div class="checkin-item" data-pid="${l.pid}" style="padding:10px 12px">
-      <div class="checkin-item-info">
-        <strong>${esc(l.nome)}</strong>
-        <span class="checkin-meta">
-          ${l.categoria ? `<span class="chip-cat">${esc(l.categoria)}</span>` : ""}
-          <span class="checkin-ok">✓ desde ${esc(hora(l.desde)) || "hoje"}</span>
+
+  alvo.innerHTML = `<div id="ga-bar"></div>` + linhas
+    .map((l) => `<label class="checkin-item" data-pid="${l.pid}" style="padding:10px 12px;cursor:pointer">
+      <div class="checkin-item-info" style="flex-direction:row;align-items:center;gap:10px">
+        <input type="checkbox" data-sel ${selecionadosLista.has(l.pid) ? "checked" : ""} />
+        <span>
+          <strong>${esc(l.nome)}</strong>
+          <span class="checkin-meta">
+            ${l.categoria ? `<span class="chip-cat">${esc(l.categoria)}</span>` : ""}
+            <span class="chip-codigo">${esc(l.codigo || "—")}</span>
+            <span class="checkin-ok">✓ desde ${esc(hora(l.desde)) || "hoje"}</span>
+          </span>
         </span>
       </div>
       <div class="checkin-item-acao">
         <button class="btn btn-fantasma btn-sm" data-saida>Registrar saída</button>
       </div>
-    </div>`)
+    </label>`)
     .join("");
+
   alvo.querySelectorAll("[data-pid]").forEach((row) => {
-    row.querySelector("[data-saida]").onclick = () => registrarSaida(row.dataset.pid, row.querySelector("[data-saida]"));
+    row.querySelector("[data-sel]").onchange = (e) => {
+      e.target.checked ? selecionadosLista.add(row.dataset.pid) : selecionadosLista.delete(row.dataset.pid);
+      sincBarraLista(todos);
+    };
+    row.querySelector("[data-saida]").onclick = (e) => {
+      e.preventDefault();
+      registrarSaida(row.dataset.pid, row.querySelector("[data-saida]"));
+    };
   });
+  sincBarraLista(todos);
+}
+
+// só reconstrói a barra de ações (não re-renderiza a lista inteira a cada clique)
+function sincBarraLista(todos) {
+  const bar = document.getElementById("ga-bar");
+  if (!bar) return;
+  const sel = [...selecionadosLista].filter((pid) => todos.some((l) => l.pid === pid));
+  bar.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px";
+  bar.innerHTML = `
+    <button class="btn btn-secundario btn-sm" id="ga-exportar" ${todos.length ? "" : "disabled"}>${icone("baixar")} Exportar CSV</button>
+    ${sel.length
+      ? `<span class="barra-acoes-cont">${sel.length} selecionado(s)</span>
+         <button class="btn btn-perigo btn-sm" id="ga-remover">Remover da atividade</button>
+         <button class="btn btn-fantasma btn-sm" id="ga-limpar-sel">Limpar</button>`
+      : ""}`;
+  bar.querySelector("#ga-exportar").onclick = () => exportarCredenciados(todos);
+  const rem = bar.querySelector("#ga-remover");
+  if (rem) rem.onclick = () => removerDaAtividade(sel);
+  const lim = bar.querySelector("#ga-limpar-sel");
+  if (lim) lim.onclick = () => {
+    selecionadosLista.clear();
+    document.querySelectorAll("#gaveta [data-sel]").forEach((cb) => (cb.checked = false));
+    sincBarraLista(todos);
+  };
+}
+
+function exportarCredenciados(linhas) {
+  if (!linhas.length) { toast("Nada para exportar.", "erro"); return; }
+  const csv = gerarCSV(linhas, [
+    { rotulo: "Nome", valor: (l) => l.nome },
+    { rotulo: "Categoria", valor: (l) => l.categoria },
+    { rotulo: "Código", valor: (l) => l.codigo },
+    { rotulo: "E-mail", valor: (l) => l.email },
+    { rotulo: "Empresa", valor: (l) => l.empresa },
+    { rotulo: "Entrada em", valor: (l) => (l.desde ? `${formatarData(l.desde)} ${hora(l.desde)}` : "") },
+  ]);
+  const nomeArq = "atividade-" + (gavetaAtv.nome || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") + ".csv";
+  baixarCSV(nomeArq || "atividade.csv", csv);
+  toast("Arquivo gerado.", "ok");
+}
+
+async function removerDaAtividade(pids) {
+  if (!pids.length) return;
+  if (!confirmar(`Remover ${pids.length} participante(s) da atividade "${gavetaAtv.nome}"? O histórico de check-in deles nesta atividade será apagado.`)) return;
+  try {
+    await removerCheckinsAtividade(gavetaAtv.id, pids);
+    selecionadosLista.clear();
+    checkins = await listCheckins().catch(() => checkins);
+    renderGavetaCorpo();
+    render();
+    toast(`${pids.length} removido(s) da atividade.`, "ok");
+  } catch (e) {
+    toast(e.message, "erro");
+  }
 }
 
 function renderAdd() {
@@ -260,6 +346,9 @@ function renderAdd() {
     : "";
 
   alvo.innerHTML = `
+    <div style="margin-bottom:10px">
+      <button type="button" class="btn btn-secundario btn-sm" id="ga-importar">${icone("subir")} Importar lista (Excel/CSV)</button>
+    </div>
     ${atalhos}
     <div class="pagina-sub" style="margin:0 0 8px">${fora.length} fora da atividade${fora.length > lista.length ? ` · refine a busca (mostrando ${lista.length})` : ""}</div>
     <div id="ga-add-lista">
@@ -292,7 +381,104 @@ function renderAdd() {
     };
   });
   document.getElementById("ga-add-btn").onclick = adicionarSelecionados;
+  document.getElementById("ga-importar").onclick = () => modalImportarAtv();
   atualizarBotaoAdd();
+}
+
+const ALIAS_ATV = {
+  "nome completo": "nome", "e-mail": "email", email: "email", whatsapp: "telefone",
+  celular: "telefone", fone: "telefone", telefone: "telefone", empresa: "empresa",
+  categoria: "categoria", ingresso: "categoria", "tipo de ingresso": "categoria",
+  codigo: "codigo", "codigo do participante": "codigo", "cod": "codigo",
+};
+
+const norm = (s) => String(s || "").trim().toLowerCase();
+
+function modalImportarAtv() {
+  abrirModal({
+    titulo: `Importar participantes — ${gavetaAtv.nome}`,
+    textoConfirmar: "Importar",
+    corpoHtml: `
+      <p class="pagina-sub" style="margin:0 0 10px">
+        Cole a tabela (Excel/Sheets) ou selecione um CSV. Colunas: <b>nome</b>
+        (obrigatória), <b>email</b>, <b>codigo</b>, categoria, empresa, telefone.
+        Cada linha é casada com um participante do evento por <b>e-mail</b>,
+        <b>código</b> ou <b>nome</b>. Quem não existir é cadastrado como Convidado
+        e entra na atividade.
+      </p>
+      <label class="campo"><span>Colar tabela</span>
+        <textarea class="input" name="texto" rows="7" placeholder="nome;email;codigo"></textarea></label>
+      <label class="campo"><span>…ou arquivo CSV</span>
+        <input class="input" type="file" name="arquivo" accept=".csv,.txt,.tsv" /></label>`,
+    aoMontar: (root) => {
+      const arq = root.querySelector('[name="arquivo"]');
+      arq.onchange = () => {
+        const f = arq.files[0];
+        if (!f) return;
+        const r = new FileReader();
+        r.onload = () => { root.querySelector('[name="texto"]').value = r.result; };
+        r.readAsText(f, "utf-8");
+      };
+    },
+    onConfirmar: async (form) => {
+      const linhas = parsearTabela(form.querySelector('[name="texto"]').value, ALIAS_ATV)
+        .filter((l) => (l.nome || l.email || l.codigo || "").trim());
+      if (!linhas.length) { toast("Nenhuma linha válida.", "erro"); return false; }
+
+      const porEmail = new Map(participantes.filter((p) => p.email).map((p) => [norm(p.email), p]));
+      const porCodigo = new Map(participantes.filter((p) => p.codigo).map((p) => [norm(p.codigo), p]));
+      const porNome = new Map(participantes.map((p) => [norm(p.nome), p]));
+      const dentro = new Set(credenciadosDe(gavetaAtv.id).map((l) => l.pid));
+
+      const paraEntrar = new Set();
+      const novos = [];
+      let jaEstavam = 0;
+
+      for (const l of linhas) {
+        const achado =
+          (l.email && porEmail.get(norm(l.email))) ||
+          (l.codigo && porCodigo.get(norm(l.codigo))) ||
+          (l.nome && porNome.get(norm(l.nome)));
+        if (achado) {
+          if (dentro.has(achado.id)) jaEstavam++;
+          else paraEntrar.add(achado.id);
+        } else if ((l.nome || "").trim()) {
+          novos.push({
+            nome: l.nome.trim(),
+            email: (l.email || "").trim() || null,
+            telefone: (l.telefone || "").trim() || null,
+            empresa: (l.empresa || "").trim() || null,
+            tipo: "Convidado",
+            pagamento: "Convidado",
+            ingresso: (l.categoria || "").trim() || null,
+          });
+        }
+      }
+
+      let criados = [];
+      if (novos.length) criados = await inserirLote("participantes", novos);
+      const idsEntrada = [...paraEntrar, ...criados.map((p) => p.id)];
+      if (idsEntrada.length) {
+        await inserirLote("checkins", idsEntrada.map((id) => ({
+          participante_id: id, acao: "entrada", origem: "atividades-import", atividade_id: gavetaAtv.id,
+        })));
+      }
+
+      [atividades, checkins, participantes] = await Promise.all([
+        listAtividades(), listCheckins().catch(() => checkins), listParticipantes().catch(() => participantes),
+      ]);
+      gavetaModo = "lista";
+      const g = document.getElementById("gaveta");
+      g?.querySelectorAll("[data-aba]").forEach((x) => x.classList.toggle("ativo", x.dataset.aba === "lista"));
+      renderGavetaCorpo();
+      render();
+
+      const partes = [`${idsEntrada.length} adicionado(s)`];
+      if (criados.length) partes.push(`${criados.length} novo(s) cadastro(s)`);
+      if (jaEstavam) partes.push(`${jaEstavam} já estava(m)`);
+      toast(partes.join(" · "), "ok");
+    },
+  });
 }
 
 function atualizarBotaoAdd() {

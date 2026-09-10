@@ -142,6 +142,20 @@ export const listAtividades = (eid) =>
     .order("inicio", { ascending: true })
     .then(ok);
 
+// Remove os registros de check-in de uma atividade para os participantes dados
+// (usado ao "excluir participante da atividade").
+export async function removerCheckinsAtividade(atividadeId, participanteIds) {
+  if (!atividadeId || !participanteIds?.length) return [];
+  return ok(
+    await supabase
+      .from("checkins")
+      .delete()
+      .eq("atividade_id", atividadeId)
+      .in("participante_id", participanteIds)
+      .select()
+  );
+}
+
 /* ---- Check-in (histórico entrada/saída) ---------------------------- */
 export const listCheckins = (eid) =>
   supabase
