@@ -257,12 +257,13 @@ function filtrosAtivos() {
     "categoria", "etapa", "atividade", "presAtv", "presenca"].some((k) => filtros[k]);
 }
 
-function filtrarLista() {
+function filtrarLista(incluirDesativados = false) {
   const diaDe = filtros.dataDe ? new Date(filtros.dataDe + "T00:00:00") : null;
   const diaAte = filtros.dataAte ? new Date(filtros.dataAte + "T23:59:59") : null;
   return participantes.filter((p) => {
-    // desativados: escondidos, a não ser que o filtro peça exatamente eles
-    if (situacaoDe(p) === "Desativado" && filtros.situacao !== "Desativado") return false;
+    // desativados: escondidos na Lista (a não ser que o filtro peça); no
+    // Pipeline aparecem normalmente (ex.: coluna "Não vai").
+    if (!incluirDesativados && situacaoDe(p) === "Desativado" && filtros.situacao !== "Desativado") return false;
     if (filtros.situacao && situacaoDe(p) !== filtros.situacao) return false;
     if (filtros.tipo && p.tipo !== filtros.tipo) return false;
     if (filtros.pagamento && p.pagamento !== filtros.pagamento) return false;
@@ -593,9 +594,8 @@ function ordenarCards(itens, chave) {
 }
 
 function renderPipeline() {
-  const dados = filtrarLista();
-  const totalAtivos = participantes.filter(ativo).length;
-  el("contador").textContent = `${dados.length} de ${totalAtivos} participantes`;
+  const dados = filtrarLista(true); // pipeline mostra os "Não vai" (Desativados) também
+  el("contador").textContent = `${dados.length} de ${participantes.length} participantes`;
   el("btn-toggle-filtros").classList.toggle("ativo", filtrosAtivos());
 
   const semEtapa = dados.filter((p) => !p.etapa_id);
@@ -748,7 +748,8 @@ function atualizarSelectEtapas() {
 }
 
 function cardPart(p) {
-  return `<div class="card-part" data-id="${p.id}" draggable="true">
+  const desativado = situacaoDe(p) === "Desativado";
+  return `<div class="card-part ${desativado ? "card-desativado" : ""}" data-id="${p.id}" draggable="true">
     <div class="card-corpo">
       <div style="display:flex;justify-content:space-between;gap:8px;align-items:start">
         <strong style="font-size:.9rem">${esc(p.nome)}</strong>
@@ -757,7 +758,7 @@ function cardPart(p) {
       ${p.faturamento ? `<div class="pagina-sub" style="margin:4px 0 0;font-size:.75rem">${esc(p.faturamento)}</div>` : ""}
       <div class="pagina-sub" style="margin:2px 0 0;font-size:.72rem">${esc(p.email || p.telefone || "")}</div>
       <div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-        <span class="badge ${badgePag(p.pagamento)}" style="font-size:.65rem">${esc(p.pagamento)}</span>
+        <span class="badge ${badgeSituacao(situacaoDe(p))}" style="font-size:.65rem">${esc(situacaoDe(p))}</span>
         ${p.presente ? `<span class="badge badge-ok" style="font-size:.65rem">Presente</span>` : ""}
         <span class="pagina-sub" style="margin:0;font-size:.68rem">${formatarData(p.created_at)}</span>
       </div>

@@ -737,6 +737,7 @@ table.tabela tbody tr:last-child td { border-bottom: none; }
 .kanban .card-part { cursor: grab; }
 .kanban .card-part:active { cursor: grabbing; }
 .kanban .card-part.arrastando { opacity: .4; }
+.kanban .card-part.card-desativado { opacity: .6; border-style: dashed; }
 .kanban .card-part .select { width: 100%; }
 .kanban .coluna.drop-alvo { border-color: var(--cor-laranja); }
 .kanban .coluna.drop-alvo .coluna-corpo {
