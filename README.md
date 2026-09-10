@@ -79,20 +79,45 @@ Crie um projeto **novo** na Vercel para este painel:
 ### 5. Migrações e Edge Functions
 
 As migrações em [`supabase/migrations/`](supabase/migrations/) são rodadas **manualmente**
-no SQL Editor, em ordem (`0001` → `0015`). Cada tela nova avisa qual migração falta.
+no SQL Editor, em ordem (`0001` → `0017`). Cada tela nova avisa qual migração falta.
 
-Edge Functions (opcionais — o cadastro funciona sem elas, o disparo não):
+Edge Functions:
 
 ```
 supabase functions deploy enviar-email     # e-mail (Resend) — precisa dos secrets RESEND_API_KEY / EMAIL_FROM
 supabase functions deploy integracoes      # dispara webhooks/conectores de saída
 supabase functions deploy webhook-in       # recebe inscrições de ticketeiras/gateways
-supabase functions deploy equipe           # cria/lista/remove os logins da equipe de check-in
+supabase functions deploy equipe           # usuários de uma organização
+supabase functions deploy plataforma       # organizações (clientes), limites, convites
+supabase functions deploy publico          # dados das páginas públicas (só depois do 0017)
 ```
 
-`integracoes`, `webhook-in` e `equipe` não precisam de secret extra (usam as
-chaves já presentes no ambiente da função). Config em
-[`supabase/config.toml`](supabase/config.toml).
+Config em [`supabase/config.toml`](supabase/config.toml). Secrets opcionais para
+`plataforma` (e `enviar-email`): `RESEND_API_KEY`, `EMAIL_FROM`, `SITE_URL`.
+
+### 5.1 Ligar o multi-tenant (login + organizações)
+
+**Ordem — cada etapa é segura de subir sozinha; o `/admin` só passa a exigir
+login depois do commit 3.**
+
+1. **Migração `0016_plataforma.sql`** no SQL Editor (cria organizações, membros,
+   `eventos.org_id`, adota os eventos atuais na org "We.events"). Aditiva.
+2. **Deploy** de `plataforma` e `equipe`. Em **Supabase → Authentication → URL
+   Configuration**: adicionar `https://SEU-DOMINIO/login.html` em *Redirect URLs*
+   e como *Site URL*. Configurar **SMTP do Resend** em *Authentication → SMTP*
+   (ou setar `RESEND_API_KEY`/`EMAIL_FROM`/`SITE_URL` nos secrets da função).
+3. **Commit 3 já no ar** → o `/admin` exige login. Abra `https://SEU-DOMINIO/login.html`
+   → aparece "Configurar a plataforma" → crie a conta de dona (só o e-mail
+   `bescarletsouza@gmail.com`). Logue.
+4. Abra **Plataforma** (item novo no rodapé do menu) → cadastre as organizações
+   clientes (empresa, ramo, faturamento, nível de acesso, limite de eventos,
+   expiração). O responsável recebe o convite por e-mail.
+5. Promova as contas admin reais da org "We.events" a `papel='admin'`:
+   `update org_membros set papel='admin' where org_id=(select id from organizacoes where nome='We.events') and email='...';`
+6. **Só quando tudo acima estiver validado**: migração `0017_rls_por_org.sql`
+   (troca a RLS aberta por RLS de organização) + deploy de `publico` + o commit
+   que aponta `convite/painel/status.js` para a função `publico`. Guarde
+   `rollback_0017.sql` à mão.
 
 ### 6. Check-in no celular como "app"
 
