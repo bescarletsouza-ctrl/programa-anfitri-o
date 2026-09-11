@@ -182,19 +182,22 @@ function desenharTabuleiro(confirmados, marcos, conquistados) {
 function renderFases(confirmados, marcos, conquistados) {
   const cards = marcos.map((m, idx) => {
     const ok = confirmados >= m.quantidade;
-    const atual = !ok && idx === conquistados;
-    const estado = ok ? "conquistada" : atual ? "atual" : "bloqueada";
+    // "próxima" é só pra mostrar "faltam X" — visualmente ela fica igual às
+    // outras bandeiras não alcançadas (cinza); só o marcador "você está aqui"
+    // é destacado.
+    const proxima = !ok && idx === conquistados;
+    const estado = ok ? "conquistada" : "bloqueada";
     const selo = ok
       ? `<span class="fase-selo ok">Bandeira conquistada</span>`
-      : atual
-      ? `<span class="fase-selo atual">Próxima meta · faltam ${m.quantidade - confirmados}</span>`
+      : proxima
+      ? `<span class="fase-selo bloq">🔒 Próxima meta · faltam ${m.quantidade - confirmados}</span>`
       : `<span class="fase-selo bloq">🔒 Bloqueada</span>`;
     // o prêmio só é revelado (título + descrição) depois de conquistado —
-    // antes disso é surpresa, mesmo na bandeira mais próxima ("atual")
+    // antes disso é surpresa, mesmo na bandeira mais próxima
     const titulo = ok ? esc(m.titulo) : "🔒 Prêmio bloqueado";
     const corpo = ok
       ? `<p>${esc(m.descricao || "")}</p>`
-      : atual
+      : proxima
       ? `<p class="dim">Continue confirmando convidados para descobrir o prêmio!</p>`
       : `<p class="dim">Chegue à bandeira anterior para desbloquear.</p>`;
     return `<div class="fase ${estado}">
