@@ -11,7 +11,7 @@ import {
 import {
   listParticipantes, listEtapasParticipante, listAtividades, listCheckins, listTiposIngresso, listGrupos,
   salvar, remover, inserirLote, atualizarEmLote, removerEmLote, registrarCheckin, listarEquipe,
-  sincParticipanteAnfitriao, desvincularAoExcluirParticipante, dispararIntegracoes, sincronizarStatusConvidados,
+  sincParticipanteAnfitriao, desvincularAoExcluirParticipante, dispararIntegracoes,
 } from "./supabase.js";
 import { eventoNome } from "./evento.js";
 import { imprimirCracha } from "./cracha.js";
@@ -572,16 +572,12 @@ async function acaoEmMassa(acao) {
 
   if (acao === "presente" || acao === "ausente") {
     try {
-      const presente = acao === "presente";
-      const atualizados = await atualizarEmLote("participantes", ids, presente
+      await atualizarEmLote("participantes", ids, acao === "presente"
         ? { presente: true, checkin_at: new Date().toISOString() }
         : { presente: false, checkin_at: null });
       await inserirLote("checkins", ids.map((id) => ({
-        participante_id: id, acao: presente ? "entrada" : "saida", origem: "lista",
+        participante_id: id, acao: acao === "presente" ? "entrada" : "saida", origem: "lista",
       }))).catch(() => {});
-      // participantes que vieram de um convidado (link do anfitrião): a
-      // presença confirmada aqui espelha em convidados.status
-      await sincronizarStatusConvidados(atualizados, presente).catch(() => {});
       selecionados.clear();
       toast(`Presença atualizada para ${ids.length} participante(s).`, "ok");
       await recarregar();
