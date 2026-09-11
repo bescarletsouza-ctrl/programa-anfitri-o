@@ -11,8 +11,9 @@ import {
 import {
   listParticipantes, listEtapasParticipante, listAtividades, listCheckins, listTiposIngresso, listGrupos,
   salvar, remover, inserirLote, atualizarEmLote, removerEmLote, registrarCheckin, listarEquipe,
-  sincParticipanteAnfitriao, desvincularAoExcluirParticipante, dispararIntegracoes,
+  sincParticipanteAnfitriao, desvincularAoExcluirParticipante, dispararIntegracoes, definirStatusConvidado,
 } from "./supabase.js";
+import { STATUS_CONVIDADO } from "./config.js";
 import { eventoNome } from "./evento.js";
 import { imprimirCracha } from "./cracha.js";
 import { parsearTabela, lerXlsx, baixarXLSX, baixarModeloXLSX } from "./tabela.js";
@@ -40,6 +41,7 @@ const COLUNAS = {
   categoria:  "Categoria",
   responsavel: "Responsável",
   situacao:   "Situação",
+  statusConvite: "Status do convite",
   pagamento:  "Pagamento",
   empresa:    "Empresa",
   telefone:   "Telefone",
@@ -47,7 +49,7 @@ const COLUNAS = {
   presenca:   "Presença",
   cadastro:   "Cadastro",
 };
-const COLUNAS_PADRAO = ["codigo", "tipo", "categoria", "responsavel", "situacao", "pagamento", "etapa", "presenca", "cadastro"];
+const COLUNAS_PADRAO = ["codigo", "tipo", "categoria", "responsavel", "situacao", "statusConvite", "pagamento", "etapa", "presenca", "cadastro"];
 let colunas = [...COLUNAS_PADRAO];
 try {
   const s = JSON.parse(localStorage.getItem("part_colunas") || "null");
@@ -98,6 +100,10 @@ const badgePag = (p) =>
 const badgeSituacao = (s) =>
   ({ Confirmado: "badge-ok", Pendente: "badge-alerta", "Fila de espera": "badge-info",
      "Pré-inscrito": "badge-neutro", Desativado: "badge-erro" }[s] || "badge-neutro");
+// status do CONVITE (convidados.status) — campo separado da Situação do
+// participante. Só existe pra quem veio de um convite (tem convidado_id).
+const badgeStatusConvite = (s) =>
+  ({ Pendente: "badge-alerta", Aprovado: "badge-info", Recusado: "badge-erro", Confirmado: "badge-ok" }[s] || "badge-neutro");
 const situacaoDe = (p) => p.situacao || "Confirmado";
 const ativo = (p) => situacaoDe(p) !== "Desativado";
 
@@ -383,6 +389,11 @@ function celulaHtml(p, c) {
     }
     case "situacao":
       return `<td class="celula-edit" data-campo="situacao" title="Alterar situação"><span class="badge ${badgeSituacao(situacaoDe(p))}">${esc(situacaoDe(p))}</span>${lapis()}</td>`;
+    case "statusConvite": {
+      if (!p.convidado_id) return `<td><span class="cel-tenue">—</span></td>`;
+      const st = p.convidado?.status || "Pendente";
+      return `<td class="celula-edit" data-campo="statusConvite" title="Alterar status do convite"><span class="badge ${badgeStatusConvite(st)}">${esc(st)}</span>${lapis()}</td>`;
+    }
     case "pagamento":
       return `<td class="celula-edit" data-campo="pagamento" title="Alterar pagamento"><span class="badge ${badgePag(p.pagamento)}">${esc(p.pagamento)}</span>${lapis()}</td>`;
     case "empresa":
@@ -490,6 +501,9 @@ async function editarCelula(id, campo, td) {
   } else if (campo === "responsavel") {
     itens = [{ valor: "", rotulo: "— sem responsável —" }, ...membrosOrg.map((m) => ({ valor: m.user_id, rotulo: m.nome || m.email }))];
     atualValor = p.responsavel_user_id || "";
+  } else if (campo === "statusConvite") {
+    itens = STATUS_CONVIDADO.map((s) => ({ valor: s, rotulo: s }));
+    atualValor = p.convidado?.status || "Pendente";
   } else {
     itens = [{ valor: "", rotulo: "Sem etapa" }, ...etapas.map((e) => ({ valor: e.id, rotulo: e.nome }))];
     atualValor = p.etapa_id || "";
@@ -517,6 +531,12 @@ async function editarCelula(id, campo, td) {
     } else if (campo === "responsavel") {
       const salvo = await salvar("participantes", { id, responsavel_user_id: escolha || null });
       Object.assign(p, salvo);
+    } else if (campo === "statusConvite") {
+      // separado da Situação do participante — mexe só no status do convite
+      // (convidados.status). Se virar Pendente/Recusado, o participante pode
+      // sumir da lista (mesma regra da tela Convidados).
+      await definirStatusConvidado(p.convidado_id, escolha);
+      participantes = await listParticipantes();
     } else {
       const salvo = await salvar("participantes", { id, [COL_DB[campo] || campo]: escolha || null });
       Object.assign(p, salvo);
@@ -1016,6 +1036,12 @@ function abrirGavetaDetalhe(id) {
       <select class="select" id="g-situacao">
         ${SITUACOES.map((s) => `<option ${s === situacaoDe(p) ? "selected" : ""}>${s}</option>`).join("")}</select>
     </div>
+    ${p.convidado_id ? `<div class="secao">
+      <h4>Status do convite</h4>
+      <p class="pagina-sub" style="margin:0 0 8px">Separado da Situação acima — é o andamento do convite dele (Pendente/Aprovado/Recusado/Confirmado).</p>
+      <select class="select" id="g-status-convite">
+        ${STATUS_CONVIDADO.map((s) => `<option ${s === (p.convidado?.status || "Pendente") ? "selected" : ""}>${s}</option>`).join("")}</select>
+    </div>` : ""}
     <div class="secao">
       <h4>Etapa do pipeline</h4>
       <select class="select" id="g-etapa"><option value="">Sem etapa</option>
@@ -1059,6 +1085,14 @@ function abrirGavetaDetalhe(id) {
       await recarregar();
     } catch (err) { toast(err.message, "erro"); }
   };
+  g.querySelector("#g-status-convite")?.addEventListener("change", async (e) => {
+    try {
+      await definirStatusConvidado(p.convidado_id, e.target.value);
+      toast("Status do convite atualizado.", "ok");
+      await recarregar();
+      fecharGaveta();
+    } catch (err) { toast(err.message, "erro"); }
+  });
   g.querySelector("#g-resp").onchange = async (e) => {
     try {
       await salvar("participantes", { id: p.id, responsavel_user_id: e.target.value || null });
@@ -1172,6 +1206,7 @@ async function exportar(dados) {
     { chave: "empresa", rotulo: "Empresa" },
     { chave: "tipo", rotulo: "Tipo" },
     { rotulo: "Situação", valor: (p) => situacaoDe(p) },
+    { rotulo: "Status do convite", valor: (p) => p.convidado?.status || "" },
     { chave: "ingresso", rotulo: "Ingresso" },
     { rotulo: "Responsável", valor: (p) => nomeMembro(p.responsavel_user_id) || "" },
     { chave: "faturamento", rotulo: "Faturamento" },

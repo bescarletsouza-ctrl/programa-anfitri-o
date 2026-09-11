@@ -361,10 +361,20 @@ export const listConvidadosDoAnfitriao = (anfitriaoId) =>
 export const listParticipantes = (eid) =>
   supabase
     .from("participantes")
-    .select("*")
+    .select("*, convidado:convidados(status)")
     .eq("evento_id", ev(eid))
     .order("created_at", { ascending: false })
     .then(ok);
+
+// Atualiza só o status do convidado ligado a este participante (campo
+// separado da Situação do participante — um é o status do convite/inscrição,
+// o outro é o estado do cadastro em si). Reprovar/voltar pra Pendente aqui
+// também remove o participante da lista, igual fazendo pela tela Convidados.
+export async function definirStatusConvidado(convidadoId, status) {
+  const salvo = await salvar("convidados", { id: convidadoId, status });
+  await sincParticipanteConvidado({ id: convidadoId, status }).catch(() => {});
+  return salvo;
+}
 
 // Busca 1 participante pelo conteúdo do QR do crachá (código ou id) — usado no
 // check-in mobile. Aceita "IMER-0042" ou um uuid; tolera lixo antes/depois.
