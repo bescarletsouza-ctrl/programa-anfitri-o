@@ -1,20 +1,22 @@
 /* =============================================================================
-   Programa Anfitrião — sistema de design
-   Identidade: laranja / preto / branco. Tema claro + escuro (data-theme).
-   Para trocar as cores, mexa só nas variáveis dos blocos :root abaixo.
+   We.events — sistema de design
+   Identidade: violeta (gradiente indigo → roxo → magenta) / preto / branco.
+   Tema claro + escuro (data-theme). Para trocar as cores, mexa só nas
+   variáveis dos blocos :root abaixo — o nome "--cor-laranja*" ficou só por
+   compatibilidade interna, o valor já é a cor da marca.
    ========================================================================== */
 :root {
   color-scheme: light;
 
-  /* Marca */
-  --cor-laranja:        #ea580c;
-  --cor-laranja-forte:  #b8460b;
-  --cor-laranja-suave:  #fff1e7;
-  --cor-laranja-ring:   rgba(234, 88, 12, .18);
+  /* Marca (mesma família do gradiente do logotipo) */
+  --cor-laranja:        #7c3aed;
+  --cor-laranja-forte:  #6d28d9;
+  --cor-laranja-suave:  #f3ecfe;
+  --cor-laranja-ring:   rgba(124, 58, 237, .18);
   --cor-preto:          #0f0f10;
   --cor-branco:         #ffffff;
 
-  /* Gradiente do logotipo We.events (wordmark "events" + ponto) */
+  /* Gradiente do logotipo We.events (wordmark "events", ponto, CTAs) */
   --marca-grad: linear-gradient(90deg, #4338ca 0%, #9333ea 55%, #db2777 100%);
 
   /* Neutros — rampa por papel (bg sutil → borda → texto muted → texto forte) */
@@ -51,8 +53,8 @@
   --side-texto:     #d8d8d5;
   --side-muted:     #86867f;
   --side-hover:     rgba(255, 255, 255, .06);
-  --side-ativo-bg:  rgba(234, 88, 12, .16);
-  --side-ativo-txt: #ff8a4c;
+  --side-ativo-bg:  rgba(139, 92, 246, .18);
+  --side-ativo-txt: #a78bfa;
 
   /* Tipografia — uma família só */
   --fonte-titulo: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -70,10 +72,10 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --cor-laranja:        #fb7a3c;
-  --cor-laranja-forte:  #ff9a63;
-  --cor-laranja-suave:  #2a1a11;
-  --cor-laranja-ring:   rgba(251, 122, 60, .24);
+  --cor-laranja:        #a78bfa;
+  --cor-laranja-forte:  #c4b5fd;
+  --cor-laranja-suave:  #241a38;
+  --cor-laranja-ring:   rgba(167, 139, 250, .28);
 
   --cinza-50:  #18181b;
   --cinza-100: #1e1e21;
@@ -105,8 +107,8 @@
   --side-texto:     #d8d8d5;
   --side-muted:     #82827c;
   --side-hover:     rgba(255, 255, 255, .05);
-  --side-ativo-bg:  rgba(251, 122, 60, .16);
-  --side-ativo-txt: #fb7a3c;
+  --side-ativo-bg:  rgba(167, 139, 250, .18);
+  --side-ativo-txt: #a78bfa;
 
   --sombra:    0 1px 2px rgba(0, 0, 0, .4);
   --sombra-md: 0 8px 28px rgba(0, 0, 0, .5);
@@ -264,8 +266,8 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .btn:focus-visible { box-shadow: 0 0 0 3px var(--cor-laranja-ring); }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 .btn-sm { height: 30px; padding: 0 10px; font-size: .8rem; }
-.btn-primario { background: var(--cor-laranja); color: #fff; }
-.btn-primario:hover:not(:disabled) { background: var(--cor-laranja-forte); }
+.btn-primario { background: var(--marca-grad); color: #fff; }
+.btn-primario:hover:not(:disabled) { filter: brightness(.93); }
 .btn-secundario { background: var(--superficie); border-color: var(--borda-forte); color: var(--texto); }
 .btn-secundario:hover:not(:disabled) { background: var(--superficie-2); border-color: var(--cinza-400); }
 .btn-perigo { background: var(--erro-solid); color: #fff; }
@@ -817,7 +819,7 @@ table.tabela tbody tr:last-child td { border-bottom: none; }
 .cracha-evento { font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: #666; margin-bottom: .5mm; }
 .cracha-nome { font-weight: 800; letter-spacing: -.02em; line-height: 1; }
 .cracha-linha { color: #333; }
-.cracha-tipo { color: #ea580c; font-weight: 700; }
+.cracha-tipo { color: #7c3aed; font-weight: 700; }
 .cracha-qr { position: absolute; right: 6mm; bottom: 6mm; line-height: 0; }
 .cracha-qr img { width: 23mm; height: 23mm; image-rendering: pixelated; }
 .cracha-semqr { font-weight: 800; letter-spacing: .08em; }

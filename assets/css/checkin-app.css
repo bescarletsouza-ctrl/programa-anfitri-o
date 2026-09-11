@@ -2,7 +2,7 @@
    Check-in mobile — app de câmera. Tela cheia, escura, cara de aplicativo.
    Carrega DEPOIS do theme.css (usa os tokens de cor dele).
    ========================================================================== */
-:root { --ck-bg: #0c0c0d; --ck-surface: #fff; --ck-laranja: #ea580c; }
+:root { --ck-bg: #0c0c0d; --ck-surface: #fff; --ck-laranja: #a78bfa; }
 
 html, body.ck-app {
   margin: 0; height: 100%; background: var(--ck-bg); color: #fff;
@@ -38,7 +38,7 @@ body.ck-app {
 .ck-lista-topo strong { display: block; font-size: 1.05rem; }
 .ck-lista-topo > div { flex: 1; min-width: 0; }
 .ck-lista-sub { font-size: .76rem; color: #a1a1aa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ck-btn-txt { background: none; border: none; color: #ea580c; font: inherit; font-weight: 650; font-size: .88rem; cursor: pointer; flex-shrink: 0; }
+.ck-btn-txt { background: none; border: none; color: #a78bfa; font: inherit; font-weight: 650; font-size: .88rem; cursor: pointer; flex-shrink: 0; }
 .ck-icone-btn-claro { background: #1f1f22; }
 .ck-icone-btn-claro:active { background: #2f2f33; }
 
@@ -64,8 +64,8 @@ body.ck-app {
 }
 .ck-modo-card:active { background: #202024; }
 .ck-modo-ic {
-  flex-shrink: 0; width: 46px; height: 46px; border-radius: 12px; background: rgba(234,88,12,.16);
-  color: #fb923c; display: grid; place-items: center; font-size: 1.3rem;
+  flex-shrink: 0; width: 46px; height: 46px; border-radius: 12px; background: rgba(167,139,250,.18);
+  color: #a78bfa; display: grid; place-items: center; font-size: 1.3rem;
 }
 .ck-modo-txt { display: grid; gap: 3px; }
 .ck-modo-txt strong { font-size: 1rem; }
@@ -133,7 +133,8 @@ body.ck-app {
   align-items: center; justify-content: center; gap: 8px; padding: 0 16px;
 }
 .ck-btn:active { transform: scale(.985); }
-.ck-btn-primario { background: var(--ck-laranja); color: #fff; }
+.ck-btn-primario { background: var(--marca-grad); color: #fff; }
+.ck-btn-primario:active { filter: brightness(.93); }
 .ck-btn-secundario { background: #ededed; color: #18181b; }
 .ck-btn-fantasma { background: transparent; color: #71717a; min-height: 44px; }
 .ck-btn-grande { min-height: 52px; background: rgba(255,255,255,.12); color: #fff; }

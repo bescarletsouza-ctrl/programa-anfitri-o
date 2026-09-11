@@ -410,7 +410,7 @@ async function editarItem(tabela, id, recarregar) {
           ? `<label class="campo"><span>Ordem</span>
                <input class="input" type="number" name="ordem" value="${atual?.ordem ?? ""}" /></label>
              <label class="campo"><span>Cor (hex, opcional)</span>
-               <input class="input" name="cor" value="${esc(atual?.cor || "")}" placeholder="#ea580c" /></label>`
+               <input class="input" name="cor" value="${esc(atual?.cor || "")}" placeholder="#7c3aed" /></label>`
           : ""
       }`,
     onConfirmar: async (form) => {

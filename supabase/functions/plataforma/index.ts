@@ -39,7 +39,7 @@ async function mandarConvite(email: string, link: string, nomeOrg?: string) {
   if (!KEY || !FROM) return { enviado: false, link };
   const html = `<div style="font-family:system-ui,Segoe UI,Arial,sans-serif;font-size:15px;line-height:1.6;color:#111">
     <p>Você recebeu acesso ${nomeOrg ? `à organização <b>${nomeOrg}</b> ` : ""}no <b>We.events</b>.</p>
-    <p><a href="${link}" style="background:#ea580c;color:#fff;padding:11px 20px;border-radius:8px;text-decoration:none;font-weight:600">Criar minha senha e entrar</a></p>
+    <p><a href="${link}" style="background:#7c3aed;color:#fff;padding:11px 20px;border-radius:8px;text-decoration:none;font-weight:600">Criar minha senha e entrar</a></p>
     <p style="color:#666;font-size:13px">Ou copie: ${link}</p>
   </div>`;
   const r = await fetch("https://api.resend.com/emails", {
