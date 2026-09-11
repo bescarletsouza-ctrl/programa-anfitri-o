@@ -7,7 +7,7 @@ import {
 } from "./ui.js";
 import {
   listEstagios, listGrupos, listAnfitrioes, listarEquipe,
-  listConvidadosDoAnfitriao, salvar, remover, inserirLote, reSincCategoriaAnfitriao,
+  listConvidadosDoAnfitriao, salvar, remover, inserirLote, reSincCategoriaAnfitriao, reSincResponsavelAnfitriao,
   sincAnfitriaoParticipante, desvincularAoExcluirAnfitriao,
 } from "./supabase.js";
 import { APP, TIPOS_ANFITRIAO } from "./config.js";
@@ -369,6 +369,9 @@ async function abrirGavetaDetalhe(id) {
       });
       if (catConv !== (a.categoria_convidado || null)) {
         await reSincCategoriaAnfitriao(a.id, catConv).catch(() => {});
+      }
+      if (atualizado.responsavel_user_id !== (a.responsavel_user_id || null)) {
+        await reSincResponsavelAnfitriao(a.id, atualizado.responsavel_user_id).catch(() => {});
       }
       await sincAnfitriaoParticipante(atualizado).catch((e) => console.warn(e));
       toast("Anfitrião atualizado.", "ok");

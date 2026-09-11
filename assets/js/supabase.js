@@ -98,7 +98,7 @@ export const listAnfitrioes = (eid) =>
 export const listConvidados = (eid) =>
   supabase
     .from("convidados")
-    .select("*, anfitriao:anfitrioes(id, nome, slug, grupo_id, categoria_convidado)")
+    .select("*, anfitriao:anfitrioes(id, nome, slug, grupo_id, categoria_convidado, responsavel_user_id)")
     .eq("evento_id", ev(eid))
     .order("created_at", { ascending: false })
     .then(ok);
@@ -155,6 +155,8 @@ export async function sincParticipanteConvidado(convidado) {
       situacao: await situacaoDoTipo(convidado.evento_id, ingresso),
       etapa_id: await primeiraEtapaId(convidado.evento_id),
       convidado_id: convidado.id,
+      // herda o responsável do anfitrião que convidou (não da categoria)
+      responsavel_user_id: convidado.anfitriao?.responsavel_user_id || null,
     });
     dispararIntegracoes("convidado.aprovado", { participante_id: novo.id, participante: { nome: novo.nome, email: novo.email, telefone: novo.telefone }, convidado_id: convidado.id });
     return novo;
@@ -172,6 +174,19 @@ export async function reSincCategoriaAnfitriao(anfitriaoId, categoria) {
   await supabase
     .from("participantes")
     .update({ ingresso: categoria || null })
+    .in("convidado_id", convs.map((c) => c.id))
+    .then(ok);
+}
+
+// Responsável do anfitrião mudou → convidados dele já virados participante
+// acompanham o novo responsável (eles herdam do anfitrião, não da categoria).
+export async function reSincResponsavelAnfitriao(anfitriaoId, responsavelUserId) {
+  const convs = await supabase
+    .from("convidados").select("id").eq("anfitriao_id", anfitriaoId).then(ok);
+  if (!convs.length) return;
+  await supabase
+    .from("participantes")
+    .update({ responsavel_user_id: responsavelUserId || null })
     .in("convidado_id", convs.map((c) => c.id))
     .then(ok);
 }
