@@ -203,9 +203,20 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .nav-link.ativo svg { opacity: 1; }
 
 .sidebar .rodape {
-  margin-top: auto; padding-top: 12px; border-top: 1px solid var(--side-borda);
-  display: grid; gap: 3px;
+  margin-top: auto; padding-top: 4px; border-top: 1px solid var(--side-borda);
 }
+.rodape-toggle {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;
+  background: none; border: none; color: var(--side-muted);
+  padding: 8px 11px; border-radius: 9px; font: inherit; font-size: .7rem; font-weight: 700;
+  letter-spacing: .04em; text-transform: uppercase; cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.rodape-toggle:hover { background: var(--side-hover); color: var(--side-texto); }
+.rodape-toggle svg { width: 15px; height: 15px; flex-shrink: 0; transition: transform .15s; }
+.rodape-corpo { display: grid; gap: 3px; padding-top: 4px; }
+.rodape.fechado .rodape-corpo { display: none; }
+.rodape.fechado .rodape-toggle svg { transform: rotate(180deg); }
 .btn-tema {
   display: flex; align-items: center; gap: 11px; width: 100%;
   background: transparent; border: none; color: var(--side-muted);
@@ -230,6 +241,10 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
   .sidebar.recolhida .nav-bloco + .nav-bloco { margin-top: 8px; padding-top: 8px; }
   .sidebar.recolhida .nav-link,
   .sidebar.recolhida .btn-tema { justify-content: center; gap: 0; padding-left: 0; padding-right: 0; }
+  /* menu inteiro já recolhido a ícones: some o toggle do rodapé e garante os
+     ícones dele sempre visíveis, pra não empilhar dois níveis de recolher */
+  .sidebar.recolhida .rodape-toggle { display: none; }
+  .sidebar.recolhida .rodape.fechado .rodape-corpo { display: grid; }
 }
 
 .conteudo { flex: 1; min-width: 0; padding: 28px clamp(16px, 4vw, 40px) 64px; }

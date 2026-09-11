@@ -37,6 +37,7 @@ const PATHS = {
   integracoes: '<path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
   pausar: '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>',
   play: '<polygon points="6 4 20 12 6 20 6 4"/>',
+  chevron: '<polyline points="18 15 12 9 6 15"/>',
 };
 
 export function icone(nome, cls = "") {
@@ -108,6 +109,21 @@ function alternarRecolhida() {
   try { localStorage.setItem(RECOLHIDA_KEY, nova ? "1" : "0"); } catch {}
 }
 
+// Bloco fixo do rodapé (Configurações/Integrações/Sair/Tema/crédito) — some
+// junto do menu recolhido de cima, mas pode ser fechado à parte.
+const RODAPE_FECHADO_KEY = "side_rodape_fechado";
+const lerRodapeFechado = () => {
+  try { return localStorage.getItem(RODAPE_FECHADO_KEY) === "1"; } catch { return false; }
+};
+function alternarRodape(el) {
+  const bloco = el.querySelector(".rodape");
+  if (!bloco) return;
+  const fechado = !bloco.classList.contains("fechado");
+  bloco.classList.toggle("fechado", fechado);
+  el.querySelector("[data-rodape-toggle]")?.setAttribute("aria-expanded", String(!fechado));
+  try { localStorage.setItem(RODAPE_FECHADO_KEY, fechado ? "1" : "0"); } catch {}
+}
+
 const navLinkHtml = (n, ativo) =>
   `<a class="nav-link ${n.chave === ativo ? "ativo" : ""}" href="${n.href}" title="${esc(n.rotulo)}">${icone(n.ico)}<span>${esc(n.rotulo)}</span></a>`;
 
@@ -148,15 +164,21 @@ export function renderSidebar(ativo, ctx) {
           ${bloco.itens.map((n) => navLinkHtml(n, ativo)).join("")}
         </div>`).join("")}
     </nav>
-    <div class="rodape">
-      ${rodape.map((n) => navLinkHtml(n, ativo)).join("")}
-      ${ctx ? `<button class="nav-link" data-sair type="button" title="${esc(ctx.email || "Sair")}">${icone("x")}<span>Sair</span></button>` : ""}
-      <button class="btn-tema" data-toggle-tema type="button"></button>
-      <div class="side-credito">${APP.creditoHtml}</div>
+    <div class="rodape ${lerRodapeFechado() ? "fechado" : ""}">
+      <button class="rodape-toggle" data-rodape-toggle type="button" aria-expanded="${lerRodapeFechado() ? "false" : "true"}">
+        <span>Mais</span>${icone("chevron")}
+      </button>
+      <div class="rodape-corpo">
+        ${rodape.map((n) => navLinkHtml(n, ativo)).join("")}
+        ${ctx ? `<button class="nav-link" data-sair type="button" title="${esc(ctx.email || "Sair")}">${icone("x")}<span>Sair</span></button>` : ""}
+        <button class="btn-tema" data-toggle-tema type="button"></button>
+        <div class="side-credito">${APP.creditoHtml}</div>
+      </div>
     </div>`;
   aplicarTema(document.documentElement.dataset.theme === "dark" ? "dark" : "light");
   el.querySelector("[data-toggle-tema]").onclick = alternarTema;
   el.querySelector("[data-recolher]").onclick = alternarRecolhida;
+  el.querySelector("[data-rodape-toggle]").onclick = () => alternarRodape(el);
   el.querySelector("[data-sair]")?.addEventListener("click", sair);
   montarTopbarMobile(el);
   popularSeletorEvento(el);
