@@ -58,8 +58,8 @@ async function boot() {
 
 function mostrarLogin() {
   modo = "login";
-  el("titulo").textContent = "Login W.E Events";
-  el("sub").textContent = "Acesse sua conta W.E Events para gerenciar seus eventos.";
+  el("titulo").textContent = "Login We.events";
+  el("sub").textContent = "Acesse sua conta We.events para gerenciar seus eventos.";
   el("btn").textContent = "Entrar";
   el("email").closest(".campo").hidden = false;
   el("email").disabled = false; el("email").required = true;
