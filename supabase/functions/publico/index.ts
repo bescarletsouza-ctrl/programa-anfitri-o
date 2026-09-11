@@ -72,7 +72,7 @@ Deno.serve(async (req) => {
       const [{ data: convites }, { data: marcos }, { data: ranking }] = await Promise.all([
         sb.from("convidados").select("id, nome, status, created_at").eq("anfitriao_id", a.id).order("created_at", { ascending: false }),
         sb.from("marcos").select("*").eq("evento_id", a.evento_id).order("quantidade"),
-        sb.from("ranking_publico").select("*").eq("evento_id", a.evento_id).order("confirmados", { ascending: false }),
+        sb.from("ranking_publico").select("*").eq("evento_id", a.evento_id).order("aprovados", { ascending: false }),
       ]);
       return json({ anfitriao: a, convites: convites || [], marcos: marcos || [], ranking: ranking || [] });
     }

@@ -457,7 +457,7 @@ export const listRankingPublico = (eid) =>
     .from("ranking_publico")
     .select("*")
     .eq("evento_id", ev(eid))
-    .order("confirmados", { ascending: false })
+    .order("aprovados", { ascending: false })
     .then(ok);
 
 export const criarConvidado = (registro) =>

@@ -55,7 +55,7 @@ const badgeStatus = (s) =>
 
     // a jornada avança por convidado aprovado (não só "Confirmado" — esse
     // status costuma vir bem depois, no dia do evento)
-    renderJornada(aprovados, marcos);
+    renderJornada(aprovados, marcos, anfitriao.id);
     renderConvites(convites, { enviados: convites.length, aprovados, confirmados });
     renderRanking(ranking, anfitriao.id);
 
@@ -86,7 +86,7 @@ function erro(msg) {
   if (msg) box.innerHTML = `<h2 style="margin:0 0 8px">Ops</h2><p style="margin:0">${esc(msg)}</p>`;
 }
 
-function renderJornada(aprovados, marcosTodos) {
+function renderJornada(aprovados, marcosTodos, anfitriaoId) {
   el("n-confirmados").textContent = aprovados;
   // o marco "prêmio final" não é mais uma bandeira no meio do caminho — ele
   // vira o próprio troféu no fim do tabuleiro/lista.
@@ -109,6 +109,62 @@ function renderJornada(aprovados, marcosTodos) {
 
   desenharTabuleiro(aprovados, marcos, conquistados, marcoFinal);
   renderFases(aprovados, marcos, conquistados, marcoFinal);
+  celebrarNovasConquistas(aprovados, marcos, marcoFinal, anfitriaoId);
+}
+
+/* ---- Celebração ao desbloquear uma bandeira ---------------------------- */
+function celebrarNovasConquistas(aprovados, marcos, marcoFinal, anfitriaoId) {
+  const todos = marcoFinal ? [...marcos, marcoFinal] : marcos;
+  const conquistadosAgora = todos.filter((m) => aprovados >= m.quantidade);
+  if (!conquistadosAgora.length) return;
+
+  const chave = `we_marcos_celebrados_${anfitriaoId}`;
+  let jaCelebrados;
+  try { jaCelebrados = new Set(JSON.parse(localStorage.getItem(chave) || "[]")); } catch { jaCelebrados = new Set(); }
+
+  const novos = conquistadosAgora.filter((m) => !jaCelebrados.has(m.id));
+  conquistadosAgora.forEach((m) => jaCelebrados.add(m.id));
+  try { localStorage.setItem(chave, JSON.stringify([...jaCelebrados])); } catch {}
+  if (!novos.length) return;
+
+  // celebra a maior conquista nova (se ele confirmou vários de uma vez e
+  // passou por mais de uma bandeira, só mostra a mais recente)
+  const premio = novos.sort((a, b) => b.quantidade - a.quantidade)[0];
+  mostrarCelebracao(premio, premio === marcoFinal);
+}
+
+let _confettiPromise = null;
+async function dispararConfete() {
+  try {
+    if (!_confettiPromise) _confettiPromise = import("https://esm.sh/canvas-confetti@1.9.2");
+    const { default: confetti } = await _confettiPromise;
+    const fim = Date.now() + 2200;
+    (function disparo() {
+      confetti({ particleCount: 4, startVelocity: 45, spread: 75, ticks: 200, origin: { x: Math.random(), y: -0.1 } });
+      if (Date.now() < fim) requestAnimationFrame(disparo);
+    })();
+    confetti({ particleCount: 140, spread: 100, startVelocity: 45, origin: { y: 0.55 } });
+  } catch (e) {
+    console.warn("confete indisponível", e);
+  }
+}
+
+function mostrarCelebracao(marco, ehPremioFinal) {
+  dispararConfete();
+  const overlay = document.createElement("div");
+  overlay.className = "celebracao-overlay";
+  overlay.innerHTML = `
+    <div class="celebracao-card">
+      <div class="celebracao-emoji">${ehPremioFinal ? "🏆" : "🎉"}</div>
+      <h2>${ehPremioFinal ? "Meta conquistada!" : "Bandeira conquistada!"}</h2>
+      <p class="celebracao-premio">${esc(marco.titulo)}</p>
+      ${marco.descricao ? `<p class="celebracao-desc">${esc(marco.descricao)}</p>` : ""}
+      <button class="btn btn-primario" id="celebracao-fechar">Continuar</button>
+    </div>`;
+  document.body.appendChild(overlay);
+  const fechar = () => overlay.remove();
+  overlay.querySelector("#celebracao-fechar").onclick = fechar;
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) fechar(); });
 }
 
 /* ---- Tabuleiro (jogo de tabuleiro) ------------------------------------- */
@@ -284,7 +340,8 @@ function kpi(n, rotulo) {
 }
 
 function renderRanking(ranking, meuId) {
-  const ordenado = [...ranking].sort((a, b) => b.confirmados - a.confirmados);
+  // ordem decrescente por indicações aprovadas (Aprovado + Confirmado)
+  const ordenado = [...ranking].sort((a, b) => b.aprovados - a.aprovados);
   const pos = ordenado.findIndex((r) => r.id === meuId) + 1;
   el("minha-posicao").textContent =
     pos > 0 ? `Você está em ${pos}º de ${ordenado.length} anfitriões.` : "";
@@ -293,7 +350,7 @@ function renderRanking(ranking, meuId) {
     .map(
       (r, i) => `<div class="rank-linha ${r.id === meuId ? "eu" : ""}">
         <span><b style="color:var(--texto-suave);margin-right:8px">${i + 1}º</b>${esc(r.nome)}</span>
-        <span style="font-weight:700">${r.confirmados}</span>
+        <span style="font-weight:700">${r.aprovados}</span>
       </div>`
     )
     .join("");
