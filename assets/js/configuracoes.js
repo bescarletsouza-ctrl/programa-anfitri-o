@@ -262,7 +262,8 @@ async function renderMarcos() {
           (m) => `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:11px 0;border-bottom:1px solid var(--cinza-100)" data-id="${m.id}">
         <div>
           <div style="font-weight:600;font-size:.9rem">
-            <span class="badge badge-laranja" style="margin-right:6px">${m.quantidade} confirmados</span>${esc(m.titulo)}
+            <span class="badge badge-laranja" style="margin-right:6px">${m.quantidade} confirmados</span>
+            ${m.meta_final ? `<span class="badge badge-neutro" style="margin-right:6px">🏁 Meta do evento</span>` : ""}${esc(m.titulo)}
           </div>
           <div class="pagina-sub" style="margin:3px 0 0;font-size:.8rem">${esc(m.descricao || "—")}</div>
         </div>
@@ -289,25 +290,55 @@ async function renderMarcos() {
 }
 
 function editarMarco(m) {
+  const metaEvento = Number(config?.meta_confirmados) || 0;
   abrirModal({
     titulo: m ? "Editar marco" : "Novo marco",
     corpoHtml: `
+      <label class="campo" style="display:flex;gap:8px;align-items:center">
+        <input type="checkbox" name="meta_final" ${m?.meta_final ? "checked" : ""} />
+        <span style="margin:0">Este é o prêmio final (usa a Meta de confirmados do evento${metaEvento ? `: ${metaEvento}` : ""})</span>
+      </label>
       <label class="campo"><span>Convidados confirmados para desbloquear *</span>
-        <input class="input" name="quantidade" type="number" min="1" required value="${m?.quantidade ?? ""}" /></label>
+        <input class="input" name="quantidade" type="number" min="1" required value="${m?.quantidade ?? ""}" ${m?.meta_final ? "disabled" : ""} /></label>
       <label class="campo"><span>Título *</span>
         <input class="input" name="titulo" required value="${esc(m?.titulo || "")}" /></label>
       <label class="campo"><span>Descrição / prêmio</span>
-        <textarea class="input" name="descricao" rows="2">${esc(m?.descricao || "")}</textarea></label>`,
+        <textarea class="input" name="descricao" rows="2">${esc(m?.descricao || "")}</textarea></label>
+      ${metaEvento ? "" : `<p class="cel-tenue" style="font-size:.72rem">Defina a "Meta de confirmados" em Dados do evento para usar essa opção.</p>`}`,
+    aoMontar: (root) => {
+      const chk = root.querySelector('[name="meta_final"]');
+      const qtd = root.querySelector('[name="quantidade"]');
+      const sincroniza = () => {
+        if (chk.checked && metaEvento) { qtd.value = metaEvento; qtd.disabled = true; }
+        else qtd.disabled = false;
+      };
+      chk.onchange = sincroniza;
+      sincroniza();
+    },
     onConfirmar: async (form) => {
       const f = Object.fromEntries(new FormData(form));
+      const ehMetaFinal = form.querySelector('[name="meta_final"]').checked;
+      const quantidade = ehMetaFinal && metaEvento ? metaEvento : (Number(f.quantidade) || 1);
       const registro = {
-        quantidade: Number(f.quantidade) || 1,
+        quantidade,
         titulo: f.titulo.trim(),
         descricao: f.descricao.trim() || null,
-        ordem: Number(f.quantidade) || 1,
+        ordem: quantidade,
+        meta_final: ehMetaFinal,
       };
       if (m) registro.id = m.id;
-      await salvar("marcos", registro);
+      try {
+        await salvar("marcos", registro);
+      } catch (e) {
+        if (/meta_final|schema cache|could not find/i.test(e.message || "")) {
+          delete registro.meta_final;
+          await salvar("marcos", registro);
+          toast("Marco salvo (rode a migração 0022 no Supabase para vincular à Meta do evento).", "erro");
+          renderMarcos();
+          return;
+        }
+        throw e;
+      }
       toast("Marco salvo.", "ok");
       renderMarcos();
     },

@@ -5,7 +5,7 @@
 import { esc, slugify, formatarData } from "./ui.js";
 import { APP } from "./config.js";
 import {
-  getAnfitriaoPorSlug, listConvidadosDoAnfitriao, listMarcos, listRankingPublico,
+  getAnfitriaoPorSlug, listConvidadosDoAnfitriao, listMarcos, listRankingPublico, getEvento,
 } from "./supabase.js";
 
 const el = (id) => document.getElementById(id);
@@ -22,11 +22,16 @@ const badgeStatus = (s) =>
     const anfitriao = await getAnfitriaoPorSlug(slug);
     if (!anfitriao) return erro();
 
-    const [convites, marcos, ranking] = await Promise.all([
+    const [convites, marcosRaw, ranking, evento] = await Promise.all([
       listConvidadosDoAnfitriao(anfitriao.id),
       listMarcos(anfitriao.evento_id).catch(() => []),
       listRankingPublico(anfitriao.evento_id).catch(() => []),
+      getEvento(anfitriao.evento_id).catch(() => null),
     ]);
+    // o marco "prêmio final" acompanha a Meta de confirmados do evento, mesmo
+    // que ela mude depois de o marco ter sido criado
+    const metaEvento = Number(evento?.meta_confirmados) || 0;
+    const marcos = marcosRaw.map((m) => (m.meta_final && metaEvento ? { ...m, quantidade: metaEvento } : m));
 
     const confirmados = convites.filter((c) => c.status === "Confirmado").length;
     const aprovados = convites.filter((c) => c.status === "Aprovado" || c.status === "Confirmado").length;
@@ -94,7 +99,7 @@ function renderJornada(confirmados, marcosRaw) {
   const conquistados = marcos.filter((m) => confirmados >= m.quantidade).length;
   const proximo = marcos[conquistados];
   el("proximo-marco").textContent = proximo
-    ? `Faltam ${proximo.quantidade - confirmados} confirmados para a bandeira "${proximo.titulo}".`
+    ? `Faltam ${proximo.quantidade - confirmados} confirmados para desbloquear a próxima bandeira!`
     : "Você chegou à última bandeira! 🏆";
 
   desenharTabuleiro(confirmados, marcos, conquistados);
@@ -175,33 +180,45 @@ function desenharTabuleiro(confirmados, marcos, conquistados) {
 
 /* ---- Fases (cards abaixo do tabuleiro) --------------------------------- */
 function renderFases(confirmados, marcos, conquistados) {
-  el("fases").innerHTML = marcos
-    .map((m, idx) => {
-      const ok = confirmados >= m.quantidade;
-      const atual = !ok && idx === conquistados;
-      const estado = ok ? "conquistada" : atual ? "atual" : "bloqueada";
-      const selo = ok
-        ? `<span class="fase-selo ok">Bandeira conquistada</span>`
-        : atual
-        ? `<span class="fase-selo atual">Você está aqui · faltam ${m.quantidade - confirmados}</span>`
-        : `<span class="fase-selo bloq">🔒 Bloqueada</span>`;
-      // o prêmio só é revelado (título + descrição) depois de conquistado —
-      // antes disso é surpresa, mesmo na bandeira mais próxima ("atual")
-      const titulo = ok ? esc(m.titulo) : "🔒 Prêmio bloqueado";
-      const corpo = ok
-        ? `<p>${esc(m.descricao || "")}</p>`
-        : atual
-        ? `<p class="dim">Continue confirmando convidados para descobrir o prêmio!</p>`
-        : `<p class="dim">Chegue à bandeira anterior para desbloquear.</p>`;
-      return `<div class="fase ${estado}">
-        <div class="fase-num">${m.quantidade}</div>
-        <div class="fase-txt">
-          <div class="fase-topo"><h4>${titulo}</h4>${selo}</div>
-          ${corpo}
-        </div>
-      </div>`;
-    })
-    .join("");
+  const cards = marcos.map((m, idx) => {
+    const ok = confirmados >= m.quantidade;
+    const atual = !ok && idx === conquistados;
+    const estado = ok ? "conquistada" : atual ? "atual" : "bloqueada";
+    const selo = ok
+      ? `<span class="fase-selo ok">Bandeira conquistada</span>`
+      : atual
+      ? `<span class="fase-selo atual">Próxima meta · faltam ${m.quantidade - confirmados}</span>`
+      : `<span class="fase-selo bloq">🔒 Bloqueada</span>`;
+    // o prêmio só é revelado (título + descrição) depois de conquistado —
+    // antes disso é surpresa, mesmo na bandeira mais próxima ("atual")
+    const titulo = ok ? esc(m.titulo) : "🔒 Prêmio bloqueado";
+    const corpo = ok
+      ? `<p>${esc(m.descricao || "")}</p>`
+      : atual
+      ? `<p class="dim">Continue confirmando convidados para descobrir o prêmio!</p>`
+      : `<p class="dim">Chegue à bandeira anterior para desbloquear.</p>`;
+    return `<div class="fase ${estado}">
+      <div class="fase-num">${m.quantidade}</div>
+      <div class="fase-txt">
+        <div class="fase-topo"><h4>${titulo}</h4>${selo}</div>
+        ${corpo}
+      </div>
+    </div>`;
+  });
+
+  // marcador "você está aqui": posição real do anfitrião — entra antes da
+  // próxima bandeira (ou no fim da lista, se já conquistou todas). Fica
+  // separado das bandeiras pra não parecer que ele já chegou numa delas.
+  const posAtual = `<div class="fase atual fase-aqui">
+    <div class="fase-num">📍</div>
+    <div class="fase-txt">
+      <div class="fase-topo"><h4>Você está aqui</h4></div>
+      <p>${confirmados} confirmado${confirmados === 1 ? "" : "s"} até agora.</p>
+    </div>
+  </div>`;
+  cards.splice(conquistados, 0, posAtual);
+
+  el("fases").innerHTML = cards.join("");
 }
 
 function renderConvites(convites, resumo) {
