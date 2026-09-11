@@ -146,7 +146,7 @@ export function renderSidebar(ativo, ctx) {
     </nav>
     <div class="rodape">
       ${rodape.map((n) => navLinkHtml(n, ativo)).join("")}
-      ${ctx ? `<button class="nav-link" data-sair type="button" style="width:100%;text-align:left">${icone("x")}<span>Sair${ctx.email ? " (" + esc(ctx.email) + ")" : ""}</span></button>` : ""}
+      ${ctx ? `<button class="nav-link" data-sair type="button" title="${esc(ctx.email || "Sair")}">${icone("x")}<span>Sair</span></button>` : ""}
       <button class="btn-tema" data-toggle-tema type="button"></button>
       <div class="side-credito">${APP.creditoHtml}</div>
     </div>`;
