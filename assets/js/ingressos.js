@@ -5,7 +5,7 @@
 // =============================================================================
 import { iniciarPagina, esc, debounce, formatarData, abrirModal, toast, confirmar, icone } from "./ui.js";
 import { listTiposIngresso, listParticipantes, salvar, remover } from "./supabase.js";
-import { gerarCSV, baixarCSV } from "./tabela.js";
+import { baixarXLSX } from "./tabela.js";
 
 const _iniciando = iniciarPagina("ingressos");
 const el = (id) => document.getElementById(id);
@@ -232,10 +232,10 @@ async function excluir(t) {
   } catch (e) { toast(e.message, "erro"); }
 }
 
-function exportar() {
+async function exportar() {
   const lista = filtrados();
   if (!lista.length) { toast("Nada para exportar.", "erro"); return; }
-  const csv = gerarCSV(lista, [
+  await baixarXLSX("tipos-ingresso.xlsx", lista, [
     { rotulo: "Nome", valor: (t) => t.nome },
     { rotulo: "Preço", valor: (t) => t.preco || "Gratuito" },
     { rotulo: "Vagas", valor: (t) => (t.vagas ?? "ilimitado") },
@@ -245,6 +245,5 @@ function exportar() {
     { rotulo: "Vendas até", valor: (t) => (t.fim_vendas ? formatarData(t.fim_vendas + "T12:00:00") : "") },
     { rotulo: "Ativo", valor: (t) => (t.ativo ? "Sim" : "Não") },
   ]);
-  baixarCSV("tipos-ingresso.csv", csv);
   toast("Arquivo gerado.", "ok");
 }

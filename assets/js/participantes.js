@@ -15,7 +15,7 @@ import {
 } from "./supabase.js";
 import { eventoNome } from "./evento.js";
 import { imprimirCracha } from "./cracha.js";
-import { parsearTabela, gerarCSV, baixarCSV } from "./tabela.js";
+import { parsearTabela, lerXlsx, baixarXLSX, baixarModeloXLSX } from "./tabela.js";
 import { abrirEnvioEmail } from "./email.js";
 
 const _iniciando = iniciarPagina("participantes");
@@ -1099,10 +1099,11 @@ async function excluir(id) {
 }
 
 /* ---- Importar ---- */
-const MODELO =
-  "nome;email;telefone;empresa;tipo;ingresso;faturamento;pagamento;quantidade\n" +
-  "Maria Silva;maria@ex.com;11999990000;Acme Ltda;Convidado;Convite;150 mil – 500 mil/mês;Gratuito;1\n" +
-  "João Souza;joao@ex.com;11988887777;JS Co;Anfitrião;Convite;;Gratuito;1";
+const MODELO_LINHAS = [
+  ["nome", "email", "telefone", "empresa", "tipo", "ingresso", "faturamento", "pagamento", "quantidade"],
+  ["Maria Silva", "maria@ex.com", "11999990000", "Acme Ltda", "Convidado", "Convite", "150 mil – 500 mil/mês", "Gratuito", 1],
+  ["João Souza", "joao@ex.com", "11988887777", "JS Co", "Anfitrião", "Convite", "", "Gratuito", 1],
+];
 
 function modalImportar() {
   abrirModal({
@@ -1110,29 +1111,24 @@ function modalImportar() {
     textoConfirmar: "Importar",
     corpoHtml: `
       <p class="pagina-sub" style="margin:0 0 10px">
-        Cole a tabela (Excel/Sheets) ou selecione um CSV. Colunas: <b>nome</b>
+        Cole a tabela (Excel/Sheets) ou selecione um arquivo Excel (.xlsx). Colunas: <b>nome</b>
         (obrigatória), email, telefone, empresa, tipo, ingresso, faturamento,
         pagamento, quantidade. Quem vier com <b>tipo = Anfitrião</b> também entra
         na Gestão de anfitriões (sem duplicar, casando por e-mail).
       </p>
-      <a href="data:text/csv;charset=utf-8,${encodeURIComponent(MODELO)}" download="modelo-participantes.csv"
-         style="font-size:.8rem;font-weight:600;color:var(--cor-laranja-forte)">↓ baixar modelo</a>
+      <button type="button" id="imp-modelo" style="font-size:.8rem;font-weight:600;color:var(--cor-laranja-forte);background:none;border:none;padding:0;cursor:pointer;text-decoration:underline">↓ baixar modelo</button>
       <label class="campo" style="margin-top:12px"><span>Colar tabela</span>
         <textarea class="input" name="texto" rows="7"></textarea></label>
-      <label class="campo"><span>…ou arquivo CSV</span>
-        <input class="input" type="file" name="arquivo" accept=".csv,.txt,.tsv" /></label>`,
+      <label class="campo"><span>…ou arquivo Excel (.xlsx)</span>
+        <input class="input" type="file" name="arquivo" accept=".xlsx,.xls" /></label>`,
     aoMontar: (root) => {
-      const arq = root.querySelector('[name="arquivo"]');
-      arq.onchange = () => {
-        const f = arq.files[0];
-        if (!f) return;
-        const r = new FileReader();
-        r.onload = () => { root.querySelector('[name="texto"]').value = r.result; };
-        r.readAsText(f, "utf-8");
-      };
+      root.querySelector("#imp-modelo").onclick = () => baixarModeloXLSX("modelo-participantes.xlsx", MODELO_LINHAS);
     },
     onConfirmar: async (form) => {
-      const linhas = parsearTabela(form.querySelector('[name="texto"]').value, ALIAS_IMPORT);
+      const arquivo = form.querySelector('[name="arquivo"]').files[0];
+      const linhas = arquivo
+        ? await lerXlsx(arquivo, ALIAS_IMPORT)
+        : parsearTabela(form.querySelector('[name="texto"]').value, ALIAS_IMPORT);
       const validas = linhas.filter((l) => (l.nome || "").trim());
       if (!validas.length) { toast("Nenhuma linha com nome.", "erro"); return false; }
 
@@ -1166,9 +1162,9 @@ function modalImportar() {
 }
 
 /* ---- Exportar ---- */
-function exportar(dados) {
+async function exportar(dados) {
   if (!dados.length) { toast("Nada para exportar.", "erro"); return; }
-  const csv = gerarCSV(dados, [
+  await baixarXLSX("participantes.xlsx", dados, [
     { chave: "codigo", rotulo: "Código" },
     { chave: "nome", rotulo: "Nome" },
     { chave: "email", rotulo: "E-mail" },
@@ -1186,6 +1182,5 @@ function exportar(dados) {
     { rotulo: "Check-in", valor: (p) => formatarData(p.checkin_at, true) },
     { rotulo: "Data de cadastro", valor: (p) => formatarData(p.created_at) },
   ]);
-  baixarCSV("participantes.csv", csv);
   toast("Arquivo gerado.", "ok");
 }

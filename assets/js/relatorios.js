@@ -4,7 +4,7 @@
 // =============================================================================
 import { iniciarPagina, esc, debounce, formatarData, toast } from "./ui.js";
 import { listParticipantes, listCheckins, listAtividades } from "./supabase.js";
-import { gerarCSV, baixarCSV } from "./tabela.js";
+import { baixarXLSX } from "./tabela.js";
 
 const _iniciando = iniciarPagina("relatorios");
 const el = (id) => document.getElementById(id);
@@ -204,10 +204,10 @@ function renderLog() {
     .join("");
 }
 
-function exportar() {
+async function exportar() {
   const dados = logFiltrado();
   if (!dados.length) { toast("Nada para exportar.", "erro"); return; }
-  const csv = gerarCSV(dados, [
+  await baixarXLSX("checkins.xlsx", dados, [
     { rotulo: "Ação", valor: (c) => (c.acao === "entrada" ? "Entrada" : "Saída") },
     { rotulo: "Participante", valor: (c) => c.participante?.nome || "" },
     { rotulo: "Categoria", valor: (c) => c.participante?.ingresso || "" },
@@ -218,6 +218,5 @@ function exportar() {
     { rotulo: "Data", valor: (c) => formatarData(c.at) },
     { rotulo: "Hora", valor: (c) => hora(c.at) },
   ]);
-  baixarCSV("checkins.csv", csv);
   toast("Arquivo gerado.", "ok");
 }

@@ -8,7 +8,7 @@ import {
   listAtividades, listCheckins, listParticipantes, salvar, remover,
   registrarCheckin, inserirLote, removerCheckinsAtividade,
 } from "./supabase.js";
-import { parsearTabela, gerarCSV, baixarCSV } from "./tabela.js";
+import { parsearTabela, lerXlsx, baixarXLSX } from "./tabela.js";
 
 const _iniciando = iniciarPagina("atividades");
 const el = (id) => document.getElementById(id);
@@ -281,7 +281,7 @@ function sincBarraLista(todos) {
   const sel = [...selecionadosLista].filter((pid) => todos.some((l) => l.pid === pid));
   bar.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px";
   bar.innerHTML = `
-    <button class="btn btn-secundario btn-sm" id="ga-exportar" ${todos.length ? "" : "disabled"}>${icone("baixar")} Exportar CSV</button>
+    <button class="btn btn-secundario btn-sm" id="ga-exportar" ${todos.length ? "" : "disabled"}>${icone("baixar")} Exportar Excel</button>
     ${sel.length
       ? `<span class="barra-acoes-cont">${sel.length} selecionado(s)</span>
          <button class="btn btn-perigo btn-sm" id="ga-remover">Remover da atividade</button>
@@ -298,9 +298,10 @@ function sincBarraLista(todos) {
   };
 }
 
-function exportarCredenciados(linhas) {
+async function exportarCredenciados(linhas) {
   if (!linhas.length) { toast("Nada para exportar.", "erro"); return; }
-  const csv = gerarCSV(linhas, [
+  const nomeArq = "atividade-" + (gavetaAtv.nome || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") + ".xlsx";
+  await baixarXLSX(nomeArq || "atividade.xlsx", linhas, [
     { rotulo: "Nome", valor: (l) => l.nome },
     { rotulo: "Categoria", valor: (l) => l.categoria },
     { rotulo: "Código", valor: (l) => l.codigo },
@@ -308,8 +309,6 @@ function exportarCredenciados(linhas) {
     { rotulo: "Empresa", valor: (l) => l.empresa },
     { rotulo: "Entrada em", valor: (l) => (l.desde ? `${formatarData(l.desde)} ${hora(l.desde)}` : "") },
   ]);
-  const nomeArq = "atividade-" + (gavetaAtv.nome || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") + ".csv";
-  baixarCSV(nomeArq || "atividade.csv", csv);
   toast("Arquivo gerado.", "ok");
 }
 
@@ -348,7 +347,7 @@ function renderAdd() {
 
   alvo.innerHTML = `
     <div style="margin-bottom:10px">
-      <button type="button" class="btn btn-secundario btn-sm" id="ga-importar">${icone("subir")} Importar lista (Excel/CSV)</button>
+      <button type="button" class="btn btn-secundario btn-sm" id="ga-importar">${icone("subir")} Importar lista (Excel)</button>
     </div>
     ${atalhos}
     <div class="pagina-sub" style="margin:0 0 8px">${fora.length} fora da atividade${fora.length > lista.length ? ` · refine a busca (mostrando ${lista.length})` : ""}</div>
@@ -401,28 +400,19 @@ function modalImportarAtv() {
     textoConfirmar: "Importar",
     corpoHtml: `
       <p class="pagina-sub" style="margin:0 0 10px">
-        Cole a tabela (Excel/Sheets) ou selecione um CSV. Colunas: <b>nome</b>
-        (obrigatória), <b>email</b>, <b>codigo</b>, categoria, empresa, telefone.
+        Cole a tabela (Excel/Sheets) ou selecione um arquivo Excel (.xlsx). Colunas:
+        <b>nome</b> (obrigatória), <b>email</b>, <b>codigo</b>, categoria, empresa, telefone.
         Cada linha é casada com um participante do evento por <b>e-mail</b>,
         <b>código</b> ou <b>nome</b>. Quem não existir é cadastrado como Convidado
         e entra na atividade.
       </p>
       <label class="campo"><span>Colar tabela</span>
         <textarea class="input" name="texto" rows="7" placeholder="nome;email;codigo"></textarea></label>
-      <label class="campo"><span>…ou arquivo CSV</span>
-        <input class="input" type="file" name="arquivo" accept=".csv,.txt,.tsv" /></label>`,
-    aoMontar: (root) => {
-      const arq = root.querySelector('[name="arquivo"]');
-      arq.onchange = () => {
-        const f = arq.files[0];
-        if (!f) return;
-        const r = new FileReader();
-        r.onload = () => { root.querySelector('[name="texto"]').value = r.result; };
-        r.readAsText(f, "utf-8");
-      };
-    },
+      <label class="campo"><span>…ou arquivo Excel (.xlsx)</span>
+        <input class="input" type="file" name="arquivo" accept=".xlsx,.xls" /></label>`,
     onConfirmar: async (form) => {
-      const linhas = parsearTabela(form.querySelector('[name="texto"]').value, ALIAS_ATV)
+      const arquivo = form.querySelector('[name="arquivo"]').files[0];
+      const linhas = (arquivo ? await lerXlsx(arquivo, ALIAS_ATV) : parsearTabela(form.querySelector('[name="texto"]').value, ALIAS_ATV))
         .filter((l) => (l.nome || l.email || l.codigo || "").trim());
       if (!linhas.length) { toast("Nenhuma linha válida.", "erro"); return false; }
 

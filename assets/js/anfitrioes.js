@@ -11,7 +11,7 @@ import {
   sincAnfitriaoParticipante, desvincularAoExcluirAnfitriao,
 } from "./supabase.js";
 import { APP, TIPOS_ANFITRIAO } from "./config.js";
-import { parsearTabela } from "./tabela.js";
+import { parsearTabela, lerXlsx, baixarXLSX, baixarModeloXLSX } from "./tabela.js";
 
 const _iniciando = iniciarPagina("anfitrioes");
 const el = (id) => document.getElementById(id);
@@ -64,6 +64,8 @@ el("btn-novo").innerHTML = icone("mais") + "Novo anfitrião";
 el("btn-novo").onclick = modalNovo;
 el("btn-importar").innerHTML = icone("subir") + "Importar lista";
 el("btn-importar").onclick = modalImportar;
+el("btn-exportar").innerHTML = icone("baixar") + "Exportar Excel";
+el("btn-exportar").onclick = () => exportar(filtrar());
 
 /* ---- render ---- */
 function filtrar() {
@@ -86,6 +88,10 @@ function filtrar() {
 function nomeGrupo(id) { return grupos.find((g) => g.id === id)?.nome; }
 function nomeEstagio(id) { return estagios.find((s) => s.id === id)?.nome || "—"; }
 function respDoGrupo(grupoId) { return grupos.find((g) => g.id === grupoId)?.responsavel_user_id || null; }
+function nomeMembro(uid) {
+  const m = membrosOrg.find((x) => x.user_id === uid);
+  return m ? (m.nome || m.email) : "";
+}
 
 function render() {
   const filtrada = filtrar();
@@ -174,10 +180,11 @@ function modalNovo() {
 }
 
 /* ---- Importar lista ---- */
-const MODELO_CSV =
-  "nome,email,telefone,tipo,grupo\n" +
-  "Maria Silva,maria@exemplo.com,11999990000,Titular,Turma 1\n" +
-  "João Souza,joao@exemplo.com,11988887777,Titular,Turma 1";
+const MODELO_LINHAS = [
+  ["nome", "email", "telefone", "tipo", "grupo"],
+  ["Maria Silva", "maria@exemplo.com", "11999990000", "Titular", "Turma 1"],
+  ["João Souza", "joao@exemplo.com", "11988887777", "Titular", "Turma 1"],
+];
 
 const ALIAS = {
   "nome completo": "nome", "e-mail": "email",
@@ -191,33 +198,26 @@ function modalImportar() {
     textoConfirmar: "Importar",
     corpoHtml: `
       <p class="pagina-sub" style="margin:0 0 10px">
-        Cole uma tabela (do Excel/Sheets) ou selecione um arquivo CSV. Colunas
-        aceitas: <b>nome</b> (obrigatória), email, telefone, tipo, grupo.
+        Cole uma tabela (do Excel/Sheets) ou selecione um arquivo Excel (.xlsx).
+        Colunas aceitas: <b>nome</b> (obrigatória), email, telefone, tipo, grupo.
         Grupo (Tipo) é criado automaticamente se ainda não existir — e se esse
         Tipo já tiver um responsável cadastrado em Configurações, ele é
         atribuído ao anfitrião automaticamente.
       </p>
-      <a href="data:text/csv;charset=utf-8,${encodeURIComponent(MODELO_CSV)}" download="modelo-anfitrioes.csv"
-         style="font-size:.8rem;font-weight:600;color:var(--cor-laranja-forte)">↓ baixar modelo CSV</a>
+      <button type="button" id="imp-modelo" style="font-size:.8rem;font-weight:600;color:var(--cor-laranja-forte);background:none;border:none;padding:0;cursor:pointer;text-decoration:underline">↓ baixar modelo</button>
       <label class="campo" style="margin-top:12px"><span>Colar tabela</span>
         <textarea class="input" name="texto" rows="7" placeholder="nome,email,telefone,tipo,grupo&#10;Maria Silva,maria@exemplo.com,..."></textarea></label>
-      <label class="campo"><span>…ou arquivo CSV</span>
-        <input class="input" type="file" name="arquivo" accept=".csv,.txt,.tsv" /></label>
+      <label class="campo"><span>…ou arquivo Excel (.xlsx)</span>
+        <input class="input" type="file" name="arquivo" accept=".xlsx,.xls" /></label>
       <div class="pagina-sub" id="imp-status" style="margin:0"></div>`,
     aoMontar: (root) => {
-      const arq = root.querySelector('[name="arquivo"]');
-      const txt = root.querySelector('[name="texto"]');
-      arq.onchange = () => {
-        const f = arq.files[0];
-        if (!f) return;
-        const r = new FileReader();
-        r.onload = () => { txt.value = r.result; };
-        r.readAsText(f, "utf-8");
-      };
+      root.querySelector("#imp-modelo").onclick = () => baixarModeloXLSX("modelo-anfitrioes.xlsx", MODELO_LINHAS);
     },
     onConfirmar: async (form) => {
-      const texto = form.querySelector('[name="texto"]').value;
-      const linhas = parsearTabela(texto, ALIAS);
+      const arquivo = form.querySelector('[name="arquivo"]').files[0];
+      const linhas = arquivo
+        ? await lerXlsx(arquivo, ALIAS)
+        : parsearTabela(form.querySelector('[name="texto"]').value, ALIAS);
       const validas = linhas.filter((l) => (l.nome || "").trim());
       if (!validas.length) {
         toast("Nenhuma linha com nome encontrada. Confira o cabeçalho.", "erro");
@@ -268,6 +268,28 @@ function modalImportar() {
       render();
     },
   });
+}
+
+/* ---- Exportar ---- */
+async function exportar(dados) {
+  if (!dados.length) { toast("Nada para exportar.", "erro"); return; }
+  await baixarXLSX("anfitrioes.xlsx", dados, [
+    { chave: "nome", rotulo: "Nome" },
+    { chave: "tipo", rotulo: "Papel" },
+    { rotulo: "Tipo", valor: (a) => nomeGrupo(a.grupo_id) || "" },
+    { chave: "email", rotulo: "E-mail" },
+    { chave: "telefone", rotulo: "Telefone" },
+    { rotulo: "Responsável", valor: (a) => nomeMembro(a.responsavel_user_id) },
+    { rotulo: "Estágio", valor: (a) => nomeEstagio(a.estagio_id) },
+    { chave: "categoria_convidado", rotulo: "Categoria liberada" },
+    { rotulo: "Vai ao evento", valor: (a) => (a.vai !== false ? "Sim" : "Não") },
+    { rotulo: "Presença", valor: (a) => (a.presenca ? "Sim" : "Não") },
+    { rotulo: "Enviados", valor: (a) => a.enviados || 0 },
+    { rotulo: "Aprovados", valor: (a) => a.aprovados || 0 },
+    { rotulo: "Confirmados", valor: (a) => a.confirmados || 0 },
+    { rotulo: "Cadastro", valor: (a) => formatarData(a.created_at) },
+  ]);
+  toast("Arquivo gerado.", "ok");
 }
 
 /* ---- Gaveta de detalhe ---- */
