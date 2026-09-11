@@ -54,7 +54,7 @@ function render() {
           <div class="linha-acoes">
             <button class="icone-btn" data-toggle-ativo title="Ativar/desativar">${p.ativo ? "🚫" : "✔"}</button>
             <button class="icone-btn" data-editar title="Editar">${icone("editar")}</button>
-            ${p.sistema ? "" : `<button class="icone-btn" data-excluir title="Excluir">${icone("excluir")}</button>`}
+            <button class="icone-btn" data-excluir title="Excluir">${icone("excluir")}</button>
           </div>
         </div>
       </div>`;
@@ -100,8 +100,10 @@ async function toggleAtivo(p) {
 }
 
 async function excluir(p) {
-  if (p.sistema) return;
-  if (!confirmar(`Excluir a pergunta "${p.rotulo}"?`)) return;
+  const aviso = p.sistema
+    ? `Excluir a pergunta do sistema "${p.rotulo}"? Ela deixa de ser coletada nos próximos convites (quem já respondeu não é afetado).`
+    : `Excluir a pergunta "${p.rotulo}"?`;
+  if (!confirmar(aviso)) return;
   try {
     await remover("form_perguntas", p.id);
     perguntas = perguntas.filter((x) => x.id !== p.id);
