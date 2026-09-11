@@ -463,6 +463,20 @@ export const listRankingPublico = (eid) =>
 export const criarConvidado = (registro) =>
   supabase.from("convidados").insert(registro).select().single().then(ok);
 
+// Já existe uma inscrição com esse e-mail neste evento? Usado pelo
+// formulário público (convite.js) pra barrar duplicidade antes de enviar.
+export async function existeConvidadoComEmail(eventoId, email) {
+  const alvo = (email || "").trim();
+  if (!alvo) return false;
+  const r = await supabase
+    .from("convidados")
+    .select("id", { count: "exact", head: true })
+    .eq("evento_id", eventoId)
+    .ilike("email", alvo);
+  if (r.error) throw new Error(r.error.message || "Erro na consulta.");
+  return (r.count || 0) > 0;
+}
+
 export const getConvidadoStatus = (id) =>
   supabase
     .from("convidados")

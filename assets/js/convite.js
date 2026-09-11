@@ -5,7 +5,7 @@
 import { esc, slugify } from "./ui.js";
 import { APP } from "./config.js";
 import {
-  getAnfitriaoPorSlug, listFormPerguntas, getEvento, criarConvidado,
+  getAnfitriaoPorSlug, listFormPerguntas, getEvento, criarConvidado, existeConvidadoComEmail,
 } from "./supabase.js";
 
 const el = (id) => document.getElementById(id);
@@ -18,6 +18,27 @@ const utm = {
 };
 
 const CHAVES_SISTEMA = ["nome", "email", "telefone", "empresa", "site", "faturamento", "funcionarios", "cnpj"];
+
+/* ---- Máscaras --------------------------------------------------------- */
+function maskTelefone(v) {
+  const d = v.replace(/\D/g, "").slice(0, 11);
+  if (!d) return "";
+  let out = "(" + d.slice(0, 2);
+  if (d.length > 2) out += ") " + d.slice(2, d.length > 10 ? 7 : 6);
+  if (d.length > 6) out += "-" + d.slice(d.length > 10 ? 7 : 6, d.length > 10 ? 11 : 10);
+  return out;
+}
+
+function maskCnpj(v) {
+  const d = v.replace(/\D/g, "").slice(0, 14);
+  if (!d) return "";
+  let out = d.slice(0, 2);
+  if (d.length > 2) out += "." + d.slice(2, 5);
+  if (d.length > 5) out += "." + d.slice(5, 8);
+  if (d.length > 8) out += "/" + d.slice(8, 12);
+  if (d.length > 12) out += "-" + d.slice(12, 14);
+  return out;
+}
 
 let anfitriao = null;
 let perguntas = [];
@@ -82,7 +103,8 @@ function renderPasso() {
     campo = `<textarea class="pub-input" data-campo rows="4">${esc(valor)}</textarea>`;
   } else {
     const tipoInput = { email: "email", telefone: "tel", url: "url" }[p.tipo] || "text";
-    const ph = { url: "https://…", telefone: "(11) 99999-9999" }[p.tipo] || "";
+    const ph = { url: "https://…", telefone: "(11) 99999-9999" }[p.tipo]
+      || (p.chave === "cnpj" ? "00.000.000/0000-00" : "");
     campo = `<input class="pub-input" data-campo type="${tipoInput}" value="${esc(valor)}" placeholder="${ph}" />`;
   }
 
@@ -101,6 +123,8 @@ function renderPasso() {
     const inp = el("passo").querySelector("[data-campo]");
     inp.focus();
     inp.onkeydown = (e) => { if (e.key === "Enter" && p.tipo !== "textarea") { e.preventDefault(); avancar(); } };
+    if (p.tipo === "telefone") inp.oninput = () => { inp.value = maskTelefone(inp.value); };
+    else if (p.chave === "cnpj") inp.oninput = () => { inp.value = maskCnpj(inp.value); };
   }
 
   el("btn-voltar").hidden = passo === 0;
@@ -129,6 +153,26 @@ async function avancar() {
   const v = lerCampo();
   const erro = validar(p, v);
   if (erro) { el("passo-erro").textContent = erro; return; }
+
+  if (p.tipo === "email" && v) {
+    const btn = el("btn-proximo");
+    btn.disabled = true;
+    btn.textContent = "Verificando…";
+    try {
+      const duplicado = await existeConvidadoComEmail(anfitriao.evento_id, v);
+      if (duplicado) {
+        el("passo-erro").textContent = "Este e-mail já está inscrito neste evento.";
+        btn.disabled = false;
+        btn.textContent = passo === perguntas.length - 1 ? "Enviar aplicação" : "Próximo";
+        return;
+      }
+    } catch (e) {
+      console.warn(e); // se a checagem falhar, deixa seguir — a inscrição não pode travar por isso
+    }
+    btn.disabled = false;
+    btn.textContent = passo === perguntas.length - 1 ? "Enviar aplicação" : "Próximo";
+  }
+
   respostas[p.chave] = v;
 
   if (passo < perguntas.length - 1) {
