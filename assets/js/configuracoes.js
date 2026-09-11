@@ -3,7 +3,7 @@
 // =============================================================================
 import { iniciarPagina, esc, abrirModal, toast, confirmar, icone, formatarData } from "./ui.js";
 import {
-  listGrupos, listResponsaveis, listEstagios, listEtapasParticipante, listMarcos, listTiposIngresso,
+  listGrupos, listEstagios, listEtapasParticipante, listMarcos, listTiposIngresso,
   getEvento, salvar, remover, salvarEvento,
   listarEquipe, criarMembroEquipe, trocarSenhaMembro, removerMembroEquipe,
 } from "./supabase.js";
@@ -72,7 +72,7 @@ async function carregar() {
     montarCrachaConfig();
     montarCtaMobile();
     montarEquipe();
-    await Promise.allSettled([renderGrupos(), renderResponsaveis(), renderEstagios(), renderEtapasPart(), renderMarcos(), renderCategoriasIngresso()]);
+    await Promise.allSettled([renderGrupos(), renderEstagios(), renderEtapasPart(), renderMarcos(), renderCategoriasIngresso()]);
   } catch (e) {
     el("carregando").innerHTML = /evento_id|eventos|schema cache/.test(e.message || "")
       ? "Rode a migração <code>supabase/migrations/0005_eventos.sql</code> no SQL Editor do Supabase."
@@ -227,12 +227,6 @@ function editarCategoriasDoResponsavel(userId, membros, tipos) {
   });
 }
 
-async function renderResponsaveis() {
-  const arr = await listResponsaveis();
-  const c = el("lista-responsaveis");
-  c.innerHTML = arr.length ? arr.map((x) => itemLinha("responsaveis", x)).join("") : vazio();
-  ligar(c, "responsaveis", renderResponsaveis);
-}
 async function renderEstagios() {
   const arr = await listEstagios();
   const c = el("lista-estagios");
@@ -496,13 +490,11 @@ function montarCtaMobile() {
   });
 }
 
-/* ---- editar / criar (responsaveis, estagios, etapas_participante — "grupos" tem editor próprio, editarGrupo) ---- */
+/* ---- editar / criar (estagios, etapas_participante — "grupos" tem editor próprio, editarGrupo) ---- */
 const RECARGA = {
-  responsaveis: renderResponsaveis,
   estagios: renderEstagios, etapas_participante: renderEtapasPart,
 };
 const TITULO = {
-  responsaveis: "responsável",
   estagios: "estágio", etapas_participante: "etapa",
 };
 const COM_ORDEM = ["estagios", "etapas_participante"];
@@ -512,7 +504,6 @@ async function editarItem(tabela, id, recarregar) {
   let atual = null;
   if (id) {
     const fn = {
-      responsaveis: listResponsaveis,
       estagios: listEstagios, etapas_participante: listEtapasParticipante,
     }[tabela];
     atual = (await fn()).find((x) => x.id === id);
