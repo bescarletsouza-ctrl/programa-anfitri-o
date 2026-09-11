@@ -294,17 +294,17 @@ function editarMarco(m) {
   abrirModal({
     titulo: m ? "Editar marco" : "Novo marco",
     corpoHtml: `
+      ${metaEvento ? "" : `<div class="aviso" style="margin:0 0 12px">Defina a <b>"Meta de confirmados"</b> em Dados do evento antes de marcar um prêmio como final.</div>`}
       <label class="campo" style="display:flex;gap:8px;align-items:center">
-        <input type="checkbox" name="meta_final" ${m?.meta_final ? "checked" : ""} />
+        <input type="checkbox" name="meta_final" ${m?.meta_final ? "checked" : ""} ${metaEvento ? "" : "disabled"} />
         <span style="margin:0">Este é o prêmio final (usa a Meta de confirmados do evento${metaEvento ? `: ${metaEvento}` : ""})</span>
       </label>
       <label class="campo"><span>Convidados confirmados para desbloquear *</span>
-        <input class="input" name="quantidade" type="number" min="1" required value="${m?.quantidade ?? ""}" ${m?.meta_final ? "disabled" : ""} /></label>
+        <input class="input" name="quantidade" type="number" min="1" required value="${m?.quantidade ?? ""}" ${m?.meta_final && metaEvento ? "disabled" : ""} /></label>
       <label class="campo"><span>Título *</span>
         <input class="input" name="titulo" required value="${esc(m?.titulo || "")}" /></label>
       <label class="campo"><span>Descrição / prêmio</span>
-        <textarea class="input" name="descricao" rows="2">${esc(m?.descricao || "")}</textarea></label>
-      ${metaEvento ? "" : `<p class="cel-tenue" style="font-size:.72rem">Defina a "Meta de confirmados" em Dados do evento para usar essa opção.</p>`}`,
+        <textarea class="input" name="descricao" rows="2">${esc(m?.descricao || "")}</textarea></label>`,
     aoMontar: (root) => {
       const chk = root.querySelector('[name="meta_final"]');
       const qtd = root.querySelector('[name="quantidade"]');
