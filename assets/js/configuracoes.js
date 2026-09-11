@@ -3,7 +3,7 @@
 // =============================================================================
 import { iniciarPagina, esc, abrirModal, toast, confirmar, icone, formatarData } from "./ui.js";
 import {
-  listGrupos, listResponsaveis, listEstagios, listEtapasParticipante, listMarcos,
+  listGrupos, listResponsaveis, listEstagios, listEtapasParticipante, listMarcos, listTiposIngresso,
   getEvento, salvar, remover, salvarEvento,
   listarEquipe, criarMembroEquipe, trocarSenhaMembro, removerMembroEquipe,
 } from "./supabase.js";
@@ -72,7 +72,7 @@ async function carregar() {
     montarCrachaConfig();
     montarCtaMobile();
     montarEquipe();
-    await Promise.allSettled([renderGrupos(), renderResponsaveis(), renderEstagios(), renderEtapasPart(), renderMarcos()]);
+    await Promise.allSettled([renderGrupos(), renderResponsaveis(), renderEstagios(), renderEtapasPart(), renderMarcos(), renderCategoriasIngresso()]);
   } catch (e) {
     el("carregando").innerHTML = /evento_id|eventos|schema cache/.test(e.message || "")
       ? "Rode a migração <code>supabase/migrations/0005_eventos.sql</code> no SQL Editor do Supabase."
@@ -166,6 +166,67 @@ function editarGrupo(atual, membrosCarregados) {
   };
   montar();
 }
+/* ---- Categorias de ingresso: atribuição de responsável (por pessoa) ---- */
+async function renderCategoriasIngresso() {
+  const c = el("lista-ingressos-resp");
+  if (!c) return;
+  const [tipos, membros] = await Promise.all([
+    listTiposIngresso().catch(() => []),
+    CTX?.org?.id ? listarEquipe(CTX.org.id).catch(() => []) : [],
+  ]);
+  if (!membros.length) {
+    c.innerHTML = `<p class="pagina-sub" style="margin:0">Cadastre pessoas em "Usuários da organização" para poder atribuir categorias.</p>`;
+    return;
+  }
+  if (!tipos.length) {
+    c.innerHTML = `<p class="pagina-sub" style="margin:0">Nenhuma categoria de ingresso cadastrada ainda. Crie em <a href="ingressos.html">Tipos de ingresso</a>.</p>`;
+    return;
+  }
+  c.innerHTML = membros.map((m) => {
+    const minhas = tipos.filter((t) => t.responsavel_user_id === m.user_id);
+    return `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--cinza-100)" data-uid="${esc(m.user_id)}">
+      <span style="font-size:.9rem">${esc(m.nome || m.email)}
+        ${minhas.length
+          ? `<span class="pagina-sub" style="font-size:.72rem;display:block">${minhas.map((t) => esc(t.nome)).join(", ")}</span>`
+          : `<span class="cel-tenue" style="font-size:.72rem;display:block">nenhuma categoria</span>`}
+      </span>
+      <button class="icone-btn" data-editar title="Atribuir categorias">${icone("editar")}</button>
+    </div>`;
+  }).join("");
+  c.querySelectorAll("[data-uid]").forEach((row) => {
+    row.querySelector("[data-editar]").onclick = () => editarCategoriasDoResponsavel(row.dataset.uid, membros, tipos);
+  });
+}
+
+function editarCategoriasDoResponsavel(userId, membros, tipos) {
+  const membro = membros.find((m) => m.user_id === userId);
+  const nomeMembro = (uid) => {
+    const m = membros.find((x) => x.user_id === uid);
+    return m ? (m.nome || m.email) : null;
+  };
+  abrirModal({
+    titulo: `Categorias de ${esc(membro?.nome || membro?.email || "responsável")}`,
+    corpoHtml: `
+      <p class="pagina-sub" style="margin:0 0 10px">Marque as categorias de ingresso pelas quais esta pessoa é responsável.</p>
+      ${tipos.map((t) => {
+        const outro = t.responsavel_user_id && t.responsavel_user_id !== userId ? nomeMembro(t.responsavel_user_id) : null;
+        return `<label class="campo" style="display:flex;gap:8px;align-items:center">
+          <input type="checkbox" name="cat" value="${t.id}" ${t.responsavel_user_id === userId ? "checked" : ""} />
+          <span style="margin:0">${esc(t.nome)}${outro ? ` <span class="cel-tenue" style="font-size:.72rem">(hoje: ${esc(outro)})</span>` : ""}</span>
+        </label>`;
+      }).join("")}`,
+    onConfirmar: async (form) => {
+      const marcados = new Set([...form.querySelectorAll('[name="cat"]:checked')].map((i) => i.value));
+      const alterar = tipos.filter((t) => (t.responsavel_user_id === userId) !== marcados.has(t.id));
+      for (const t of alterar) {
+        await salvar("tipos_ingresso", { id: t.id, responsavel_user_id: marcados.has(t.id) ? userId : null });
+      }
+      toast("Categorias atualizadas.", "ok");
+      renderCategoriasIngresso();
+    },
+  });
+}
+
 async function renderResponsaveis() {
   const arr = await listResponsaveis();
   const c = el("lista-responsaveis");
