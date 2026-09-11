@@ -11,8 +11,13 @@ body.site { background: var(--fundo); color: var(--texto); }
   background: color-mix(in srgb, var(--fundo) 88%, transparent);
   backdrop-filter: blur(8px); border-bottom: 1px solid var(--borda);
 }
-.site-marca { font-weight: 800; font-size: 1.1rem; letter-spacing: -.02em; color: var(--texto); text-decoration: none; }
-.site-marca b { color: var(--cor-laranja); }
+.site-marca-lockup { display: flex; flex-direction: column; gap: 2px; text-decoration: none; }
+.site-marca { font-weight: 800; font-size: 1.1rem; letter-spacing: -.02em; color: var(--texto); line-height: 1; }
+.site-marca b { background-image: var(--marca-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.site-tagline { font-size: .62rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--texto-tenue); }
+.site-marca-lockup-grande { align-items: center; margin: 4px 0 22px; }
+.site-marca-grande { font-size: clamp(1.8rem, 5vw, 2.6rem); }
+.site-tagline-grande { font-size: .82rem; letter-spacing: .16em; }
 .site-nav { display: flex; align-items: center; gap: 22px; }
 .site-nav a { color: var(--texto-suave); text-decoration: none; font-size: .9rem; font-weight: 500; }
 .site-nav a:hover { color: var(--texto); }

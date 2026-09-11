@@ -15,10 +15,12 @@ export const APP = {
   // usado no wordmark: a parte em <b> fica laranja
   marcaHtml: 'We<b>.events</b>',
   // crédito pequeno no rodapé
-  creditoHtml: 'desenvolvido por <b>@mirapontocom</b>',
+  creditoHtml: 'desenvolvido por <b>we.events</b>',
+  // assinatura da marca
+  tagline: "Eventos que conectam pessoas",
   // contato/suporte mostrado na página institucional
-  suporteEmail: "contato@mirapontocom.com.br",
-  suporteWhatsApp: "",  // ex.: "5511999998888" — vazio esconde o botão
+  suporteEmail: "mirapontocommkt@gmail.com",
+  suporteWhatsApp: "5511945736097",  // ex.: "5511999998888" — vazio esconde o botão
   termoAnfitriao: "Anfitrião",
   termoAnfitriaoPlural: "Anfitriões",
   termoConvidado: "Convidado",

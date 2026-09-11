@@ -16,7 +16,7 @@ body.publico {
   font-weight: 700; font-size: 1rem; letter-spacing: -.015em;
   color: #fff; margin-bottom: 30px;
 }
-.pub-marca b { color: var(--cor-laranja); }
+.pub-marca b { background-image: var(--marca-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
 
 .pub-credito { margin: 40px 0 0; font-size: .72rem; color: rgba(255, 255, 255, .38); text-align: center; }
 .pub-credito b { font-weight: 600; color: rgba(255, 255, 255, .62); }

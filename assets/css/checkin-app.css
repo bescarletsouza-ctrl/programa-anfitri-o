@@ -21,7 +21,7 @@ body.ck-app {
 /* ---- splash / código do evento ---- */
 .ck-abrir { align-items: center; justify-content: center; text-align: center; padding: 32px; gap: 6px; }
 .ck-abrir-marca { font-weight: 800; font-size: 1.1rem; letter-spacing: -.02em; margin-bottom: 18px; }
-.ck-abrir-marca b { color: var(--ck-laranja); }
+.ck-abrir-marca b { background-image: var(--marca-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .ck-abrir h1 { margin: 0; font-size: 1.7rem; letter-spacing: -.03em; }
 .ck-abrir p { margin: 4px 0 0; color: #a1a1aa; font-size: .9rem; max-width: 300px; }
 .ck-abrir form { margin-top: 22px; width: 100%; max-width: 340px; display: grid; gap: 12px; text-align: left; }

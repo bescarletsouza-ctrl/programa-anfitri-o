@@ -14,6 +14,9 @@
   --cor-preto:          #0f0f10;
   --cor-branco:         #ffffff;
 
+  /* Gradiente do logotipo We.events (wordmark "events" + ponto) */
+  --marca-grad: linear-gradient(90deg, #4338ca 0%, #9333ea 55%, #db2777 100%);
+
   /* Neutros — rampa por papel (bg sutil → borda → texto muted → texto forte) */
   --cinza-50:  #f6f6f5;
   --cinza-100: #f0f0ef;
@@ -156,7 +159,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
   font-weight: 700; font-size: .98rem; letter-spacing: -.015em;
   color: #fff; padding: 8px 6px 18px 10px;
 }
-.sidebar .marca b { color: var(--cor-laranja); }
+.sidebar .marca b { background-image: var(--marca-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .sidebar .marca-full { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; }
 .side-recolher {
   flex-shrink: 0; display: inline-flex; padding: 5px; cursor: pointer;
@@ -533,7 +536,7 @@ table.tabela tbody tr:last-child td { border-bottom: none; }
 /* ---- Tela de eventos ---- */
 .eventos-tela { max-width: 620px; margin: 0 auto; padding: 56px 20px 72px; }
 .marca-grande { font-weight: 700; font-size: 1.05rem; letter-spacing: -.015em; margin-bottom: 40px; }
-.marca-grande b { color: var(--cor-laranja); }
+.marca-grande b { background-image: var(--marca-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .eventos-titulo { font-size: 1.7rem; font-weight: 700; letter-spacing: -.025em; margin: 0 0 6px; }
 .eventos-sub { color: var(--texto-suave); margin: 0 0 24px; font-size: .92rem; line-height: 1.55; }
 .eventos-credito { margin: 44px 0 0; font-size: .72rem; color: var(--texto-tenue); }
@@ -927,7 +930,7 @@ table.tabela tbody tr:last-child td { border-bottom: none; }
   }
   .topbar-mobile .abrir-menu svg { width: 22px; height: 22px; }
   .topbar-mobile .marca { font-weight: 700; font-size: .95rem; letter-spacing: -.015em; }
-  .topbar-mobile .marca b { color: var(--cor-laranja); }
+  .topbar-mobile .marca b { background-image: var(--marca-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
 
   .conteudo { padding: 18px 16px 56px; }
   .funil-linha { grid-template-columns: 108px 1fr auto; gap: 10px; }

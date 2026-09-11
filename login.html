@@ -17,8 +17,9 @@
     border: 1px solid var(--borda); border-radius: var(--raio-lg);
     box-shadow: var(--sombra-md); padding: 30px 26px;
   }
-  .login-marca { font-weight: 800; font-size: 1.15rem; letter-spacing: -.02em; margin-bottom: 20px; }
-  .login-marca b { color: var(--cor-laranja); }
+  .login-marca { font-weight: 800; font-size: 1.15rem; letter-spacing: -.02em; margin-bottom: 4px; }
+  .login-marca b { background-image: var(--marca-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .login-tagline { font-size: .62rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--texto-tenue); margin: 0 0 20px; }
   .login-card h1 { font-size: 1.35rem; font-weight: 700; letter-spacing: -.02em; margin: 0 0 4px; }
   .login-card > p { color: var(--texto-suave); font-size: .88rem; margin: 0 0 20px; }
   .login-card .campo { margin-bottom: 12px; }
@@ -31,6 +32,7 @@
 <body>
   <div class="login-card">
     <div class="login-marca">We<b>.events</b></div>
+    <p class="login-tagline">Eventos que conectam pessoas</p>
 
     <form id="form-login" hidden>
       <h1 id="titulo">Entrar</h1>
