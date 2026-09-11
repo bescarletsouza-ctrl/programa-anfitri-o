@@ -16,6 +16,9 @@ export const APP = {
   marcaHtml: 'We<b>.events</b>',
   // crédito pequeno no rodapé
   creditoHtml: 'desenvolvido por <b>@mirapontocom</b>',
+  // contato/suporte mostrado na página institucional
+  suporteEmail: "contato@mirapontocom.com.br",
+  suporteWhatsApp: "",  // ex.: "5511999998888" — vazio esconde o botão
   termoAnfitriao: "Anfitrião",
   termoAnfitriaoPlural: "Anfitriões",
   termoConvidado: "Convidado",

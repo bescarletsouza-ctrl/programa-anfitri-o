@@ -2,17 +2,115 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8" />
-<title>We.events</title>
-<script>
-  try {
-    var k = "sb-xiuhqkvkiexmbgwyvunr-auth-token";
-    location.replace(localStorage.getItem(k) ? "admin/index.html" : "login.html");
-  } catch (e) {
-    location.replace("login.html");
-  }
-</script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<meta name="description" content="We.events — plataforma de gestão de eventos: inscrições, credenciamento, check-in por QR Code, programa de anfitriões, integrações e relatórios." />
+<script>try{var t=localStorage.getItem('tema')==='dark'?'dark':'light';document.documentElement.dataset.theme=t;document.documentElement.style.background=t==='dark'?'#0c0c0d':'#f7f7f6';}catch(e){}</script>
+<title>We.events — gestão de eventos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&display=swap" rel="stylesheet" />
+<link rel="icon" type="image/png" sizes="192x192" href="assets/img/app-icon-192.png" />
+<link rel="stylesheet" href="assets/css/theme.css" />
+<link rel="stylesheet" href="assets/css/site.css" />
 </head>
-<body>
-<p>Redirecionando… <a href="login.html">continuar</a></p>
+<body class="site">
+
+  <header class="site-topo">
+    <a class="site-marca" href="/">We<b>.events</b></a>
+    <nav class="site-nav">
+      <a href="#funcionalidades">Funcionalidades</a>
+      <a href="#para-quem">Para quem é</a>
+      <a href="#contato">Contato</a>
+      <a class="btn btn-primario btn-sm" href="/login.html">Entrar</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="site-hero">
+      <p class="site-eyebrow">Plataforma de gestão de eventos</p>
+      <h1>Do primeiro inscrito ao crachá na mão.</h1>
+      <p class="site-lead">
+        Inscrições, credenciamento, check-in pelo celular, programa de anfitriões,
+        integrações e relatórios — tudo num lugar só, por evento e por organização.
+      </p>
+      <div class="site-cta">
+        <a class="btn btn-primario" href="/login.html">Entrar na plataforma</a>
+        <a class="btn btn-secundario" href="#contato">Quero conhecer</a>
+      </div>
+    </section>
+
+    <section class="site-secao" id="o-que-e">
+      <h2>O que é a We.events</h2>
+      <p>
+        A <b>We.events</b> é o sistema que a equipe do evento usa nos bastidores:
+        recebe as inscrições, organiza os participantes num quadro visual, controla
+        quem entra no evento e em cada atividade, imprime crachás e mede tudo em
+        tempo real. Cada organização tem o seu espaço isolado, com os próprios
+        usuários, eventos e limites de plano.
+      </p>
+    </section>
+
+    <section class="site-secao" id="para-quem">
+      <h2>Para quem é</h2>
+      <div class="site-grid">
+        <div class="site-cartao"><h3>Produtores de eventos</h3><p>Imersões, summits, congressos, workshops e treinamentos presenciais.</p></div>
+        <div class="site-cartao"><h3>Equipes de credenciamento</h3><p>Quem precisa de fila rápida, controle de acesso por sessão e reimpressão de crachá.</p></div>
+        <div class="site-cartao"><h3>Programas de indicação</h3><p>Eventos que crescem por anfitriões que convidam e acompanham os próprios convidados.</p></div>
+        <div class="site-cartao"><h3>Agências e produtoras</h3><p>Quem gerencia vários eventos de vários clientes, cada um com seu acesso.</p></div>
+      </div>
+    </section>
+
+    <section class="site-secao" id="funcionalidades">
+      <h2>Funcionalidades</h2>
+      <div class="site-grid">
+        <div class="site-cartao"><h3>Inscrições e ingressos</h3><p>Tipos de ingresso com preço, vagas, lista de espera, situação padrão e termo de adesão.</p></div>
+        <div class="site-cartao"><h3>Pipeline de participantes</h3><p>Quadro kanban com etapas, filtros, arrastar e soltar e vínculo com a situação.</p></div>
+        <div class="site-cartao"><h3>Check-in e credenciamento</h3><p>Busca rápida, presença em tempo real e histórico de entrada/saída.</p></div>
+        <div class="site-cartao"><h3>App de check-in no celular</h3><p>Lê o QR Code do crachá com a câmera, credencia e imprime — com cara de aplicativo.</p></div>
+        <div class="site-cartao"><h3>Crachá personalizável</h3><p>Layout, tamanho, campos e QR Code definidos por evento.</p></div>
+        <div class="site-cartao"><h3>Atividades e sessões</h3><p>Controle de acesso por palestra: vagas, categorias liberadas e alertas.</p></div>
+        <div class="site-cartao"><h3>Programa de anfitriões</h3><p>Links de convite, funil de indicações, painel do anfitrião e marcos de jornada.</p></div>
+        <div class="site-cartao"><h3>Integrações e webhooks</h3><p>Zapier, ActiveCampaign, Z-API (WhatsApp), ticketeiras e gateways de pagamento.</p></div>
+        <div class="site-cartao"><h3>Relatórios e painéis</h3><p>Inscritos, presença, faturamento estimado e check-ins por dia e por hora.</p></div>
+        <div class="site-cartao"><h3>Multi-organização</h3><p>Cada cliente com seu espaço, seus usuários, nível de acesso e limite de eventos.</p></div>
+      </div>
+    </section>
+
+    <section class="site-secao site-marca-secao" id="marca">
+      <h2>Identidade</h2>
+      <p>
+        <b>We.events</b> — o ponto (<span style="color:var(--cor-laranja)">.</span>)
+        e o laranja são a marca. Uso do nome sempre como “We.events”, com o
+        <b>.events</b> em laranja quando o meio permitir.
+        Plataforma desenvolvida por <b>@mirapontocom</b>.
+      </p>
+    </section>
+
+    <section class="site-secao site-contato" id="contato">
+      <h2>Contato e suporte</h2>
+      <p>Dúvidas, demonstração ou suporte:</p>
+      <p class="site-contato-links" id="contato-links"></p>
+      <a class="btn btn-primario" href="/login.html">Já sou cliente — entrar</a>
+    </section>
+  </main>
+
+  <footer class="site-rodape">
+    <div class="site-marca">We<b>.events</b></div>
+    <nav>
+      <a href="/privacidade.html">Política de privacidade</a>
+      <a href="/termos.html">Termos de uso</a>
+      <a href="/login.html">Entrar</a>
+    </nav>
+    <p class="site-credito">desenvolvido por <b>@mirapontocom</b></p>
+  </footer>
+
+<script type="module">
+  import { APP } from "./assets/js/config.js";
+  const links = [];
+  if (APP.suporteEmail) links.push(`<a href="mailto:${APP.suporteEmail}">${APP.suporteEmail}</a>`);
+  if (APP.suporteWhatsApp) links.push(`<a href="https://wa.me/${APP.suporteWhatsApp}" target="_blank" rel="noopener">WhatsApp</a>`);
+  document.getElementById("contato-links").innerHTML = links.join(" &nbsp;·&nbsp; ") || "em breve";
+</script>
 </body>
 </html>

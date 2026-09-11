@@ -74,7 +74,10 @@ Crie um projeto **novo** na Vercel para este painel:
 1. [vercel.com/new](https://vercel.com/new) → importe o repositório `breenda_project`.
 2. Framework preset **Other** (site estático, sem build command).
 3. Em **Root Directory**, selecione `anfitriões`.
-4. Deploy. A raiz redireciona para `/admin/`.
+4. Deploy. Rotas: `/` = página institucional (`index.html`), `/login.html` = login,
+   `/admin/` = painel (exige login), `/checkin-app.html` = app de check-in,
+   `/convite.html` · `/painel.html` · `/status.html` = páginas públicas por link,
+   `/privacidade.html` · `/termos.html` = textos legais.
 
 ### 5. Migrações e Edge Functions
 

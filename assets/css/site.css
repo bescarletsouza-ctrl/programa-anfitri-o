@@ -1,0 +1,79 @@
+/* =============================================================================
+   Página institucional (index.html, privacidade.html, termos.html)
+   Usa os tokens do theme.css.
+   ========================================================================== */
+body.site { background: var(--fundo); color: var(--texto); }
+
+.site-topo {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; padding: 14px clamp(16px, 5vw, 48px);
+  background: color-mix(in srgb, var(--fundo) 88%, transparent);
+  backdrop-filter: blur(8px); border-bottom: 1px solid var(--borda);
+}
+.site-marca { font-weight: 800; font-size: 1.1rem; letter-spacing: -.02em; color: var(--texto); text-decoration: none; }
+.site-marca b { color: var(--cor-laranja); }
+.site-nav { display: flex; align-items: center; gap: 22px; }
+.site-nav a { color: var(--texto-suave); text-decoration: none; font-size: .9rem; font-weight: 500; }
+.site-nav a:hover { color: var(--texto); }
+.site-nav .btn { color: #fff; }
+@media (max-width: 640px) {
+  .site-nav a:not(.btn) { display: none; }
+}
+
+main { max-width: 960px; margin: 0 auto; padding: 0 clamp(16px, 5vw, 48px); }
+
+.site-hero { padding: clamp(56px, 12vw, 120px) 0 clamp(40px, 8vw, 72px); max-width: 720px; }
+.site-eyebrow {
+  text-transform: uppercase; letter-spacing: .12em; font-size: .74rem; font-weight: 700;
+  color: var(--cor-laranja-forte); margin: 0 0 16px;
+}
+.site-hero h1 {
+  font-size: clamp(2rem, 6vw, 3.4rem); line-height: 1.05; letter-spacing: -.03em;
+  font-weight: 800; margin: 0 0 20px; color: var(--texto);
+}
+.site-lead { font-size: clamp(1rem, 2.4vw, 1.2rem); color: var(--texto-suave); line-height: 1.6; margin: 0 0 28px; }
+.site-cta { display: flex; gap: 12px; flex-wrap: wrap; }
+.site-cta .btn { height: 46px; padding: 0 22px; font-size: .95rem; }
+
+.site-secao { padding: clamp(36px, 7vw, 64px) 0; border-top: 1px solid var(--borda); }
+.site-secao h2 {
+  font-size: clamp(1.4rem, 4vw, 2rem); letter-spacing: -.02em; font-weight: 750;
+  margin: 0 0 18px; color: var(--texto);
+}
+.site-secao > p { font-size: 1.02rem; line-height: 1.7; color: var(--texto-suave); max-width: 680px; }
+
+.site-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; margin-top: 8px; }
+.site-cartao {
+  border: 1px solid var(--borda); border-radius: var(--raio-lg); background: var(--superficie);
+  padding: 18px 20px;
+}
+.site-cartao h3 { margin: 0 0 6px; font-size: 1rem; letter-spacing: -.01em; }
+.site-cartao p { margin: 0; font-size: .88rem; color: var(--texto-suave); line-height: 1.55; }
+
+.site-contato .btn { margin-top: 18px; height: 44px; padding: 0 20px; color: #fff; }
+.site-contato-links { font-size: 1.05rem; }
+.site-contato-links a { color: var(--cor-laranja-forte); font-weight: 600; }
+
+.site-rodape {
+  border-top: 1px solid var(--borda); margin-top: 40px;
+  padding: 40px clamp(16px, 5vw, 48px);
+  display: grid; gap: 14px; place-items: center; text-align: center;
+}
+.site-rodape .site-marca { font-size: 1rem; }
+.site-rodape nav { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
+.site-rodape nav a { color: var(--texto-suave); text-decoration: none; font-size: .86rem; }
+.site-rodape nav a:hover { color: var(--texto); text-decoration: underline; }
+.site-credito { font-size: .74rem; color: var(--texto-tenue); margin: 0; }
+.site-credito b { color: var(--texto-suave); font-weight: 600; }
+
+/* ---- páginas de texto legal ---- */
+.site-legal { max-width: 760px; margin: 0 auto; padding: clamp(40px, 8vw, 72px) clamp(16px, 5vw, 48px) 64px; }
+.site-legal h1 { font-size: clamp(1.6rem, 5vw, 2.2rem); letter-spacing: -.02em; margin: 0 0 6px; }
+.site-legal .site-legal-data { color: var(--texto-tenue); font-size: .82rem; margin: 0 0 32px; }
+.site-legal h2 { font-size: 1.15rem; letter-spacing: -.01em; margin: 34px 0 10px; }
+.site-legal p, .site-legal li { color: var(--texto-suave); line-height: 1.7; font-size: .96rem; }
+.site-legal ul { padding-left: 20px; }
+.site-legal a { color: var(--cor-laranja-forte); font-weight: 600; }
+.site-legal .voltar { display: inline-block; margin-bottom: 28px; font-size: .88rem; color: var(--texto-suave); text-decoration: none; }
+.site-legal .voltar:hover { color: var(--texto); }
