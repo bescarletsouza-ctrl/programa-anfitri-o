@@ -53,7 +53,9 @@ const badgeStatus = (s) =>
       });
     };
 
-    renderJornada(confirmados, marcos);
+    // a jornada avança por convidado aprovado (não só "Confirmado" — esse
+    // status costuma vir bem depois, no dia do evento)
+    renderJornada(aprovados, marcos);
     renderConvites(convites, { enviados: convites.length, aprovados, confirmados });
     renderRanking(ranking, anfitriao.id);
 
@@ -84,8 +86,8 @@ function erro(msg) {
   if (msg) box.innerHTML = `<h2 style="margin:0 0 8px">Ops</h2><p style="margin:0">${esc(msg)}</p>`;
 }
 
-function renderJornada(confirmados, marcosTodos) {
-  el("n-confirmados").textContent = confirmados;
+function renderJornada(aprovados, marcosTodos) {
+  el("n-confirmados").textContent = aprovados;
   // o marco "prêmio final" não é mais uma bandeira no meio do caminho — ele
   // vira o próprio troféu no fim do tabuleiro/lista.
   const marcoFinal = marcosTodos.find((m) => m.meta_final) || null;
@@ -99,18 +101,18 @@ function renderJornada(confirmados, marcosTodos) {
     return;
   }
 
-  const conquistados = marcos.filter((m) => confirmados >= m.quantidade).length;
+  const conquistados = marcos.filter((m) => aprovados >= m.quantidade).length;
   const alvo = conquistados < marcos.length ? marcos[conquistados] : marcoFinal;
-  el("proximo-marco").textContent = alvo && confirmados < alvo.quantidade
-    ? `Faltam ${alvo.quantidade - confirmados} confirmados para desbloquear a próxima bandeira!`
+  el("proximo-marco").textContent = alvo && aprovados < alvo.quantidade
+    ? `Faltam ${alvo.quantidade - aprovados} convidados aprovados para desbloquear a próxima bandeira!`
     : "Você chegou à última bandeira! 🏆";
 
-  desenharTabuleiro(confirmados, marcos, conquistados, marcoFinal);
-  renderFases(confirmados, marcos, conquistados, marcoFinal);
+  desenharTabuleiro(aprovados, marcos, conquistados, marcoFinal);
+  renderFases(aprovados, marcos, conquistados, marcoFinal);
 }
 
 /* ---- Tabuleiro (jogo de tabuleiro) ------------------------------------- */
-function desenharTabuleiro(confirmados, marcos, conquistados, marcoFinal) {
+function desenharTabuleiro(aprovados, marcos, conquistados, marcoFinal) {
   // nós: início + 1 por marco (sem contar o prêmio final) + a meta no fim
   const N = marcos.length + 2;
   const W = 300;
@@ -133,13 +135,13 @@ function desenharTabuleiro(confirmados, marcos, conquistados, marcoFinal) {
   if (conquistados < marcos.length) {
     const baixo = conquistados === 0 ? 0 : marcos[conquistados - 1].quantidade;
     const alto = marcos[conquistados].quantidade;
-    const seg = alto > baixo ? Math.min(1, Math.max(0, (confirmados - baixo) / (alto - baixo))) : 0;
+    const seg = alto > baixo ? Math.min(1, Math.max(0, (aprovados - baixo) / (alto - baixo))) : 0;
     progresso = nodeFrac(conquistados) + seg * (nodeFrac(conquistados + 1) - nodeFrac(conquistados));
   } else if (marcoFinal) {
     // último trecho: do último marco normal até a meta final
     const baixo = marcos.length ? marcos[marcos.length - 1].quantidade : 0;
     const alto = marcoFinal.quantidade;
-    const seg = alto > baixo ? Math.min(1, Math.max(0, (confirmados - baixo) / (alto - baixo))) : 1;
+    const seg = alto > baixo ? Math.min(1, Math.max(0, (aprovados - baixo) / (alto - baixo))) : 1;
     progresso = nodeFrac(marcos.length) + seg * (nodeFrac(marcos.length + 1) - nodeFrac(marcos.length));
   } else {
     progresso = 1;
@@ -155,14 +157,14 @@ function desenharTabuleiro(confirmados, marcos, conquistados, marcoFinal) {
     } else if (i === N - 1) {
       // o troféu final É o prêmio final (quando configurado) — o nome só
       // aparece depois de conquistado, senão vira "Meta" genérico
-      const ok = marcoFinal ? confirmados >= marcoFinal.quantidade : conquistados >= marcos.length;
+      const ok = marcoFinal ? aprovados >= marcoFinal.quantidade : conquistados >= marcos.length;
       const rotulo = ok && marcoFinal ? esc(marcoFinal.titulo) : "Meta";
       nos.push(`<g class="no-meta ${ok ? "ok" : ""}"><circle cx="${cx}" cy="${cy}" r="18"/>
         <text x="${cx}" y="${cy + 6}" class="emoji">🏆</text></g>
         <text class="rot" x="${cx}" y="${cy + 38}">${rotulo}</text>`);
     } else {
       const m = marcos[i - 1];
-      const ok = confirmados >= m.quantidade;
+      const ok = aprovados >= m.quantidade;
       // sem destaque "atual" na bandeira em si — quem marca a posição do
       // anfitrião é só o peão (📍), senão parece que ele já chegou lá
       const cls = ok ? "ok" : "";
@@ -192,9 +194,9 @@ function desenharTabuleiro(confirmados, marcos, conquistados, marcoFinal) {
 }
 
 /* ---- Fases (cards abaixo do tabuleiro) --------------------------------- */
-function renderFases(confirmados, marcos, conquistados, marcoFinal) {
+function renderFases(aprovados, marcos, conquistados, marcoFinal) {
   const cards = marcos.map((m, idx) => {
-    const ok = confirmados >= m.quantidade;
+    const ok = aprovados >= m.quantidade;
     // "próxima" é só pra mostrar "faltam X" — visualmente ela fica igual às
     // outras bandeiras não alcançadas (cinza); só o marcador "você está aqui"
     // é destacado.
@@ -203,7 +205,7 @@ function renderFases(confirmados, marcos, conquistados, marcoFinal) {
     const selo = ok
       ? `<span class="fase-selo ok">Bandeira conquistada</span>`
       : proxima
-      ? `<span class="fase-selo bloq">🔒 Próxima meta · faltam ${m.quantidade - confirmados}</span>`
+      ? `<span class="fase-selo bloq">🔒 Próxima meta · faltam ${m.quantidade - aprovados}</span>`
       : `<span class="fase-selo bloq">🔒 Bloqueada</span>`;
     // o prêmio só é revelado (título + descrição) depois de conquistado —
     // antes disso é surpresa, mesmo na bandeira mais próxima
@@ -211,7 +213,7 @@ function renderFases(confirmados, marcos, conquistados, marcoFinal) {
     const corpo = ok
       ? `<p>${esc(m.descricao || "")}</p>`
       : proxima
-      ? `<p class="dim">Continue confirmando convidados para descobrir o prêmio!</p>`
+      ? `<p class="dim">Continue aprovando convidados para descobrir o prêmio!</p>`
       : `<p class="dim">Chegue à bandeira anterior para desbloquear.</p>`;
     return `<div class="fase ${estado}">
       <div class="fase-num">${m.quantidade}</div>
@@ -229,7 +231,7 @@ function renderFases(confirmados, marcos, conquistados, marcoFinal) {
     <div class="fase-num">📍</div>
     <div class="fase-txt">
       <div class="fase-topo"><h4>Você está aqui</h4></div>
-      <p>${confirmados} confirmado${confirmados === 1 ? "" : "s"} até agora.</p>
+      <p>${aprovados} convidado${aprovados === 1 ? "" : "s"} aprovado${aprovados === 1 ? "" : "s"} até agora.</p>
     </div>
   </div>`;
   cards.splice(conquistados, 0, posAtual);
@@ -237,16 +239,16 @@ function renderFases(confirmados, marcos, conquistados, marcoFinal) {
   // o prêmio final vira o card de encerramento (troféu), não mais uma
   // bandeira numerada no meio da lista
   if (marcoFinal) {
-    const ok = confirmados >= marcoFinal.quantidade;
+    const ok = aprovados >= marcoFinal.quantidade;
     const titulo = ok ? esc(marcoFinal.titulo) : "🔒 Prêmio final bloqueado";
     // esconde o NOME do prêmio até conquistar, mas o número da Meta (quantos
-    // confirmados faltam) sempre aparece — senão ninguém sabe a meta a bater
+    // aprovados faltam) sempre aparece — senão ninguém sabe a meta a bater
     const selo = ok
       ? `<span class="fase-selo ok">Meta conquistada</span>`
-      : `<span class="fase-selo bloq">🔒 Meta do evento · faltam ${marcoFinal.quantidade - confirmados}</span>`;
+      : `<span class="fase-selo bloq">🔒 Meta do evento · faltam ${marcoFinal.quantidade - aprovados}</span>`;
     const corpo = ok
       ? `<p>${esc(marcoFinal.descricao || "")}</p>`
-      : `<p class="dim">Alcance ${marcoFinal.quantidade} confirmados para descobrir o grande prêmio!</p>`;
+      : `<p class="dim">Alcance ${marcoFinal.quantidade} convidados aprovados para descobrir o grande prêmio!</p>`;
     cards.push(`<div class="fase ${ok ? "conquistada" : "bloqueada"}">
       <div class="fase-num">🏆</div>
       <div class="fase-txt">
