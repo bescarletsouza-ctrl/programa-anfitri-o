@@ -74,7 +74,7 @@ let pagina = 1;
 const selecionados = new Set();
 const FILTROS_VAZIO = {
   busca: "", campo: "", situacao: "", tipo: "", pagamento: "", dataDe: "", dataAte: "",
-  categoria: "", etapa: "", atividade: "", presAtv: "", presenca: "",
+  categoria: "", etapa: "", atividade: "", presAtv: "", presenca: "", responsavel: "",
 };
 const filtros = { ...FILTROS_VAZIO };
 
@@ -177,6 +177,9 @@ async function carregar() {
       atividades.map((a) => `<option value="${a.id}">${esc(a.nome)}</option>`).join("");
     el("f-categoria").innerHTML = `<option value="">Todas</option>` +
       categoriasIngresso().map((c) => `<option>${esc(c)}</option>`).join("");
+    el("f-responsavel").innerHTML = `<option value="">Todos</option>` +
+      `<option value="_nenhum_">— sem responsável —</option>` +
+      membrosOrg.map((m) => `<option value="${esc(m.user_id)}">${esc(m.nome || m.email)}</option>`).join("");
     el("carregando").hidden = true;
     el("conteudo-part").hidden = false;
     ligarEventos();
@@ -211,6 +214,7 @@ function ligarEventos() {
   el("f-campo").onchange = refiltra((e) => { filtros.campo = e.target.value; });
   el("f-situacao").onchange = refiltra((e) => { filtros.situacao = e.target.value; });
   el("f-tipo").onchange = refiltra((e) => { filtros.tipo = e.target.value; });
+  el("f-responsavel").onchange = refiltra((e) => { filtros.responsavel = e.target.value; });
   el("f-pagamento").onchange = refiltra((e) => { filtros.pagamento = e.target.value; });
   el("f-data-de").onchange = refiltra((e) => { filtros.dataDe = e.target.value; });
   el("f-data-ate").onchange = refiltra((e) => { filtros.dataAte = e.target.value; });
@@ -228,7 +232,7 @@ function ligarEventos() {
   };
   el("btn-limpar-filtros").onclick = () => {
     Object.assign(filtros, FILTROS_VAZIO);
-    ["f-busca", "f-campo", "f-situacao", "f-tipo", "f-pagamento", "f-data-de", "f-data-ate",
+    ["f-busca", "f-campo", "f-situacao", "f-tipo", "f-responsavel", "f-pagamento", "f-data-de", "f-data-ate",
      "f-categoria", "f-etapa", "f-atividade", "f-pres-atv", "f-presenca"].forEach((id) => (el(id).value = ""));
     pagina = 1;
     render();
@@ -276,7 +280,7 @@ function render() {
 }
 
 function filtrosAtivos() {
-  return ["busca", "campo", "situacao", "tipo", "pagamento", "dataDe", "dataAte",
+  return ["busca", "campo", "situacao", "tipo", "responsavel", "pagamento", "dataDe", "dataAte",
     "categoria", "etapa", "atividade", "presAtv", "presenca"].some((k) => filtros[k]);
 }
 
@@ -289,6 +293,8 @@ function filtrarLista(incluirDesativados = false) {
     if (!incluirDesativados && situacaoDe(p) === "Desativado" && filtros.situacao !== "Desativado") return false;
     if (filtros.situacao && situacaoDe(p) !== filtros.situacao) return false;
     if (filtros.tipo && p.tipo !== filtros.tipo) return false;
+    if (filtros.responsavel === "_nenhum_" && p.responsavel_user_id) return false;
+    if (filtros.responsavel && filtros.responsavel !== "_nenhum_" && p.responsavel_user_id !== filtros.responsavel) return false;
     if (filtros.pagamento && p.pagamento !== filtros.pagamento) return false;
     if (filtros.categoria && (p.ingresso || "").trim() !== filtros.categoria) return false;
     if (filtros.etapa && p.etapa_id !== filtros.etapa) return false;
@@ -853,13 +859,23 @@ function atualizarSelectEtapas() {
     etapas.map((e) => `<option value="${e.id}" ${e.id === filtros.etapa ? "selected" : ""}>${esc(e.nome)}</option>`).join("");
 }
 
+function iniciaisDe(nome) {
+  if (!nome) return "";
+  const partes = nome.trim().split(/\s+/);
+  return ((partes[0]?.[0] || "") + (partes.length > 1 ? partes[partes.length - 1][0] : "")).toUpperCase();
+}
+
 function cardPart(p) {
   const desativado = situacaoDe(p) === "Desativado";
+  const nomeResp = nomeMembro(p.responsavel_user_id);
   return `<div class="card-part ${desativado ? "card-desativado" : ""}" data-id="${p.id}" draggable="true">
     <div class="card-corpo">
       <div style="display:flex;justify-content:space-between;gap:8px;align-items:start">
         <strong style="font-size:.9rem">${esc(p.nome)}</strong>
-        <span class="badge ${badgeTipo(p.tipo)}" style="font-size:.65rem">${esc(p.tipo)}</span>
+        <span style="display:flex;gap:6px;align-items:center;flex-shrink:0">
+          <span class="badge ${badgeTipo(p.tipo)}" style="font-size:.65rem">${esc(p.tipo)}</span>
+          ${nomeResp ? `<span title="Responsável: ${esc(nomeResp)}" style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--cinza-100);color:var(--texto-suave);font-size:.62rem;font-weight:700;flex-shrink:0">${esc(iniciaisDe(nomeResp))}</span>` : ""}
+        </span>
       </div>
       ${p.faturamento ? `<div class="pagina-sub" style="margin:4px 0 0;font-size:.75rem">${esc(p.faturamento)}</div>` : ""}
       <div class="pagina-sub" style="margin:2px 0 0;font-size:.72rem">${esc(p.email || p.telefone || "")}</div>
