@@ -27,6 +27,11 @@
   .login-erro { color: var(--erro); font-size: .82rem; margin: 4px 0 0; }
   .login-alt { text-align: center; margin-top: 16px; font-size: .82rem; }
   .login-alt a { color: var(--cor-laranja-forte); font-weight: 600; cursor: pointer; }
+  .login-rodape { width: 100%; max-width: 360px; text-align: center; margin-top: 22px; }
+  .login-rodape p { font-size: .78rem; color: var(--texto-tenue); margin: 0 0 8px; line-height: 1.5; }
+  .login-rodape nav { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+  .login-rodape nav a { font-size: .78rem; color: var(--texto-suave); text-decoration: none; }
+  .login-rodape nav a:hover { color: var(--texto); text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -35,8 +40,8 @@
     <p class="login-tagline">Eventos que conectam pessoas</p>
 
     <form id="form-login" hidden>
-      <h1 id="titulo">Entrar</h1>
-      <p id="sub">Acesse o painel da sua organização.</p>
+      <h1 id="titulo">Login W.E Events</h1>
+      <p id="sub">Acesse sua conta W.E Events para gerenciar seus eventos.</p>
       <label class="campo"><span>E-mail</span>
         <input class="input" id="email" type="email" autocomplete="username" required /></label>
       <label class="campo" id="wrap-senha"><span>Senha</span>
@@ -46,6 +51,15 @@
     </form>
 
     <div id="carregando" class="vazio" style="padding:20px 0">Carregando…</div>
+  </div>
+
+  <div class="login-rodape">
+    <p>Este é o ambiente oficial de acesso à plataforma W.E Events.</p>
+    <nav>
+      <a href="/privacidade.html">Política de Privacidade</a>
+      <a href="/termos.html">Termos de Uso</a>
+      <a id="link-suporte" href="/index.html#contato">Suporte/Contato</a>
+    </nav>
   </div>
 <script type="module" src="assets/js/login.js"></script>
 </body>

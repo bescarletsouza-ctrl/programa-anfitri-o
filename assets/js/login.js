@@ -5,6 +5,7 @@
 // =============================================================================
 import { supabase } from "./supabase.js";
 import { plataformaStatus, bootstrapPlataforma } from "./supabase.js";
+import { APP } from "./config.js";
 
 const el = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -15,6 +16,7 @@ let modo = "login"; // "login" | "definir-senha" | "bootstrap"
 const erro = (msg) => { el("erro").hidden = !msg; el("erro").textContent = msg || ""; };
 
 el("form-login").addEventListener("submit", enviar);
+if (APP.suporteEmail) el("link-suporte").href = `mailto:${APP.suporteEmail}`;
 
 boot();
 
@@ -56,8 +58,8 @@ async function boot() {
 
 function mostrarLogin() {
   modo = "login";
-  el("titulo").textContent = "Entrar";
-  el("sub").textContent = "Acesse o painel da sua organização.";
+  el("titulo").textContent = "Login W.E Events";
+  el("sub").textContent = "Acesse sua conta W.E Events para gerenciar seus eventos.";
   el("btn").textContent = "Entrar";
   el("email").closest(".campo").hidden = false;
   el("email").disabled = false; el("email").required = true;
