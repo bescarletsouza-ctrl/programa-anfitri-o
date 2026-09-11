@@ -63,6 +63,13 @@ el("marca").innerHTML = APP.marcaHtml;
     el("hero").innerHTML = `
       <h1><b>${esc(anfitriao.nome)}</b> convidou você</h1>
       <p>${esc(config?.subtitulo_convite || "Preencha sua aplicação abaixo.")}</p>`;
+
+    if (config?.tema_convite === "nitro10x") {
+      document.body.classList.add("tema-nitro10x");
+      el("n10x-nome-anfitriao").textContent = anfitriao.nome;
+      el("nitro10x").hidden = false;
+    }
+
     el("carregando").hidden = true;
     el("cartao").hidden = false;
     renderPasso();
