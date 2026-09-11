@@ -105,10 +105,6 @@ body.publico {
 .tab-svg .no-inicio text { fill: #fff; font-size: 11px; }
 .tab-svg .no.ok circle { fill: var(--cor-laranja); stroke: var(--cor-laranja); }
 .tab-svg .no.ok text { fill: #fff; }
-.tab-svg .no.atual circle { fill: #fff; stroke: var(--cor-laranja); stroke-width: 4; }
-.tab-svg .no.atual text { fill: var(--cor-laranja-forte); }
-.tab-svg .no.atual { animation: pulso 1.6s ease-in-out infinite; transform-origin: center; }
-@keyframes pulso { 50% { opacity: .55; } }
 .tab-svg .no-meta circle { fill: var(--cinza-100); stroke: var(--cinza-300); }
 .tab-svg .no-meta.ok circle { fill: var(--cor-laranja-suave); stroke: var(--cor-laranja); }
 .tab-svg .emoji { font-size: 18px; }
@@ -116,8 +112,6 @@ body.publico {
 .tab-svg .mastro { stroke: var(--cinza-400); stroke-width: 2.5; stroke-linecap: round; }
 .tab-svg .no.ok .bandeira { fill: var(--cor-laranja); }
 .tab-svg .no.ok .mastro { stroke: var(--cor-laranja-forte); }
-.tab-svg .no.atual .bandeira { fill: var(--cor-laranja-forte); }
-.tab-svg .no.atual .mastro { stroke: var(--cor-laranja-forte); }
 .tab-svg .rot { text-anchor: middle; font-weight: 700; font-size: 10px; fill: var(--texto-suave); paint-order: stroke; stroke: #fff; stroke-width: 3px; stroke-linejoin: round; }
 .tab-svg .peao circle { fill: var(--cor-preto); stroke: #fff; stroke-width: 2; }
 .tab-svg .peao text { text-anchor: middle; font-size: 13px; }

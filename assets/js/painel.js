@@ -151,8 +151,9 @@ function desenharTabuleiro(confirmados, marcos, conquistados) {
     } else {
       const m = marcos[i - 1];
       const ok = confirmados >= m.quantidade;
-      const atual = !ok && i - 1 === conquistados;
-      const cls = ok ? "ok" : atual ? "atual" : "";
+      // sem destaque "atual" na bandeira em si — quem marca a posição do
+      // anfitrião é só o peão (📍), senão parece que ele já chegou lá
+      const cls = ok ? "ok" : "";
       // bandeira "plantada" no marco (mastro + galhardete)
       const bandeira = `<line class="mastro" x1="${cx}" y1="${cy - 4}" x2="${cx}" y2="${cy - 34}"/>
         <polygon class="bandeira" points="${cx},${cy - 34} ${cx + 22},${cy - 28} ${cx},${cy - 21}"/>`;
