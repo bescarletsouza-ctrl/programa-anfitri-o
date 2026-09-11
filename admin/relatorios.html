@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="color-scheme" content="light dark" />
 <script>try{var t=localStorage.getItem('tema')==='dark'?'dark':'light';document.documentElement.dataset.theme=t;document.documentElement.style.background=t==='dark'?'#0c0c0d':'#f7f7f6';}catch(e){}</script>
-<script>try{if(!localStorage.getItem("sb-xiuhqkvkiexmbgwyvunr-auth-token"))location.replace("/login.html?next="+encodeURIComponent(location.pathname+location.search));}catch(e){}</script>
+<script>try{if(!localStorage.getItem("sb-xiuhqkvkiexmbgwyvunr-auth-token")){try{sessionStorage.setItem("we_next",location.pathname+location.search);}catch(e){}location.replace("/login.html");}}catch(e){}</script>
 <title>Relatórios — We.events</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

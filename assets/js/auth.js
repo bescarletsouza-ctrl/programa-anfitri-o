@@ -15,8 +15,8 @@ export async function sessao() {
 }
 
 function irParaLogin() {
-  const next = encodeURIComponent(location.pathname + location.search);
-  location.replace("/login.html?next=" + next);
+  try { sessionStorage.setItem("we_next", location.pathname + location.search); } catch {}
+  location.replace("/login.html");
 }
 
 export async function exigirLogin() {

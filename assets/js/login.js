@@ -9,7 +9,16 @@ import { APP } from "./config.js";
 
 const el = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
-const NEXT = params.get("next") || "/admin/index.html";
+// destino pós-login: guardado no sessionStorage pelo gate (não na URL — uma
+// URL de login carregando outra URL como parâmetro tem cara de kit de phishing
+// e já disparou aviso de "site perigoso" no navegador dos usuários).
+const NEXT = (() => {
+  try {
+    const v = sessionStorage.getItem("we_next");
+    sessionStorage.removeItem("we_next");
+    return v || "/admin/index.html";
+  } catch { return "/admin/index.html"; }
+})();
 
 let modo = "login"; // "login" | "definir-senha" | "bootstrap"
 
