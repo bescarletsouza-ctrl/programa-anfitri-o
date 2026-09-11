@@ -116,15 +116,19 @@ export function renderSidebar(ativo, ctx) {
   if (!el) return;
   el.className = "sidebar" + (lerRecolhida() ? " recolhida" : "");
 
-  const clusters = ctx?.superAdmin
-    ? ["Geral", "Evento", "Anfitriões"]
-    : (CLUSTERS_POR_ACESSO[ctx?.acesso || "tudo"] || CLUSTERS_POR_ACESSO.tudo);
-  const nav = NAV.filter((b) => clusters.includes(b.grupo));
-
-  let rodape = NAV_RODAPE.filter((n) =>
-    n.chave !== "integracoes" || ctx?.superAdmin || (ctx?.acesso || "tudo") !== "anfitrioes");
-  if (ctx?.superAdmin) {
-    rodape = [{ chave: "plataforma", rotulo: "Plataforma", href: "plataforma.html", ico: "config" }, ...rodape];
+  // Super-admin: visão gerencial (sem as ferramentas de produtor).
+  const superAdmin = !!ctx?.superAdmin;
+  let nav, rodape;
+  if (superAdmin) {
+    nav = [{ grupo: "Gestão", itens: [{ chave: "geral", rotulo: "Visão geral", href: "geral.html", ico: "grafico" }] }];
+    rodape = [
+      { chave: "plataforma", rotulo: "Organizações", href: "plataforma.html", ico: "config" },
+    ];
+  } else {
+    const clusters = CLUSTERS_POR_ACESSO[ctx?.acesso || "tudo"] || CLUSTERS_POR_ACESSO.tudo;
+    nav = NAV.filter((b) => clusters.includes(b.grupo));
+    rodape = NAV_RODAPE.filter((n) =>
+      n.chave !== "integracoes" || (ctx?.acesso || "tudo") !== "anfitrioes");
   }
 
   el.innerHTML = `
@@ -132,11 +136,11 @@ export function renderSidebar(ativo, ctx) {
       <span class="marca-full">${APP.marcaHtml}</span>
       <button class="side-recolher" data-recolher type="button" aria-label="Recolher / expandir menu" title="Recolher / expandir menu">${icone("recolher")}</button>
     </div>
-    <div class="evento-box">
+    ${superAdmin ? "" : `<div class="evento-box">
       <select class="evento-sel" data-evento-sel aria-label="Evento">
         <option value="${esc(eventoId() || "")}">${esc(eventoNome() || "Selecionar evento")}</option>
       </select>
-    </div>
+    </div>`}
     <nav>
       ${nav.map((bloco) => `
         <div class="nav-bloco">

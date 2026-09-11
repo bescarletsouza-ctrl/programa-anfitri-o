@@ -740,6 +740,23 @@ table.tabela tbody tr:last-child td { border-bottom: none; }
 .atv-vagas .checkin-num { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
 .atv-cats { display: flex; flex-wrap: wrap; gap: 6px; }
 
+/* ---- Visão gerencial (super-admin): cards de organização ---- */
+.org-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.org-card {
+  border: 1px solid var(--borda); border-radius: var(--raio-lg); background: var(--superficie);
+  padding: 16px 18px; display: grid; gap: 8px;
+}
+.org-card-topo { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.org-card-topo strong { font-size: 1rem; letter-spacing: -.01em; }
+.org-card-meta { font-size: .76rem; color: var(--texto-tenue); }
+.org-card-linha { display: flex; justify-content: space-between; font-size: .84rem; }
+.org-card-linha b { font-variant-numeric: tabular-nums; }
+.org-card-barra { height: 6px; border-radius: 4px; background: var(--cinza-100); overflow: hidden; }
+.org-card-barra i { display: block; height: 100%; background: var(--cor-laranja); }
+.org-card-nums { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 10px; font-size: .78rem; color: var(--texto-suave); margin-top: 2px; }
+.org-card-nums b { color: var(--texto); font-variant-numeric: tabular-nums; }
+.org-card-rodape { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: .76rem; color: var(--texto-suave); border-top: 1px solid var(--cinza-100); padding-top: 8px; margin-top: 2px; }
+
 /* ---- Visão geral (compilado de todos os eventos) ---- */
 .geral-divisor {
   font-size: 1.2rem; font-weight: 700; letter-spacing: -.02em;

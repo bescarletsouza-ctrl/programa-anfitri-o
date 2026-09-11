@@ -121,21 +121,81 @@ Deno.serve(async (req) => {
 
     if (acao === "listar_orgs") {
       if (!ehAdminPlataforma) return json({ erro: "Sem permissão." }, 403);
-      const { data: orgs } = await sb.from("organizacoes").select("*").order("criado_em", { ascending: false });
-      const { data: membros } = await sb.from("org_membros").select("org_id, papel, email, nome, id");
-      const { data: evs } = await sb.from("eventos").select("org_id");
-      const nMembros = new Map<string, number>();
-      const nEventos = new Map<string, number>();
-      (membros || []).forEach((m) => nMembros.set(m.org_id, (nMembros.get(m.org_id) || 0) + 1));
-      (evs || []).forEach((e) => e.org_id && nEventos.set(e.org_id, (nEventos.get(e.org_id) || 0) + 1));
+      const [{ data: orgs }, { data: membros }, { data: evs }, { data: parts }, { data: cks }, { data: anfs }, { data: convs }] =
+        await Promise.all([
+          sb.from("organizacoes").select("*").order("criado_em", { ascending: false }),
+          sb.from("org_membros").select("org_id, papel, email, nome, id"),
+          sb.from("eventos").select("id, org_id"),
+          sb.from("participantes").select("evento_id, presente, situacao"),
+          sb.from("checkins").select("evento_id, acao"),
+          sb.from("anfitrioes").select("evento_id"),
+          sb.from("convidados").select("evento_id, status"),
+        ]);
+      const orgDoEvento = new Map<string, string>();
+      (evs || []).forEach((e) => e.org_id && orgDoEvento.set(e.id, e.org_id));
+      const zero = () => ({ eventos: 0, membros: 0, participantes: 0, presentes: 0, checkins: 0, anfitrioes: 0, convidados: 0 });
+      const agg = new Map<string, ReturnType<typeof zero>>();
+      const bump = (orgId: string | undefined, k: keyof ReturnType<typeof zero>, n = 1) => {
+        if (!orgId) return; if (!agg.has(orgId)) agg.set(orgId, zero());
+        (agg.get(orgId)![k] as number) += n;
+      };
+      (evs || []).forEach((e) => bump(e.org_id, "eventos"));
+      (membros || []).forEach((m) => bump(m.org_id, "membros"));
+      (parts || []).forEach((p) => { const o = orgDoEvento.get(p.evento_id); bump(o, "participantes"); if (p.presente) bump(o, "presentes"); });
+      (cks || []).forEach((c) => { if (c.acao === "entrada") bump(orgDoEvento.get(c.evento_id), "checkins"); });
+      (anfs || []).forEach((a) => bump(orgDoEvento.get(a.evento_id), "anfitrioes"));
+      (convs || []).forEach((c) => bump(orgDoEvento.get(c.evento_id), "convidados"));
       return json({
-        orgs: (orgs || []).map((o) => ({
-          ...o,
-          membros: nMembros.get(o.id) || 0,
-          eventos_usados: nEventos.get(o.id) || 0,
-          equipe: (membros || []).filter((m) => m.org_id === o.id),
-        })),
+        orgs: (orgs || []).map((o) => {
+          const a = agg.get(o.id) || zero();
+          return {
+            ...o,
+            membros: a.membros, eventos_usados: a.eventos,
+            participantes: a.participantes, presentes: a.presentes,
+            checkins: a.checkins, anfitrioes: a.anfitrioes, convidados: a.convidados,
+            equipe: (membros || []).filter((m) => m.org_id === o.id),
+          };
+        }),
       });
+    }
+
+    if (acao === "uso_eventos") {
+      if (!ehAdminPlataforma) return json({ erro: "Sem permissão." }, 403);
+      const [{ data: orgs }, { data: evs }, { data: parts }, { data: cks }] = await Promise.all([
+        sb.from("organizacoes").select("id, nome"),
+        sb.from("eventos").select("id, nome, data_evento, org_id, created_at"),
+        sb.from("participantes").select("evento_id, presente"),
+        sb.from("checkins").select("evento_id, acao"),
+      ]);
+      const nomeOrg = new Map((orgs || []).map((o) => [o.id, o.nome]));
+      const pPorEv = new Map<string, { t: number; p: number }>();
+      (parts || []).forEach((p) => {
+        const v = pPorEv.get(p.evento_id) || { t: 0, p: 0 };
+        v.t++; if (p.presente) v.p++; pPorEv.set(p.evento_id, v);
+      });
+      const ckPorEv = new Map<string, number>();
+      (cks || []).forEach((c) => { if (c.acao === "entrada") ckPorEv.set(c.evento_id, (ckPorEv.get(c.evento_id) || 0) + 1); });
+      return json({
+        eventos: (evs || []).map((e) => ({
+          org: nomeOrg.get(e.org_id) || "—",
+          nome: e.nome, data: e.data_evento || e.created_at?.slice(0, 10),
+          participantes: pPorEv.get(e.id)?.t || 0,
+          presentes: pPorEv.get(e.id)?.p || 0,
+          checkins: ckPorEv.get(e.id) || 0,
+        })).sort((a, b) => (b.data || "").localeCompare(a.data || "")),
+      });
+    }
+
+    if (acao === "reenviar_convite") {
+      if (!ehAdminPlataforma) return json({ erro: "Sem permissão." }, 403);
+      const { data: m } = await sb.from("org_membros").select("email")
+        .eq("org_id", body.org_id).eq("papel", "admin").order("criado_em").limit(1).maybeSingle();
+      const email = (body.email || m?.email || "").trim().toLowerCase();
+      if (!email) return json({ erro: "Organização sem responsável cadastrado." }, 400);
+      const c = await convidar(sb, email);
+      const { data: org } = await sb.from("organizacoes").select("nome").eq("id", body.org_id).maybeSingle();
+      const env = await mandarConvite(email, c.link, org?.nome);
+      return json({ ok: true, email, convite: env });
     }
 
     if (acao === "criar_org") {

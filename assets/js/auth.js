@@ -82,8 +82,13 @@ export function homeDoAcesso(ctx) {
 // true se a tela pode ser aberta; senão redireciona e devolve false
 export function guardAcesso(chave, ctx) {
   if (!ctx) { irParaLogin(); return false; }
-  if (ctx.superAdmin) return true;
   const cluster = CLUSTER_DA_CHAVE[chave] || "*";
+  if (ctx.superAdmin) {
+    // super-admin só vê a visão gerencial + as organizações
+    if (chave === "geral" || chave === "plataforma") return true;
+    location.replace("geral.html");
+    return false;
+  }
   if (cluster === "plataforma") { location.replace(homeDoAcesso(ctx)); return false; }
   if (cluster === "*") return true;
   if ((CLUSTERS_POR_ACESSO[ctx.acesso] || CLUSTERS_POR_ACESSO.tudo).includes(cluster)) return true;

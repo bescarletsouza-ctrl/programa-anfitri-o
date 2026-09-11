@@ -18,8 +18,8 @@
   <main class="conteudo">
     <div class="barra-topo">
       <div>
-        <h1 class="pagina-titulo">Visão geral</h1>
-        <p class="pagina-sub">Resumo compilado de todos os eventos cadastrados — participantes, presença, anfitriões e faturamento.</p>
+        <h1 class="pagina-titulo" id="painel-titulo">Visão geral</h1>
+        <p class="pagina-sub" id="painel-sub">Resumo compilado de todos os eventos cadastrados — participantes, presença, anfitriões e faturamento.</p>
       </div>
       <button class="btn btn-secundario" id="btn-atualizar">Atualizar</button>
     </div>
@@ -29,7 +29,21 @@
     <div id="painel" hidden>
       <div class="grid grid-4" id="kpis" style="margin-bottom:26px"></div>
 
-      <div class="rel-secao">
+      <!-- Visão gerencial (super-admin) -->
+      <div id="vista-gestao" hidden>
+        <div class="rel-secao">
+          <h2>Organizações</h2>
+          <div class="org-cards" id="gestao-orgs"></div>
+        </div>
+        <div class="rel-secao">
+          <h2>Uso por evento <span class="rel-secao-sub">(contagens — sem acesso aos dados dos participantes)</span></h2>
+          <div id="gestao-uso"></div>
+        </div>
+      </div>
+
+      <!-- Visão de produtor (organização) -->
+      <div id="vista-produtor">
+      <div class="rel-secao" id="sec-por-evento">
         <h2>Por evento</h2>
         <div class="tabela-wrap">
           <table class="tabela">
@@ -92,6 +106,7 @@
         <h2>Top anfitriões <span class="rel-secao-sub">(por convidados confirmados, todos os eventos)</span></h2>
         <div id="rel-top-anf"></div>
       </div>
+      </div><!-- /vista-produtor -->
     </div>
   </main>
 </div>

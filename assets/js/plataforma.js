@@ -4,7 +4,7 @@
 // usuários de cada organização. Tudo via a Edge Function "plataforma".
 // =============================================================================
 import { iniciarPagina, esc, formatarData, abrirModal, toast, confirmar, icone } from "./ui.js";
-import { listarOrgs, criarOrg, editarOrg, removerOrg, addMembroOrg, removerMembroOrg } from "./supabase.js";
+import { listarOrgs, criarOrg, editarOrg, removerOrg, addMembroOrg, removerMembroOrg, reenviarConvite } from "./supabase.js";
 
 const el = (id) => document.getElementById(id);
 let orgs = [];
@@ -60,6 +60,7 @@ function render() {
       <td>${o.expira_em ? esc(o.expira_em.split("-").reverse().join("/")) : "sem prazo"}</td>
       <td><span class="badge ${st.cls}">${st.txt}</span></td>
       <td><span class="linha-acoes">
+        <button class="btn btn-secundario btn-sm" data-convite title="Gerar link de acesso do responsável">Link</button>
         <button class="btn btn-secundario btn-sm" data-membros>Usuários</button>
         <button class="icone-btn" data-editar title="Editar">${icone("editar")}</button>
         <button class="icone-btn" data-excluir title="Excluir">${icone("excluir")}</button>
@@ -72,6 +73,14 @@ function render() {
     row.querySelector("[data-editar]").onclick = () => modalOrg(o);
     row.querySelector("[data-membros]").onclick = () => modalMembros(o);
     row.querySelector("[data-excluir]").onclick = () => modalExcluir(o);
+    row.querySelector("[data-convite]").onclick = async (e) => {
+      const b = e.currentTarget; b.disabled = true; b.textContent = "…";
+      try {
+        const r = await reenviarConvite(o.id);
+        mostrarLinkConvite(r.convite?.link, r.email, r.convite?.enviado);
+      } catch (err) { toast(err.message, "erro"); }
+      finally { b.disabled = false; b.textContent = "Link"; }
+    };
   });
 }
 
@@ -111,13 +120,10 @@ function modalOrg(o) {
       if (novo) {
         if (!dados.email) { toast("E-mail do responsável é obrigatório.", "erro"); return false; }
         const r = await criarOrg({ ...dados, responsavel_nome: f.responsavel_nome || null });
-        if (r.convite?.enviado) {
-          toast("Organização criada e convite enviado por e-mail.", "ok");
-        } else if (r.convite?.link) {
-          mostrarLinkConvite(r.convite.link, dados.email);
-        } else {
-          toast("Organização criada.", "ok");
-        }
+        toast("Organização criada.", "ok");
+        carregar();
+        mostrarLinkConvite(r.convite?.link, dados.email, r.convite?.enviado);
+        return;
       } else {
         await editarOrg(o.id, { ...dados, ativo: !!f.ativo });
         toast("Organização atualizada.", "ok");
@@ -127,14 +133,18 @@ function modalOrg(o) {
   });
 }
 
-function mostrarLinkConvite(link, email) {
+function mostrarLinkConvite(link, email, enviado) {
+  if (!link) { toast(enviado ? "Convite enviado por e-mail." : "Sem link disponível.", enviado ? "ok" : "erro"); return; }
   abrirModal({
-    titulo: "Convite gerado",
-    textoConfirmar: "Copiar e fechar",
+    titulo: "Link de acesso",
+    textoConfirmar: "Copiar",
     corpoHtml: `
-      <p class="pagina-sub" style="margin:0 0 10px">Ainda sem e-mail configurado. Envie este link para <b>${esc(email)}</b> definir a senha:</p>
-      <label class="campo"><span>Link de acesso</span>
-        <input class="input" id="lc" readonly value="${esc(link)}" onclick="this.select()" /></label>`,
+      <p class="pagina-sub" style="margin:0 0 10px">
+        ${enviado ? "Enviado por e-mail para " : "Envie para "}<b>${esc(email || "")}</b>.
+        Vale uma vez, para a pessoa definir a senha. Se expirar, é só gerar outro aqui.
+      </p>
+      <label class="campo"><span>Link</span>
+        <textarea class="input" id="lc" readonly rows="3" onclick="this.select()">${esc(link)}</textarea></label>`,
     aoMontar: (root) => { root.querySelector("#lc").select?.(); },
     onConfirmar: async () => {
       try { await navigator.clipboard.writeText(link); toast("Link copiado.", "ok"); } catch {}

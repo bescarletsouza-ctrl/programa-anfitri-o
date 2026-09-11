@@ -570,9 +570,11 @@ async function chamarPlataforma(body) {
 export const plataformaStatus = () => chamarPlataforma({ acao: "status" });
 export const bootstrapPlataforma = (email, senha) => chamarPlataforma({ acao: "bootstrap", email, senha });
 export const listarOrgs = () => chamarPlataforma({ acao: "listar_orgs" }).then((d) => d.orgs || []);
+export const usoEventos = () => chamarPlataforma({ acao: "uso_eventos" }).then((d) => d.eventos || []);
 export const criarOrg = (dados) => chamarPlataforma({ acao: "criar_org", ...dados });
 export const editarOrg = (id, patch) => chamarPlataforma({ acao: "editar_org", id, ...patch });
 export const removerOrg = (id) => chamarPlataforma({ acao: "remover_org", id });
+export const reenviarConvite = (orgId) => chamarPlataforma({ acao: "reenviar_convite", org_id: orgId });
 export const addMembroOrg = (orgId, dados) => chamarPlataforma({ acao: "add_membro", org_id: orgId, ...dados });
 export const removerMembroOrg = (membroId) => chamarPlataforma({ acao: "remover_membro", id: membroId });
 

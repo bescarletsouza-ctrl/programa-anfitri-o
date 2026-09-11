@@ -3,14 +3,17 @@
 // por evento (não usa iniciarPagina). Junta participantes, presença, check-ins,
 // faturamento e anfitriões de todo o histórico. Gráficos em CSS, sem lib.
 // =============================================================================
-import { iniciarPagina, esc, formatarData } from "./ui.js";
+import { iniciarPagina, esc, formatarData, abrirModal, toast } from "./ui.js";
 import {
   listEventos, listParticipantesTodos, listCheckinsTodos,
   listAnfitrioesTodos, listTiposIngressoTodos,
+  listarOrgs, usoEventos, reenviarConvite,
 } from "./supabase.js";
 
 const _iniciando = iniciarPagina("geral", { semEvento: true });
 const el = (id) => document.getElementById(id);
+
+let CTX = null;
 
 let eventos = [], parts = [], checks = [], anfs = [], tipos = [];
 
@@ -27,10 +30,11 @@ function parsePreco(txt) {
 }
 const brl = (n) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: n % 1 ? 2 : 0 });
 
-_iniciando.then((ctx) => { if (ctx) carregar(); });
+_iniciando.then((ctx) => { CTX = ctx; if (ctx) carregar(); });
 el("btn-atualizar").onclick = () => carregar();
 
 async function carregar() {
+  if (CTX?.superAdmin) return carregarGestao();
   try {
     [eventos, parts, checks, anfs, tipos] = await Promise.all([
       listEventos(),
@@ -48,6 +52,119 @@ async function carregar() {
       : "Erro ao carregar: " + esc(e.message);
   }
 }
+
+/* =============================================================================
+   VISÃO GERENCIAL (super-admin) — utilização por organização, sem PII
+   ========================================================================== */
+const hoje = () => new Date().toISOString().slice(0, 10);
+const brDate = (d) => (d ? d.split("-").reverse().join("/") : "sem prazo");
+
+function statusOrg(o) {
+  if (!o.ativo) return { txt: "Inativa", cls: "badge-erro" };
+  if (o.expira_em && o.expira_em < hoje()) return { txt: "Expirada", cls: "badge-erro" };
+  if (o.expira_em) {
+    const dias = Math.round((new Date(o.expira_em) - new Date(hoje())) / 86400000);
+    if (dias <= 15) return { txt: `${dias} dia(s)`, cls: "badge-alerta" };
+  }
+  return { txt: "Ativa", cls: "badge-ok" };
+}
+
+async function carregarGestao() {
+  el("painel-titulo").textContent = "Visão gerencial";
+  el("painel-sub").textContent = "Utilização de cada organização cliente. Sem acesso aos dados dos eventos.";
+  let orgs, usoEv;
+  try {
+    [orgs, usoEv] = await Promise.all([listarOrgs(), usoEventos().catch(() => [])]);
+  } catch (e) {
+    el("carregando").innerHTML = /deploy/.test(e.message)
+      ? "Faça o deploy da função <code>plataforma</code> para ver a visão gerencial."
+      : "Erro: " + esc(e.message);
+    return;
+  }
+  el("carregando").hidden = true;
+  el("painel").hidden = false;
+  el("vista-produtor").hidden = true;
+  el("vista-gestao").hidden = false;
+  el("btn-atualizar").hidden = false;
+
+  const soma = (k) => orgs.reduce((s, o) => s + (o[k] || 0), 0);
+  const kpi = (v, r) => `<div class="card"><div class="kpi"><span class="valor">${v}</span><span class="rotulo">${esc(r)}</span></div></div>`;
+  el("kpis").innerHTML =
+    kpi(orgs.length, "Organizações") +
+    kpi(orgs.filter((o) => o.ativo && (!o.expira_em || o.expira_em >= hoje())).length, "Ativas") +
+    kpi(soma("eventos_usados"), "Eventos") +
+    kpi(soma("participantes"), "Participantes") +
+    kpi(soma("checkins"), "Check-ins") +
+    kpi(soma("anfitrioes"), "Anfitriões");
+
+  // cards por organização
+  const cards = orgs.map((o) => {
+    const st = statusOrg(o);
+    const evPct = o.max_eventos ? Math.min(100, Math.round((o.eventos_usados / o.max_eventos) * 100)) : 0;
+    return `<div class="org-card" data-org="${esc(o.id)}">
+      <div class="org-card-topo">
+        <strong>${esc(o.nome)}</strong>
+        <span class="badge ${st.cls}">${st.txt}</span>
+      </div>
+      <div class="org-card-meta">${esc(o.ramo || "—")} · acesso: ${esc(ACESSOS[o.acesso] || o.acesso)}</div>
+      <div class="org-card-linha">
+        <span>Eventos</span>
+        <b>${o.eventos_usados}${o.max_eventos ? ` / ${o.max_eventos}` : ""}</b>
+      </div>
+      ${o.max_eventos ? `<div class="org-card-barra"><i style="width:${evPct}%"></i></div>` : ""}
+      <div class="org-card-nums">
+        <span><b>${o.participantes}</b> participantes</span>
+        <span><b>${o.presentes}</b> presentes</span>
+        <span><b>${o.checkins}</b> check-ins</span>
+        <span><b>${o.anfitrioes}</b> anfitriões</span>
+      </div>
+      <div class="org-card-rodape">
+        <span>Prazo: <b>${brDate(o.expira_em)}</b></span>
+        <span class="org-card-acoes">
+          <button class="btn btn-secundario btn-sm" data-convite>Link de acesso</button>
+        </span>
+      </div>
+    </div>`;
+  }).join("");
+  el("gestao-orgs").innerHTML = cards || `<p class="pagina-sub">Nenhuma organização cadastrada.</p>`;
+  el("gestao-orgs").querySelectorAll("[data-org]").forEach((c) => {
+    c.querySelector("[data-convite]").onclick = async (e) => {
+      e.stopPropagation();
+      const btn = e.currentTarget; btn.disabled = true; btn.textContent = "Gerando…";
+      try {
+        const r = await reenviarConvite(c.dataset.org);
+        modalLink(r.convite?.link, r.email, r.convite?.enviado);
+      } catch (err) { toast(err.message, "erro"); }
+      finally { btn.disabled = false; btn.textContent = "Link de acesso"; }
+    };
+  });
+
+  // uso por evento (contagens, sem nomes de participantes)
+  el("gestao-uso").innerHTML = usoEv.length
+    ? `<div class="tabela-wrap"><table class="tabela"><thead><tr>
+        <th>Organização</th><th>Evento</th><th>Data</th>
+        <th class="num">Inscritos</th><th class="num">Presentes</th><th class="num">Check-ins</th>
+      </tr></thead><tbody>${usoEv.map((e) => `<tr>
+        <td>${esc(e.org)}</td><td>${esc(e.nome)}</td>
+        <td>${e.data ? esc(brDate(e.data)) : "—"}</td>
+        <td class="num">${e.participantes}</td><td class="num">${e.presentes}</td><td class="num">${e.checkins}</td>
+      </tr>`).join("")}</tbody></table></div>`
+    : `<p class="pagina-sub" style="margin:0">Nenhum evento criado ainda.</p>`;
+}
+
+function modalLink(link, email, enviado) {
+  if (!link) { toast("Convite enviado por e-mail.", "ok"); return; }
+  abrirModal({
+    titulo: "Link de acesso",
+    textoConfirmar: "Copiar",
+    corpoHtml: `
+      <p class="pagina-sub" style="margin:0 0 10px">${enviado ? "Enviado por e-mail para " : "Envie para "}<b>${esc(email || "")}</b>. Vale uma vez, para definir a senha:</p>
+      <label class="campo"><span>Link</span>
+        <textarea class="input" id="lk" readonly rows="3" onclick="this.select()">${esc(link)}</textarea></label>`,
+    onConfirmar: async () => { try { await navigator.clipboard.writeText(link); toast("Copiado.", "ok"); } catch {} },
+  });
+}
+const ACESSOS = { tudo: "Tudo", eventos: "Só eventos", anfitrioes: "Só anfitriões" };
 
 const precoDaCategoria = (eventoId, nome) => {
   const alvo = (nome || "").trim().toLowerCase();
