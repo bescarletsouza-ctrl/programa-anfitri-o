@@ -10,7 +10,7 @@ import {
 } from "./ui.js";
 import {
   listParticipantes, listEtapasParticipante, listAtividades, listCheckins, listTiposIngresso, listGrupos,
-  salvar, remover, inserirLote, atualizarEmLote, removerEmLote, registrarCheckin,
+  salvar, remover, inserirLote, atualizarEmLote, removerEmLote, registrarCheckin, listarEquipe,
   sincParticipanteAnfitriao, desvincularAoExcluirParticipante, dispararIntegracoes,
 } from "./supabase.js";
 import { eventoNome } from "./evento.js";
@@ -35,18 +35,19 @@ const POR_PAGINA = 50;
 // Colunas opcionais da lista (Nome e ações são fixas). Ordem + visibilidade
 // ficam salvas no navegador.
 const COLUNAS = {
-  codigo:    "Código",
-  tipo:      "Tipo",
-  categoria: "Categoria",
-  situacao:  "Situação",
-  pagamento: "Pagamento",
-  empresa:   "Empresa",
-  telefone:  "Telefone",
-  etapa:     "Etapa",
-  presenca:  "Presença",
-  cadastro:  "Cadastro",
+  codigo:     "Código",
+  tipo:       "Tipo",
+  categoria:  "Categoria",
+  responsavel: "Responsável",
+  situacao:   "Situação",
+  pagamento:  "Pagamento",
+  empresa:    "Empresa",
+  telefone:   "Telefone",
+  etapa:      "Etapa",
+  presenca:   "Presença",
+  cadastro:   "Cadastro",
 };
-const COLUNAS_PADRAO = ["codigo", "tipo", "categoria", "situacao", "pagamento", "etapa", "presenca", "cadastro"];
+const COLUNAS_PADRAO = ["codigo", "tipo", "categoria", "responsavel", "situacao", "pagamento", "etapa", "presenca", "cadastro"];
 let colunas = [...COLUNAS_PADRAO];
 try {
   const s = JSON.parse(localStorage.getItem("part_colunas") || "null");
@@ -66,7 +67,8 @@ const normSituacao = (v) => {
   return SITUACOES.find((s) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "") === n) || null;
 };
 
-let participantes = [], etapas = [], atividades = [], checkins = [], tiposIngresso = [], grupos = [];
+let CTX = null;
+let participantes = [], etapas = [], atividades = [], checkins = [], tiposIngresso = [], grupos = [], membrosOrg = [];
 let vista = "lista";
 let pagina = 1;
 const selecionados = new Set();
@@ -121,6 +123,10 @@ function opcoesIngresso(atual) {
   return lista.map((c) => `<option ${c === (atual || "").trim() ? "selected" : ""}>${esc(c)}</option>`).join("");
 }
 const nomeEtapa = (id) => etapas.find((e) => e.id === id)?.nome || "—";
+const nomeMembro = (uid) => {
+  const m = membrosOrg.find((x) => x.user_id === uid);
+  return m ? (m.nome || m.email) : null;
+};
 const horaCurta = (iso) => {
   if (!iso) return "";
   try {
@@ -150,15 +156,16 @@ function responsavelAutomatico(tipoNome, ingressoNome) {
   return null;
 }
 
-_iniciando.then((ctx) => { if (ctx) carregar(ctx); });
+_iniciando.then((ctx) => { if (ctx) { CTX = ctx; carregar(ctx); } });
 
 async function carregar() {
   try {
-    [participantes, etapas, atividades, checkins, tiposIngresso, grupos] = await Promise.all([
+    [participantes, etapas, atividades, checkins, tiposIngresso, grupos, membrosOrg] = await Promise.all([
       listParticipantes(), listEtapasParticipante(),
       listAtividades().catch(() => []), listCheckins().catch(() => []),
       listTiposIngresso().catch(() => []),
       listGrupos().catch(() => []),
+      CTX?.org?.id ? listarEquipe(CTX.org.id).catch(() => []) : Promise.resolve([]),
     ]);
     TIPOS = grupos.length ? grupos.map((g) => g.nome) : [...TIPOS_PADRAO];
     opcoes(el("f-tipo"), TIPOS, "Todos os tipos");
@@ -364,6 +371,10 @@ function celulaHtml(p, c) {
       const cat = (p.ingresso || "").trim();
       return `<td class="celula-edit" data-campo="categoria" title="Alterar categoria">${cat ? `<span class="chip-cat">${esc(cat)}</span>` : `<span class="cel-tenue">—</span>`}${lapis()}</td>`;
     }
+    case "responsavel": {
+      const nome = nomeMembro(p.responsavel_user_id);
+      return `<td class="celula-edit" data-campo="responsavel" title="Alterar responsável">${nome ? esc(nome) : `<span class="cel-tenue">—</span>`}${lapis()}</td>`;
+    }
     case "situacao":
       return `<td class="celula-edit" data-campo="situacao" title="Alterar situação"><span class="badge ${badgeSituacao(situacaoDe(p))}">${esc(situacaoDe(p))}</span>${lapis()}</td>`;
     case "pagamento":
@@ -470,6 +481,9 @@ async function editarCelula(id, campo, td) {
   else if (campo === "categoria") {
     itens = [{ valor: "", rotulo: "— sem tipo —" }, ...categoriasIngresso().map((c) => ({ valor: c, rotulo: c }))];
     atualValor = (p.ingresso || "").trim();
+  } else if (campo === "responsavel") {
+    itens = [{ valor: "", rotulo: "— sem responsável —" }, ...membrosOrg.map((m) => ({ valor: m.user_id, rotulo: m.nome || m.email }))];
+    atualValor = p.responsavel_user_id || "";
   } else {
     itens = [{ valor: "", rotulo: "Sem etapa" }, ...etapas.map((e) => ({ valor: e.id, rotulo: e.nome }))];
     atualValor = p.etapa_id || "";
@@ -493,6 +507,9 @@ async function editarCelula(id, campo, td) {
       const salvo = await salvar("participantes", {
         id, ingresso: escolha || null, responsavel_user_id: responsavelAutomatico(p.tipo, escolha || null),
       });
+      Object.assign(p, salvo);
+    } else if (campo === "responsavel") {
+      const salvo = await salvar("participantes", { id, responsavel_user_id: escolha || null });
       Object.assign(p, salvo);
     } else {
       const salvo = await salvar("participantes", { id, [COL_DB[campo] || campo]: escolha || null });
@@ -861,6 +878,7 @@ function cardPart(p) {
 
 /* ---- Cadastrar / editar ---- */
 function abrirForm(p) {
+  const respPadrao = p ? (p.responsavel_user_id || "") : (responsavelAutomatico("Convidado", null) || "");
   abrirModal({
     titulo: p ? "Editar participante" : "Novo participante",
     textoConfirmar: p ? "Salvar" : "Cadastrar",
@@ -877,6 +895,10 @@ function abrirForm(p) {
           ${opcoesIngresso(p?.ingresso)}
         </select>
         ${tiposIngresso.length ? "" : `<span class="cel-tenue" style="font-size:.72rem">Cadastre os tipos em “Tipos de ingresso”.</span>`}</label>
+      <label class="campo"><span>Responsável</span>
+        <select class="select" name="responsavel_user_id"><option value="">—</option>
+          ${membrosOrg.map((m) => `<option value="${esc(m.user_id)}" ${m.user_id === respPadrao ? "selected" : ""}>${esc(m.nome || m.email)}</option>`).join("")}</select>
+        <span class="cel-tenue" style="font-size:.72rem">Preenchido sozinho pela Categoria ou pelo Tipo, se tiverem responsável.</span></label>
       <label class="campo"><span>Situação *</span>
         <select class="select" name="situacao">${SITUACOES.map((s) => `<option ${s === (p?.situacao || "Confirmado") ? "selected" : ""}>${s}</option>`).join("")}</select></label>
       <label class="campo"><span>Faturamento</span>
@@ -888,6 +910,17 @@ function abrirForm(p) {
       <label class="campo"><span>Etapa do pipeline</span>
         <select class="select" name="etapa_id"><option value="">Sem etapa</option>
           ${etapas.map((e) => `<option value="${e.id}" ${(p ? e.id === p.etapa_id : e.id === etapas[0]?.id) ? "selected" : ""}>${esc(e.nome)}</option>`).join("")}</select></label>`,
+    aoMontar: (root) => {
+      const selTipo = root.querySelector('[name="tipo"]');
+      const selIngresso = root.querySelector('[name="ingresso"]');
+      const selResp = root.querySelector('[name="responsavel_user_id"]');
+      const atualizarResp = () => {
+        const r = responsavelAutomatico(selTipo.value, selIngresso.value || null);
+        if (r) selResp.value = r;
+      };
+      selTipo.onchange = atualizarResp;
+      selIngresso.onchange = atualizarResp;
+    },
     onConfirmar: async (form) => {
       const f = Object.fromEntries(new FormData(form));
       const reg = {
@@ -896,7 +929,7 @@ function abrirForm(p) {
         tipo: f.tipo, ingresso: f.ingresso.trim() || null, faturamento: f.faturamento || null,
         situacao: f.situacao || "Confirmado",
         pagamento: f.pagamento, quantidade: Number(f.quantidade) || 1, etapa_id: f.etapa_id || null,
-        responsavel_user_id: responsavelAutomatico(f.tipo, f.ingresso.trim() || null),
+        responsavel_user_id: f.responsavel_user_id || null,
       };
       if (p) reg.id = p.id;
       const salvo = await salvar("participantes", reg);
@@ -973,6 +1006,11 @@ function abrirGavetaDetalhe(id) {
         ${etapas.map((e) => `<option value="${e.id}" ${e.id === p.etapa_id ? "selected" : ""}>${esc(e.nome)}</option>`).join("")}</select>
     </div>
     <div class="secao">
+      <h4>Responsável</h4>
+      <select class="select" id="g-resp"><option value="">—</option>
+        ${membrosOrg.map((m) => `<option value="${esc(m.user_id)}" ${m.user_id === p.responsavel_user_id ? "selected" : ""}>${esc(m.nome || m.email)}</option>`).join("")}</select>
+    </div>
+    <div class="secao">
       <h4>Observação</h4>
       <textarea class="input" id="g-obs" rows="3">${esc(p.observacao || "")}</textarea>
       <button class="btn btn-secundario" id="g-salvar-obs" style="margin-top:8px">Salvar observação</button>
@@ -1002,6 +1040,14 @@ function abrirGavetaDetalhe(id) {
       await salvar("participantes", { id: p.id, situacao: e.target.value });
       p.situacao = e.target.value;
       toast("Situação atualizada.", "ok");
+      await recarregar();
+    } catch (err) { toast(err.message, "erro"); }
+  };
+  g.querySelector("#g-resp").onchange = async (e) => {
+    try {
+      await salvar("participantes", { id: p.id, responsavel_user_id: e.target.value || null });
+      p.responsavel_user_id = e.target.value || null;
+      toast("Responsável atualizado.", "ok");
       await recarregar();
     } catch (err) { toast(err.message, "erro"); }
   };
@@ -1115,6 +1161,7 @@ function exportar(dados) {
     { chave: "tipo", rotulo: "Tipo" },
     { rotulo: "Situação", valor: (p) => situacaoDe(p) },
     { chave: "ingresso", rotulo: "Ingresso" },
+    { rotulo: "Responsável", valor: (p) => nomeMembro(p.responsavel_user_id) || "" },
     { chave: "faturamento", rotulo: "Faturamento" },
     { chave: "pagamento", rotulo: "Pagamento" },
     { chave: "quantidade", rotulo: "Quantidade" },
