@@ -54,6 +54,7 @@ async function carregar() {
         ["subtitulo_convite", "texto_confirmacao", "texto_em_analise", "texto_aprovado", "texto_recusado"]
           .forEach((k) => { if (form[k]) patch[k] = form[k].value.trim() || null; });
         const salvo = await salvarEvento(patch);
+        config = salvo;
         definirEvento(salvo.id, salvo.nome);
         toast("Configurações do evento salvas.", "ok");
       } catch (err) {
