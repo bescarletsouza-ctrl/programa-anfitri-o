@@ -6,7 +6,7 @@ import {
   abrirModal, abrirGaveta, fecharGaveta, toast, confirmar, icone,
 } from "./ui.js";
 import {
-  listEstagios, listGrupos, listAnfitrioes, listarEquipe,
+  listEstagios, listGrupos, listAnfitrioes, listarEquipe, listTiposIngresso,
   listConvidadosDoAnfitriao, salvar, remover, inserirLote, reSincCategoriaAnfitriao, reSincResponsavelAnfitriao,
   sincAnfitriaoParticipante, desvincularAoExcluirAnfitriao,
 } from "./supabase.js";
@@ -17,7 +17,7 @@ const _iniciando = iniciarPagina("anfitrioes");
 const el = (id) => document.getElementById(id);
 
 let CTX = null;
-let estagios = [], grupos = [], membrosOrg = [], lista = [];
+let estagios = [], grupos = [], membrosOrg = [], tiposIngresso = [], lista = [];
 let aba = "todos";
 const filtros = { busca: "", grupo: "", estagio: "", presenca: "" };
 
@@ -25,9 +25,10 @@ _iniciando.then((ctx) => { if (ctx) { CTX = ctx; carregar(ctx); } });
 
 async function carregar() {
   try {
-    [estagios, grupos, membrosOrg, lista] = await Promise.all([
+    [estagios, grupos, membrosOrg, tiposIngresso, lista] = await Promise.all([
       listEstagios(), listGrupos(),
       CTX?.org?.id ? listarEquipe(CTX.org.id).catch(() => []) : Promise.resolve([]),
+      listTiposIngresso().catch(() => []),
       listAnfitrioes(),
     ]);
     preencherSelect(el("f-grupo"), grupos, "Todos os tipos");
@@ -147,6 +148,10 @@ function modalNovo() {
       <label class="campo"><span>Tipo</span>
         <select class="select" name="grupo_id"><option value="">—</option>
           ${grupos.map((g) => `<option value="${g.id}">${esc(g.nome)}</option>`).join("")}</select></label>
+      <label class="campo"><span>Categoria de ingresso</span>
+        <select class="select" name="ingresso"><option value="">— sem categoria —</option>
+          ${tiposIngresso.map((t) => `<option>${esc(t.nome)}</option>`).join("")}</select>
+        <span class="cel-tenue" style="font-size:.72rem">A categoria dele mesmo — vai junto para Participantes.</span></label>
       <label class="campo"><span>Categoria liberada para os convidados dele</span>
         <input class="input" name="categoria_convidado" list="cats-anf" placeholder="Ex.: VIP, GOLD…" />
         <datalist id="cats-anf">${categoriasUsadas().map((c) => `<option value="${esc(c)}">`).join("")}</datalist></label>
@@ -166,7 +171,7 @@ function modalNovo() {
       const f = Object.fromEntries(new FormData(form));
       const novo = await salvar("anfitrioes", {
         tipo: f.tipo, nome: f.nome.trim(), email: f.email || null, telefone: f.telefone || null,
-        grupo_id: f.grupo_id || null, responsavel_user_id: f.responsavel_user_id || null,
+        grupo_id: f.grupo_id || null, ingresso: f.ingresso || null, responsavel_user_id: f.responsavel_user_id || null,
         categoria_convidado: f.categoria_convidado.trim() || null,
         estagio_id: estagios[0]?.id || null,
       });
@@ -181,15 +186,15 @@ function modalNovo() {
 
 /* ---- Importar lista ---- */
 const MODELO_LINHAS = [
-  ["nome", "email", "telefone", "tipo", "grupo"],
-  ["Maria Silva", "maria@exemplo.com", "11999990000", "Titular", "Turma 1"],
-  ["João Souza", "joao@exemplo.com", "11988887777", "Titular", "Turma 1"],
+  ["nome", "email", "telefone", "tipo", "grupo", "categoria"],
+  ["Maria Silva", "maria@exemplo.com", "11999990000", "Titular", "Turma 1", "VIP"],
+  ["João Souza", "joao@exemplo.com", "11988887777", "Titular", "Turma 1", ""],
 ];
 
 const ALIAS = {
   "nome completo": "nome", "e-mail": "email",
   whatsapp: "telefone", celular: "telefone", fone: "telefone",
-  turma: "grupo",
+  turma: "grupo", ingresso: "categoria", "categoria de ingresso": "categoria",
 };
 
 function modalImportar() {
@@ -199,10 +204,10 @@ function modalImportar() {
     corpoHtml: `
       <p class="pagina-sub" style="margin:0 0 10px">
         Cole uma tabela (do Excel/Sheets) ou selecione um arquivo Excel (.xlsx).
-        Colunas aceitas: <b>nome</b> (obrigatória), email, telefone, tipo, grupo.
-        Grupo (Tipo) é criado automaticamente se ainda não existir — e se esse
-        Tipo já tiver um responsável cadastrado em Configurações, ele é
-        atribuído ao anfitrião automaticamente.
+        Colunas aceitas: <b>nome</b> (obrigatória), email, telefone, tipo, grupo,
+        categoria. Grupo (Tipo) é criado automaticamente se ainda não existir —
+        e se esse Tipo já tiver um responsável cadastrado em Configurações, ele
+        é atribuído ao anfitrião automaticamente.
       </p>
       <button type="button" id="imp-modelo" style="font-size:.8rem;font-weight:600;color:var(--cor-laranja-forte);background:none;border:none;padding:0;cursor:pointer;text-decoration:underline">↓ baixar modelo</button>
       <label class="campo" style="margin-top:12px"><span>Colar tabela</span>
@@ -246,6 +251,7 @@ function modalImportar() {
           telefone: (l.telefone || "").trim() || null,
           tipo: TIPOS_ANFITRIAO.includes((l.tipo || "").trim()) ? l.tipo.trim() : "Titular",
           grupo_id: grupoId,
+          ingresso: (l.categoria || "").trim() || null,
           responsavel_user_id: grupoId ? mapaGrupoResp.get(grupoId) || null : null,
           estagio_id: estagios[0]?.id || null,
         };
@@ -277,6 +283,7 @@ async function exportar(dados) {
     { chave: "nome", rotulo: "Nome" },
     { chave: "tipo", rotulo: "Papel" },
     { rotulo: "Tipo", valor: (a) => nomeGrupo(a.grupo_id) || "" },
+    { chave: "ingresso", rotulo: "Categoria de ingresso" },
     { chave: "email", rotulo: "E-mail" },
     { chave: "telefone", rotulo: "Telefone" },
     { rotulo: "Responsável", valor: (a) => nomeMembro(a.responsavel_user_id) },
@@ -328,6 +335,9 @@ async function abrirGavetaDetalhe(id) {
       <label class="campo"><span>Tipo</span>
         <select class="select" id="d-grupo"><option value="">—</option>
           ${grupos.map((g) => `<option value="${g.id}" ${g.id === a.grupo_id ? "selected" : ""}>${esc(g.nome)}</option>`).join("")}</select></label>
+      <label class="campo"><span>Categoria de ingresso</span>
+        <select class="select" id="d-ingresso"><option value="">— sem categoria —</option>
+          ${tiposIngresso.map((t) => `<option ${t.nome === a.ingresso ? "selected" : ""}>${esc(t.nome)}</option>`).join("")}</select></label>
       <label class="campo"><span>Categoria liberada para os convidados dele</span>
         <input class="input" id="d-categoria-convidado" list="cats-anf" value="${esc(a.categoria_convidado || "")}" placeholder="Ex.: VIP, GOLD…" />
         <datalist id="cats-anf">${categoriasUsadas().map((c) => `<option value="${esc(c)}">`).join("")}</datalist></label>
@@ -383,6 +393,7 @@ async function abrirGavetaDetalhe(id) {
         telefone: g.querySelector("#d-telefone").value.trim() || null,
         responsavel_user_id: g.querySelector("#d-resp").value || null,
         grupo_id: g.querySelector("#d-grupo").value || null,
+        ingresso: g.querySelector("#d-ingresso").value || null,
         categoria_convidado: catConv,
         estagio_id: g.querySelector("#d-estagio").value || null,
         vai: g.querySelector("#d-vai").checked,

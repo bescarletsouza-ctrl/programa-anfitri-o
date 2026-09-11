@@ -282,7 +282,12 @@ export async function sincAnfitriaoParticipante(anfitriao) {
 
   if (vai) {
     if (vinc) {
-      if (vinc.tipo !== "Anfitrião") await salvar("participantes", { id: vinc.id, tipo: "Anfitrião" });
+      // categoria e responsável do anfitrião mandam no participante ligado
+      const patch = {};
+      if (vinc.tipo !== "Anfitrião") patch.tipo = "Anfitrião";
+      if ((vinc.ingresso || null) !== (a.ingresso || null)) patch.ingresso = a.ingresso || null;
+      if ((vinc.responsavel_user_id || null) !== (a.responsavel_user_id || null)) patch.responsavel_user_id = a.responsavel_user_id || null;
+      if (Object.keys(patch).length) await salvar("participantes", { id: vinc.id, ...patch });
       return vinc.id;
     }
     let alvo = null;
@@ -295,7 +300,10 @@ export async function sincAnfitriaoParticipante(anfitriao) {
       alvo = cand.find((p) => mesmoEmail(p.email, email)) || null;
     }
     if (alvo) {
-      await salvar("participantes", { id: alvo.id, tipo: "Anfitrião", anfitriao_id: a.id });
+      await salvar("participantes", {
+        id: alvo.id, tipo: "Anfitrião", anfitriao_id: a.id,
+        ingresso: a.ingresso || null, responsavel_user_id: a.responsavel_user_id || null,
+      });
       await salvar("anfitrioes", { id: a.id, participante_id: alvo.id });
       return alvo.id;
     }
@@ -303,6 +311,7 @@ export async function sincAnfitriaoParticipante(anfitriao) {
       evento_id: a.evento_id,
       nome: a.nome, email: a.email || null, telefone: a.telefone || null,
       tipo: "Anfitrião", pagamento: "Gratuito", anfitriao_id: a.id, origem_anfitriao: true,
+      ingresso: a.ingresso || null, responsavel_user_id: a.responsavel_user_id || null,
       etapa_id: await primeiraEtapaId(a.evento_id),
     });
     await salvar("anfitrioes", { id: a.id, participante_id: novo.id });
