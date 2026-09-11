@@ -65,6 +65,7 @@ async function carregar() {
       b.onclick = () => editarItem(b.dataset.add, null);
     });
     el("add-marco").onclick = () => editarMarco(null);
+    el("add-tipo").onclick = () => editarGrupo(null);
 
     el("carregando").hidden = true;
     el("conteudo").hidden = false;
@@ -107,8 +108,63 @@ function ligar(container, tabela, recarregar) {
 async function renderGrupos() {
   const arr = await listGrupos();
   const c = el("lista-grupos");
-  c.innerHTML = arr.length ? arr.map((x) => itemLinha("grupos", x)).join("") : vazio();
-  ligar(c, "grupos", renderGrupos);
+  let membros = [];
+  try { membros = CTX?.org?.id ? await listarEquipe(CTX.org.id) : []; } catch { membros = []; }
+  const nomeMembro = (uid) => {
+    const m = membros.find((x) => x.user_id === uid);
+    return m ? (m.nome || m.email) : null;
+  };
+  c.innerHTML = arr.length
+    ? arr.map((x) => itemLinha("grupos", x,
+        x.responsavel_user_id
+          ? ` <span class="pagina-sub" style="font-size:.72rem">· responsável: ${esc(nomeMembro(x.responsavel_user_id) || "—")}</span>`
+          : ""))
+        .join("")
+    : vazio();
+  ligarGrupos(c, membros);
+}
+
+function ligarGrupos(container, membros) {
+  container.querySelectorAll("[data-id]").forEach((row) => {
+    const g = { id: row.dataset.id };
+    row.querySelector("[data-editar]").onclick = async () => {
+      const atual = (await listGrupos()).find((x) => x.id === row.dataset.id);
+      editarGrupo(atual, membros);
+    };
+    row.querySelector("[data-excluir]").onclick = async () => {
+      if (!confirmar("Excluir este tipo?")) return;
+      try { await remover("grupos", row.dataset.id); toast("Tipo excluído.", "ok"); renderGrupos(); }
+      catch (e) { toast(e.message, "erro"); }
+    };
+  });
+}
+
+function editarGrupo(atual, membrosCarregados) {
+  const montar = async () => {
+    const membros = membrosCarregados || (CTX?.org?.id ? await listarEquipe(CTX.org.id).catch(() => []) : []);
+    abrirModal({
+      titulo: atual ? "Editar tipo" : "Novo tipo",
+      corpoHtml: `
+        <label class="campo"><span>Nome *</span>
+          <input class="input" name="nome" required value="${esc(atual?.nome || "")}" placeholder="Ex.: Membro, VIP, Turma A" /></label>
+        <label class="campo"><span>Responsável</span>
+          <select class="select" name="responsavel_user_id">
+            <option value="">— sem responsável —</option>
+            ${membros.map((m) => `<option value="${esc(m.user_id)}" ${m.user_id === atual?.responsavel_user_id ? "selected" : ""}>${esc(m.nome || m.email)}</option>`).join("")}
+          </select>
+          ${membros.length ? "" : `<span class="cel-tenue" style="font-size:.72rem">Nenhum usuário na organização ainda — cadastre em "Usuários da organização".</span>`}
+        </label>`,
+      onConfirmar: async (form) => {
+        const f = Object.fromEntries(new FormData(form));
+        const registro = { nome: f.nome.trim(), responsavel_user_id: f.responsavel_user_id || null };
+        if (atual) registro.id = atual.id;
+        await salvar("grupos", registro);
+        toast("Tipo salvo.", "ok");
+        renderGrupos();
+      },
+    });
+  };
+  montar();
 }
 async function renderResponsaveis() {
   const arr = await listResponsaveis();
@@ -379,13 +435,13 @@ function montarCtaMobile() {
   });
 }
 
-/* ---- editar / criar ---- */
+/* ---- editar / criar (responsaveis, estagios, etapas_participante — "grupos" tem editor próprio, editarGrupo) ---- */
 const RECARGA = {
-  grupos: renderGrupos, responsaveis: renderResponsaveis,
+  responsaveis: renderResponsaveis,
   estagios: renderEstagios, etapas_participante: renderEtapasPart,
 };
 const TITULO = {
-  grupos: "grupo", responsaveis: "responsável",
+  responsaveis: "responsável",
   estagios: "estágio", etapas_participante: "etapa",
 };
 const COM_ORDEM = ["estagios", "etapas_participante"];
@@ -395,7 +451,7 @@ async function editarItem(tabela, id, recarregar) {
   let atual = null;
   if (id) {
     const fn = {
-      grupos: listGrupos, responsaveis: listResponsaveis,
+      responsaveis: listResponsaveis,
       estagios: listEstagios, etapas_participante: listEtapasParticipante,
     }[tabela];
     atual = (await fn()).find((x) => x.id === id);

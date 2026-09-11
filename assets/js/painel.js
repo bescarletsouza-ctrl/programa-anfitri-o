@@ -33,7 +33,7 @@ const badgeStatus = (s) =>
     const grupoNome = anfitriao.grupo?.nome;
 
     el("titulo").textContent = `Olá, ${anfitriao.nome.split(" ")[0]}`;
-    el("subtitulo").textContent = grupoNome ? `Grupo ${grupoNome}` : "Seu painel de convites";
+    el("subtitulo").textContent = grupoNome ? `Tipo ${grupoNome}` : "Seu painel de convites";
 
     // link de convite
     const base = location.origin;

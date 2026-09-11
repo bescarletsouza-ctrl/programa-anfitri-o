@@ -9,7 +9,7 @@ import {
   fecharGaveta, toast, confirmar, icone, abrirMenu,
 } from "./ui.js";
 import {
-  listParticipantes, listEtapasParticipante, listAtividades, listCheckins, listTiposIngresso,
+  listParticipantes, listEtapasParticipante, listAtividades, listCheckins, listTiposIngresso, listGrupos,
   salvar, remover, inserirLote, atualizarEmLote, removerEmLote, registrarCheckin,
   sincParticipanteAnfitriao, desvincularAoExcluirParticipante, dispararIntegracoes,
 } from "./supabase.js";
@@ -21,7 +21,8 @@ import { abrirEnvioEmail } from "./email.js";
 const _iniciando = iniciarPagina("participantes");
 const el = (id) => document.getElementById(id);
 
-const TIPOS = ["Convidado", "Anfitrião", "Acompanhante", "Comprador", "Cliente", "Outro"];
+const TIPOS_PADRAO = ["Convidado", "Anfitrião", "Acompanhante", "Comprador", "Membro", "Outro"];
+let TIPOS = [...TIPOS_PADRAO];
 const PAGAMENTOS = ["Gratuito", "Pago", "Convidado", "Cancelado", "Reembolsado"];
 const SITUACOES = ["Confirmado", "Pendente", "Fila de espera", "Pré-inscrito", "Desativado"];
 const FAIXAS = [
@@ -65,7 +66,7 @@ const normSituacao = (v) => {
   return SITUACOES.find((s) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "") === n) || null;
 };
 
-let participantes = [], etapas = [], atividades = [], checkins = [], tiposIngresso = [];
+let participantes = [], etapas = [], atividades = [], checkins = [], tiposIngresso = [], grupos = [];
 let vista = "lista";
 let pagina = 1;
 const selecionados = new Set();
@@ -140,11 +141,13 @@ _iniciando.then((ctx) => { if (ctx) carregar(ctx); });
 
 async function carregar() {
   try {
-    [participantes, etapas, atividades, checkins, tiposIngresso] = await Promise.all([
+    [participantes, etapas, atividades, checkins, tiposIngresso, grupos] = await Promise.all([
       listParticipantes(), listEtapasParticipante(),
       listAtividades().catch(() => []), listCheckins().catch(() => []),
       listTiposIngresso().catch(() => []),
+      listGrupos().catch(() => []),
     ]);
+    TIPOS = grupos.length ? grupos.map((g) => g.nome) : [...TIPOS_PADRAO];
     opcoes(el("f-tipo"), TIPOS, "Todos os tipos");
     opcoes(el("f-pagamento"), PAGAMENTOS, "Todos os pagamentos");
     opcoes(el("f-situacao"), SITUACOES, "Todas (menos desativados)");
@@ -887,6 +890,8 @@ function abrirForm(p) {
 
 async function recarregar() {
   tiposIngresso = await listTiposIngresso().catch(() => tiposIngresso);
+  grupos = await listGrupos().catch(() => grupos);
+  TIPOS = grupos.length ? grupos.map((g) => g.nome) : [...TIPOS_PADRAO];
   participantes = await listParticipantes();
   render();
 }

@@ -27,7 +27,7 @@ async function carregar() {
     [estagios, grupos, responsaveis, lista] = await Promise.all([
       listEstagios(), listGrupos(), listResponsaveis(), listAnfitrioes(),
     ]);
-    preencherSelect(el("f-grupo"), grupos, "Todos os grupos");
+    preencherSelect(el("f-grupo"), grupos, "Todos os tipos");
     preencherSelect(el("f-estagio"), estagios, "Todos os estágios");
     el("carregando").hidden = true;
     render();
@@ -130,12 +130,12 @@ function modalNovo() {
     titulo: "Novo anfitrião",
     textoConfirmar: "Criar",
     corpoHtml: `
-      <label class="campo"><span>Tipo</span>
+      <label class="campo"><span>Papel</span>
         <select class="select" name="tipo">${TIPOS_ANFITRIAO.map((t) => `<option>${t}</option>`).join("")}</select></label>
       <label class="campo"><span>Nome completo *</span><input class="input" name="nome" required /></label>
       <label class="campo"><span>E-mail</span><input class="input" name="email" type="email" /></label>
       <label class="campo"><span>Telefone</span><input class="input" name="telefone" /></label>
-      <label class="campo"><span>Grupo</span>
+      <label class="campo"><span>Tipo</span>
         <select class="select" name="grupo_id"><option value="">—</option>
           ${grupos.map((g) => `<option value="${g.id}">${esc(g.nome)}</option>`).join("")}</select></label>
       <label class="campo"><span>Categoria liberada para os convidados dele</span>
@@ -251,7 +251,7 @@ function modalImportar() {
         "ok"
       );
       if (criouAux) [grupos, responsaveis] = await Promise.all([listGrupos(), listResponsaveis()]);
-      preencherSelect(el("f-grupo"), grupos, "Todos os grupos", filtros.grupo);
+      preencherSelect(el("f-grupo"), grupos, "Todos os tipos", filtros.grupo);
       lista = await listAnfitrioes();
       render();
     },
@@ -291,7 +291,7 @@ async function abrirGavetaDetalhe(id) {
       <label class="campo"><span>Responsável</span>
         <select class="select" id="d-resp"><option value="">—</option>
           ${responsaveis.map((r) => `<option value="${r.id}" ${r.id === a.responsavel_id ? "selected" : ""}>${esc(r.nome)}</option>`).join("")}</select></label>
-      <label class="campo"><span>Grupo</span>
+      <label class="campo"><span>Tipo</span>
         <select class="select" id="d-grupo"><option value="">—</option>
           ${grupos.map((g) => `<option value="${g.id}" ${g.id === a.grupo_id ? "selected" : ""}>${esc(g.nome)}</option>`).join("")}</select></label>
       <label class="campo"><span>Categoria liberada para os convidados dele</span>
