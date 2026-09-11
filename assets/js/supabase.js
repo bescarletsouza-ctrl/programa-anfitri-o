@@ -436,11 +436,22 @@ export async function registrarCheckin(participanteId, acao = "entrada", origem 
     });
   }
   if (atividadeId) return { id: participanteId };
-  return salvar("participantes", {
+  const atualizado = await salvar("participantes", {
     id: participanteId,
     presente: acao === "entrada",
     checkin_at: acao === "entrada" ? new Date().toISOString() : null,
   });
+  // participante que veio de um convidado (link do anfitrião): o check-in no
+  // evento confirma a inscrição dele lá (senão o convidado fica "Aprovado"
+  // pra sempre e o painel do anfitrião nunca mostra confirmados/conquistas
+  // que dependem de status "Confirmado")
+  if (atualizado.convidado_id) {
+    await salvar("convidados", {
+      id: atualizado.convidado_id,
+      status: acao === "entrada" ? "Confirmado" : "Aprovado",
+    }).catch(() => {});
+  }
+  return atualizado;
 }
 
 /* ---- Páginas públicas ----------------------------------------------- */
@@ -516,6 +527,15 @@ export async function remover(tabela, id) {
 export async function atualizarEmLote(tabela, ids, patch) {
   if (!ids?.length) return [];
   return ok(await supabase.from(tabela).update(patch).in("id", ids).select());
+}
+
+// Presença alterada em lote (Lista > Marcar presente/ausente): participantes
+// de origem "convidado" espelham em convidados.status, igual ao check-in
+// individual (registrarCheckin).
+export async function sincronizarStatusConvidados(participantesAtualizados, presente) {
+  const ids = (participantesAtualizados || []).filter((p) => p.convidado_id).map((p) => p.convidado_id);
+  if (!ids.length) return;
+  await supabase.from("convidados").update({ status: presente ? "Confirmado" : "Aprovado" }).in("id", ids);
 }
 
 export async function removerEmLote(tabela, ids) {
