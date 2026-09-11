@@ -185,14 +185,18 @@ function renderFases(confirmados, marcos, conquistados) {
         : atual
         ? `<span class="fase-selo atual">Você está aqui · faltam ${m.quantidade - confirmados}</span>`
         : `<span class="fase-selo bloq">🔒 Bloqueada</span>`;
-      const corpo =
-        ok || atual
-          ? `<p>${esc(m.descricao || "")}</p>`
-          : `<p class="dim">Chegue à bandeira anterior para desbloquear.</p>`;
+      // o prêmio só é revelado (título + descrição) depois de conquistado —
+      // antes disso é surpresa, mesmo na bandeira mais próxima ("atual")
+      const titulo = ok ? esc(m.titulo) : "🔒 Prêmio bloqueado";
+      const corpo = ok
+        ? `<p>${esc(m.descricao || "")}</p>`
+        : atual
+        ? `<p class="dim">Continue confirmando convidados para descobrir o prêmio!</p>`
+        : `<p class="dim">Chegue à bandeira anterior para desbloquear.</p>`;
       return `<div class="fase ${estado}">
         <div class="fase-num">${m.quantidade}</div>
         <div class="fase-txt">
-          <div class="fase-topo"><h4>${esc(m.titulo)}</h4>${selo}</div>
+          <div class="fase-topo"><h4>${titulo}</h4>${selo}</div>
           ${corpo}
         </div>
       </div>`;
