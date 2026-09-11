@@ -6,7 +6,7 @@ import {
   abrirModal, abrirGaveta, fecharGaveta, toast, confirmar, icone,
 } from "./ui.js";
 import {
-  listEstagios, listGrupos, listResponsaveis, listAnfitrioes,
+  listEstagios, listGrupos, listAnfitrioes, listarEquipe,
   listConvidadosDoAnfitriao, salvar, remover, inserirLote, reSincCategoriaAnfitriao,
   sincAnfitriaoParticipante, desvincularAoExcluirAnfitriao,
 } from "./supabase.js";
@@ -16,16 +16,19 @@ import { parsearTabela } from "./tabela.js";
 const _iniciando = iniciarPagina("anfitrioes");
 const el = (id) => document.getElementById(id);
 
-let estagios = [], grupos = [], responsaveis = [], lista = [];
+let CTX = null;
+let estagios = [], grupos = [], membrosOrg = [], lista = [];
 let aba = "todos";
 const filtros = { busca: "", grupo: "", estagio: "", presenca: "" };
 
-_iniciando.then((ctx) => { if (ctx) carregar(ctx); });
+_iniciando.then((ctx) => { if (ctx) { CTX = ctx; carregar(ctx); } });
 
 async function carregar() {
   try {
-    [estagios, grupos, responsaveis, lista] = await Promise.all([
-      listEstagios(), listGrupos(), listResponsaveis(), listAnfitrioes(),
+    [estagios, grupos, membrosOrg, lista] = await Promise.all([
+      listEstagios(), listGrupos(),
+      CTX?.org?.id ? listarEquipe(CTX.org.id).catch(() => []) : Promise.resolve([]),
+      listAnfitrioes(),
     ]);
     preencherSelect(el("f-grupo"), grupos, "Todos os tipos");
     preencherSelect(el("f-estagio"), estagios, "Todos os estágios");
@@ -82,7 +85,7 @@ function filtrar() {
 
 function nomeGrupo(id) { return grupos.find((g) => g.id === id)?.nome; }
 function nomeEstagio(id) { return estagios.find((s) => s.id === id)?.nome || "—"; }
-function nomeResp(id) { return responsaveis.find((r) => r.id === id)?.nome || "—"; }
+function respDoGrupo(grupoId) { return grupos.find((g) => g.id === grupoId)?.responsavel_user_id || null; }
 
 function render() {
   const filtrada = filtrar();
@@ -142,13 +145,22 @@ function modalNovo() {
         <input class="input" name="categoria_convidado" list="cats-anf" placeholder="Ex.: VIP, GOLD…" />
         <datalist id="cats-anf">${categoriasUsadas().map((c) => `<option value="${esc(c)}">`).join("")}</datalist></label>
       <label class="campo"><span>Responsável</span>
-        <select class="select" name="responsavel_id"><option value="">—</option>
-          ${responsaveis.map((r) => `<option value="${r.id}">${esc(r.nome)}</option>`).join("")}</select></label>`,
+        <select class="select" name="responsavel_user_id"><option value="">—</option>
+          ${membrosOrg.map((m) => `<option value="${esc(m.user_id)}">${esc(m.nome || m.email)}</option>`).join("")}</select>
+        <span class="cel-tenue" style="font-size:.72rem">Preenchido sozinho conforme o Tipo, se ele tiver um responsável.</span></label>`,
+    aoMontar: (root) => {
+      const selTipo = root.querySelector('[name="grupo_id"]');
+      const selResp = root.querySelector('[name="responsavel_user_id"]');
+      selTipo.onchange = () => {
+        const r = respDoGrupo(selTipo.value);
+        if (r) selResp.value = r;
+      };
+    },
     onConfirmar: async (form) => {
       const f = Object.fromEntries(new FormData(form));
       const novo = await salvar("anfitrioes", {
         tipo: f.tipo, nome: f.nome.trim(), email: f.email || null, telefone: f.telefone || null,
-        grupo_id: f.grupo_id || null, responsavel_id: f.responsavel_id || null,
+        grupo_id: f.grupo_id || null, responsavel_user_id: f.responsavel_user_id || null,
         categoria_convidado: f.categoria_convidado.trim() || null,
         estagio_id: estagios[0]?.id || null,
       });
@@ -163,15 +175,14 @@ function modalNovo() {
 
 /* ---- Importar lista ---- */
 const MODELO_CSV =
-  "nome,email,telefone,tipo,grupo,responsavel\n" +
-  "Maria Silva,maria@exemplo.com,11999990000,Titular,Turma 1,Ana\n" +
-  "João Souza,joao@exemplo.com,11988887777,Titular,Turma 1,Ana";
+  "nome,email,telefone,tipo,grupo\n" +
+  "Maria Silva,maria@exemplo.com,11999990000,Titular,Turma 1\n" +
+  "João Souza,joao@exemplo.com,11988887777,Titular,Turma 1";
 
 const ALIAS = {
   "nome completo": "nome", "e-mail": "email",
   whatsapp: "telefone", celular: "telefone", fone: "telefone",
   turma: "grupo",
-  "responsavel (cs)": "responsavel", cs: "responsavel",
 };
 
 function modalImportar() {
@@ -181,13 +192,15 @@ function modalImportar() {
     corpoHtml: `
       <p class="pagina-sub" style="margin:0 0 10px">
         Cole uma tabela (do Excel/Sheets) ou selecione um arquivo CSV. Colunas
-        aceitas: <b>nome</b> (obrigatória), email, telefone, tipo, grupo, responsavel.
-        Grupo e responsável são criados automaticamente se ainda não existirem.
+        aceitas: <b>nome</b> (obrigatória), email, telefone, tipo, grupo.
+        Grupo (Tipo) é criado automaticamente se ainda não existir — e se esse
+        Tipo já tiver um responsável cadastrado em Configurações, ele é
+        atribuído ao anfitrião automaticamente.
       </p>
       <a href="data:text/csv;charset=utf-8,${encodeURIComponent(MODELO_CSV)}" download="modelo-anfitrioes.csv"
          style="font-size:.8rem;font-weight:600;color:var(--cor-laranja-forte)">↓ baixar modelo CSV</a>
       <label class="campo" style="margin-top:12px"><span>Colar tabela</span>
-        <textarea class="input" name="texto" rows="7" placeholder="nome,email,telefone,tipo,grupo,responsavel&#10;Maria Silva,maria@exemplo.com,..."></textarea></label>
+        <textarea class="input" name="texto" rows="7" placeholder="nome,email,telefone,tipo,grupo&#10;Maria Silva,maria@exemplo.com,..."></textarea></label>
       <label class="campo"><span>…ou arquivo CSV</span>
         <input class="input" type="file" name="arquivo" accept=".csv,.txt,.tsv" /></label>
       <div class="pagina-sub" id="imp-status" style="margin:0"></div>`,
@@ -211,33 +224,32 @@ function modalImportar() {
         return false;
       }
 
-      // resolve/cria grupos e responsáveis por nome
+      // resolve/cria grupos (Tipo) por nome; responsável vem do Tipo, sozinho
       const mapaGrupo = new Map(grupos.map((g) => [g.nome.toLowerCase(), g.id]));
-      const mapaResp = new Map(responsaveis.map((r) => [r.nome.toLowerCase(), r.id]));
+      const mapaGrupoResp = new Map(grupos.map((g) => [g.id, g.responsavel_user_id || null]));
       let criouAux = false;
 
       for (const l of validas) {
         if (l.grupo && !mapaGrupo.has(l.grupo.toLowerCase())) {
           const g = await salvar("grupos", { nome: l.grupo.trim() });
           mapaGrupo.set(g.nome.toLowerCase(), g.id);
-          criouAux = true;
-        }
-        if (l.responsavel && !mapaResp.has(l.responsavel.toLowerCase())) {
-          const r = await salvar("responsaveis", { nome: l.responsavel.trim() });
-          mapaResp.set(r.nome.toLowerCase(), r.id);
+          mapaGrupoResp.set(g.id, g.responsavel_user_id || null);
           criouAux = true;
         }
       }
 
-      const registros = validas.map((l) => ({
-        nome: l.nome.trim(),
-        email: (l.email || "").trim() || null,
-        telefone: (l.telefone || "").trim() || null,
-        tipo: TIPOS_ANFITRIAO.includes((l.tipo || "").trim()) ? l.tipo.trim() : "Titular",
-        grupo_id: l.grupo ? mapaGrupo.get(l.grupo.toLowerCase()) || null : null,
-        responsavel_id: l.responsavel ? mapaResp.get(l.responsavel.toLowerCase()) || null : null,
-        estagio_id: estagios[0]?.id || null,
-      }));
+      const registros = validas.map((l) => {
+        const grupoId = l.grupo ? mapaGrupo.get(l.grupo.toLowerCase()) || null : null;
+        return {
+          nome: l.nome.trim(),
+          email: (l.email || "").trim() || null,
+          telefone: (l.telefone || "").trim() || null,
+          tipo: TIPOS_ANFITRIAO.includes((l.tipo || "").trim()) ? l.tipo.trim() : "Titular",
+          grupo_id: grupoId,
+          responsavel_user_id: grupoId ? mapaGrupoResp.get(grupoId) || null : null,
+          estagio_id: estagios[0]?.id || null,
+        };
+      });
 
       const criados = await inserirLote("anfitrioes", registros);
       // anfitrião que "vai ao evento" (padrão) também entra em Participantes
@@ -250,7 +262,7 @@ function modalImportar() {
           (ignoradas ? ` ${ignoradas} linha(s) sem nome ignorada(s).` : ""),
         "ok"
       );
-      if (criouAux) [grupos, responsaveis] = await Promise.all([listGrupos(), listResponsaveis()]);
+      if (criouAux) grupos = await listGrupos();
       preencherSelect(el("f-grupo"), grupos, "Todos os tipos", filtros.grupo);
       lista = await listAnfitrioes();
       render();
@@ -290,7 +302,7 @@ async function abrirGavetaDetalhe(id) {
       <h4>Gestão</h4>
       <label class="campo"><span>Responsável</span>
         <select class="select" id="d-resp"><option value="">—</option>
-          ${responsaveis.map((r) => `<option value="${r.id}" ${r.id === a.responsavel_id ? "selected" : ""}>${esc(r.nome)}</option>`).join("")}</select></label>
+          ${membrosOrg.map((m) => `<option value="${esc(m.user_id)}" ${m.user_id === a.responsavel_user_id ? "selected" : ""}>${esc(m.nome || m.email)}</option>`).join("")}</select></label>
       <label class="campo"><span>Tipo</span>
         <select class="select" id="d-grupo"><option value="">—</option>
           ${grupos.map((g) => `<option value="${g.id}" ${g.id === a.grupo_id ? "selected" : ""}>${esc(g.nome)}</option>`).join("")}</select></label>
@@ -336,6 +348,10 @@ async function abrirGavetaDetalhe(id) {
   );
 
   const g = document.getElementById("gaveta");
+  g.querySelector("#d-grupo").onchange = (e) => {
+    const r = respDoGrupo(e.target.value);
+    if (r) g.querySelector("#d-resp").value = r;
+  };
   g.querySelector("#d-salvar").onclick = async () => {
     try {
       const catConv = g.querySelector("#d-categoria-convidado").value.trim() || null;
@@ -343,7 +359,7 @@ async function abrirGavetaDetalhe(id) {
         id: a.id,
         email: g.querySelector("#d-email").value.trim() || null,
         telefone: g.querySelector("#d-telefone").value.trim() || null,
-        responsavel_id: g.querySelector("#d-resp").value || null,
+        responsavel_user_id: g.querySelector("#d-resp").value || null,
         grupo_id: g.querySelector("#d-grupo").value || null,
         categoria_convidado: catConv,
         estagio_id: g.querySelector("#d-estagio").value || null,

@@ -137,6 +137,19 @@ const normPag = (v) => {
   return PAGAMENTOS.find((p) => p.toLowerCase() === n) || null;
 };
 
+// Responsável automático: prioriza o da Categoria de ingresso; na falta, o do Tipo.
+function responsavelAutomatico(tipoNome, ingressoNome) {
+  if (ingressoNome) {
+    const t = tiposIngresso.find((x) => (x.nome || "").trim().toLowerCase() === ingressoNome.trim().toLowerCase());
+    if (t?.responsavel_user_id) return t.responsavel_user_id;
+  }
+  if (tipoNome) {
+    const g = grupos.find((x) => (x.nome || "").trim().toLowerCase() === tipoNome.trim().toLowerCase());
+    if (g?.responsavel_user_id) return g.responsavel_user_id;
+  }
+  return null;
+}
+
 _iniciando.then((ctx) => { if (ctx) carregar(ctx); });
 
 async function carregar() {
@@ -470,10 +483,17 @@ async function editarCelula(id, campo, td) {
       const salvo = await salvar("participantes", { id, etapa_id: escolha || null });
       Object.assign(p, salvo);
     } else if (campo === "tipo") {
-      const salvo = await salvar("participantes", { id, tipo: escolha });
+      const salvo = await salvar("participantes", {
+        id, tipo: escolha, responsavel_user_id: responsavelAutomatico(escolha, p.ingresso),
+      });
       Object.assign(p, salvo);
       await sincParticipanteAnfitriao(p).catch((e) => console.warn(e));
       participantes = await listParticipantes();
+    } else if (campo === "categoria") {
+      const salvo = await salvar("participantes", {
+        id, ingresso: escolha || null, responsavel_user_id: responsavelAutomatico(p.tipo, escolha || null),
+      });
+      Object.assign(p, salvo);
     } else {
       const salvo = await salvar("participantes", { id, [COL_DB[campo] || campo]: escolha || null });
       Object.assign(p, salvo);
@@ -557,10 +577,12 @@ async function acaoEmMassa(acao) {
     } else if (acao === "pagamento" || acao === "situacao") {
       await atualizarEmLote("participantes", ids, { [acao]: escolha });
     } else {
-      // tipo: pode virar Anfitrião → precisa criar/limpar vínculo por linha
+      // tipo: pode virar Anfitrião → precisa criar/limpar vínculo por linha; e o
+      // responsável (que depende da categoria/ingresso de cada um) é recalculado por linha
       await atualizarEmLote("participantes", ids, { tipo: escolha });
       participantes = await listParticipantes();
       for (const p of participantes.filter((x) => selecionados.has(x.id))) {
+        await salvar("participantes", { id: p.id, responsavel_user_id: responsavelAutomatico(escolha, p.ingresso) }).catch((e) => console.warn(e));
         await sincParticipanteAnfitriao(p).catch((e) => console.warn(e));
       }
     }
@@ -874,6 +896,7 @@ function abrirForm(p) {
         tipo: f.tipo, ingresso: f.ingresso.trim() || null, faturamento: f.faturamento || null,
         situacao: f.situacao || "Confirmado",
         pagamento: f.pagamento, quantidade: Number(f.quantidade) || 1, etapa_id: f.etapa_id || null,
+        responsavel_user_id: responsavelAutomatico(f.tipo, f.ingresso.trim() || null),
       };
       if (p) reg.id = p.id;
       const salvo = await salvar("participantes", reg);
@@ -1051,19 +1074,23 @@ function modalImportar() {
       const validas = linhas.filter((l) => (l.nome || "").trim());
       if (!validas.length) { toast("Nenhuma linha com nome.", "erro"); return false; }
 
-      const registros = validas.map((l) => ({
-        nome: l.nome.trim(),
-        email: (l.email || "").trim() || null,
-        telefone: (l.telefone || "").trim() || null,
-        empresa: (l.empresa || "").trim() || null,
-        tipo: normTipo(l.tipo) || "Convidado",
-        ingresso: (l.ingresso || "").trim() || null,
-        faturamento: (l.faturamento || "").trim() || null,
-        situacao: normSituacao(l.situacao) || "Confirmado",
-        pagamento: normPag(l.pagamento) || "Gratuito",
-        quantidade: Number(l.quantidade) || 1,
-        etapa_id: etapas[0]?.id || null,
-      }));
+      const registros = validas.map((l) => {
+        const tipo = normTipo(l.tipo) || "Convidado";
+        const ingresso = (l.ingresso || "").trim() || null;
+        return {
+          nome: l.nome.trim(),
+          email: (l.email || "").trim() || null,
+          telefone: (l.telefone || "").trim() || null,
+          empresa: (l.empresa || "").trim() || null,
+          tipo, ingresso,
+          faturamento: (l.faturamento || "").trim() || null,
+          situacao: normSituacao(l.situacao) || "Confirmado",
+          pagamento: normPag(l.pagamento) || "Gratuito",
+          quantidade: Number(l.quantidade) || 1,
+          etapa_id: etapas[0]?.id || null,
+          responsavel_user_id: responsavelAutomatico(tipo, ingresso),
+        };
+      });
       const criados = await inserirLote("participantes", registros);
       // quem entrou como Anfitrião também vai para a aba Anfitriões (casa por e-mail)
       for (const novo of criados.filter((p) => p.tipo === "Anfitrião")) {

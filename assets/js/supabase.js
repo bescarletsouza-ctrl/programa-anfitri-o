@@ -80,9 +80,6 @@ export const listTiposIngressoTodos = () =>
 export const listGrupos = (eid) =>
   supabase.from("grupos").select("*").eq("evento_id", ev(eid)).order("nome").then(ok);
 
-export const listResponsaveis = (eid) =>
-  supabase.from("responsaveis").select("*").eq("evento_id", ev(eid)).order("nome").then(ok);
-
 export const listEstagios = (eid) =>
   supabase.from("estagios").select("*").eq("evento_id", ev(eid)).order("ordem").then(ok);
 

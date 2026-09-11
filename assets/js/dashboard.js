@@ -3,7 +3,7 @@
 // =============================================================================
 import { iniciarPagina, dataPorExtenso, esc, formatarData } from "./ui.js";
 import {
-  listEstagios, listGrupos, listResponsaveis, listAnfitrioes, listConvidados, getEvento,
+  listEstagios, listGrupos, listAnfitrioes, listConvidados, getEvento, listarEquipe,
 } from "./supabase.js";
 import { eventoId } from "./evento.js";
 import { APP } from "./config.js";
@@ -11,6 +11,7 @@ import { APP } from "./config.js";
 const _iniciando = iniciarPagina("painel");
 
 const el = (id) => document.getElementById(id);
+let CTX = null;
 let dados = null;
 let filtroGrupo = "";
 let faixaModo = "Confirmado";
@@ -18,13 +19,15 @@ let faixaModo = "Confirmado";
 el("data-hoje").textContent =
   dataPorExtenso().replace(/^\w/, (c) => c.toUpperCase());
 
-_iniciando.then((ctx) => { if (ctx) iniciar(); });
+_iniciando.then((ctx) => { if (ctx) { CTX = ctx; iniciar(); } });
 async function iniciar() {
   try {
-    const [estagios, grupos, responsaveis, anfitrioes, convidados, evento] = await Promise.all([
-      listEstagios(), listGrupos(), listResponsaveis(), listAnfitrioes(), listConvidados(), getEvento(eventoId()),
+    const [estagios, grupos, membrosOrg, anfitrioes, convidados, evento] = await Promise.all([
+      listEstagios(), listGrupos(),
+      CTX?.org?.id ? listarEquipe(CTX.org.id).catch(() => []) : Promise.resolve([]),
+      listAnfitrioes(), listConvidados(), getEvento(eventoId()),
     ]);
-    dados = { estagios, grupos, responsaveis, anfitrioes, convidados, evento };
+    dados = { estagios, grupos, membrosOrg, anfitrioes, convidados, evento };
 
     const fg = el("filtro-grupo");
     grupos.forEach((g) => fg.add(new Option(g.nome, g.id)));
@@ -183,13 +186,16 @@ function renderTopAnfitrioes() {
 function renderTopResponsaveis() {
   const mapa = new Map();
   anfNoGrupo().forEach((a) => {
-    if (!a.responsavel_id) return;
-    const cur = mapa.get(a.responsavel_id) || { enviados: 0, confirmados: 0 };
+    if (!a.responsavel_user_id) return;
+    const cur = mapa.get(a.responsavel_user_id) || { enviados: 0, confirmados: 0 };
     cur.enviados += a.enviados || 0;
     cur.confirmados += a.confirmados || 0;
-    mapa.set(a.responsavel_id, cur);
+    mapa.set(a.responsavel_user_id, cur);
   });
-  const nome = (id) => dados.responsaveis.find((r) => r.id === id)?.nome || "—";
+  const nome = (id) => {
+    const m = dados.membrosOrg.find((x) => x.user_id === id);
+    return m ? (m.nome || m.email) : "—";
+  };
   const linhas = [...mapa.entries()]
     .sort((a, b) => b[1].confirmados - a[1].confirmados)
     .slice(0, 10);
