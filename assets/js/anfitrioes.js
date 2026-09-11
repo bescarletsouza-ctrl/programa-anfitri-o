@@ -131,8 +131,20 @@ function render() {
   });
 }
 
+// sugestões pro campo "Categoria liberada": os Tipos de ingresso cadastrados
+// + qualquer valor antigo que já tenha sido usado (mesmo que não seja mais
+// um tipo de ingresso ativo)
 const categoriasUsadas = () =>
-  [...new Set(lista.map((a) => (a.categoria_convidado || "").trim()).filter(Boolean))].sort();
+  [...new Set([
+    ...tiposIngresso.map((t) => (t.nome || "").trim()),
+    ...lista.map((a) => (a.categoria_convidado || "").trim()),
+  ].filter(Boolean))].sort();
+
+function emailDuplicado(email, idExcluir) {
+  const alvo = (email || "").trim().toLowerCase();
+  if (!alvo) return false;
+  return lista.some((a) => a.id !== idExcluir && (a.email || "").trim().toLowerCase() === alvo);
+}
 
 /* ---- Novo anfitrião ---- */
 function modalNovo() {
@@ -169,8 +181,13 @@ function modalNovo() {
     },
     onConfirmar: async (form) => {
       const f = Object.fromEntries(new FormData(form));
+      const email = f.email.trim();
+      if (email && emailDuplicado(email, null)) {
+        toast("Já existe um anfitrião cadastrado com esse e-mail.", "erro");
+        return false;
+      }
       const novo = await salvar("anfitrioes", {
-        tipo: f.tipo, nome: f.nome.trim(), email: f.email || null, telefone: f.telefone || null,
+        tipo: f.tipo, nome: f.nome.trim(), email: email || null, telefone: f.telefone || null,
         grupo_id: f.grupo_id || null, ingresso: f.ingresso || null, responsavel_user_id: f.responsavel_user_id || null,
         categoria_convidado: f.categoria_convidado.trim() || null,
         estagio_id: estagios[0]?.id || null,
@@ -386,10 +403,15 @@ async function abrirGavetaDetalhe(id) {
   };
   g.querySelector("#d-salvar").onclick = async () => {
     try {
+      const emailNovo = g.querySelector("#d-email").value.trim();
+      if (emailNovo && emailDuplicado(emailNovo, a.id)) {
+        toast("Já existe outro anfitrião cadastrado com esse e-mail.", "erro");
+        return;
+      }
       const catConv = g.querySelector("#d-categoria-convidado").value.trim() || null;
       const atualizado = await salvar("anfitrioes", {
         id: a.id,
-        email: g.querySelector("#d-email").value.trim() || null,
+        email: emailNovo || null,
         telefone: g.querySelector("#d-telefone").value.trim() || null,
         responsavel_user_id: g.querySelector("#d-resp").value || null,
         grupo_id: g.querySelector("#d-grupo").value || null,

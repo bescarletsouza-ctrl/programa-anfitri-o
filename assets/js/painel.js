@@ -239,12 +239,14 @@ function renderFases(confirmados, marcos, conquistados, marcoFinal) {
   if (marcoFinal) {
     const ok = confirmados >= marcoFinal.quantidade;
     const titulo = ok ? esc(marcoFinal.titulo) : "🔒 Prêmio final bloqueado";
+    // esconde o NOME do prêmio até conquistar, mas o número da Meta (quantos
+    // confirmados faltam) sempre aparece — senão ninguém sabe a meta a bater
     const selo = ok
       ? `<span class="fase-selo ok">Meta conquistada</span>`
-      : `<span class="fase-selo bloq">🔒 Meta do evento</span>`;
+      : `<span class="fase-selo bloq">🔒 Meta do evento · faltam ${marcoFinal.quantidade - confirmados}</span>`;
     const corpo = ok
       ? `<p>${esc(marcoFinal.descricao || "")}</p>`
-      : `<p class="dim">Chegue à Meta do evento para descobrir o grande prêmio!</p>`;
+      : `<p class="dim">Alcance ${marcoFinal.quantidade} confirmados para descobrir o grande prêmio!</p>`;
     cards.push(`<div class="fase ${ok ? "conquistada" : "bloqueada"}">
       <div class="fase-num">🏆</div>
       <div class="fase-txt">
