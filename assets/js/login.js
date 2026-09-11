@@ -59,6 +59,8 @@ function mostrarLogin() {
   el("titulo").textContent = "Entrar";
   el("sub").textContent = "Acesse o painel da sua organização.";
   el("btn").textContent = "Entrar";
+  el("email").closest(".campo").hidden = false;
+  el("email").disabled = false; el("email").required = true;
   el("wrap-senha").hidden = false;
   el("senha").autocomplete = "current-password";
   el("carregando").hidden = true;
@@ -69,7 +71,11 @@ function mostrarDefinirSenha() {
   el("titulo").textContent = "Defina sua senha";
   el("sub").textContent = "Escolha uma senha para acessar o We.events.";
   el("btn").textContent = "Salvar e entrar";
+  // esconder um input `required` trava o submit ("not focusable")
   el("email").closest(".campo").hidden = true;
+  el("email").disabled = true;
+  el("email").required = false;
+  el("wrap-senha").hidden = false;
   el("senha").autocomplete = "new-password";
   el("senha").placeholder = "mín. 6 caracteres";
   el("carregando").hidden = true;
