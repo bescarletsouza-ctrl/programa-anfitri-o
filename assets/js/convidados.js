@@ -52,6 +52,13 @@ el("btn-novo").onclick = modalNovo;
 
 const badgeStatus = (s) =>
   ({ Pendente: "badge-alerta", Aprovado: "badge-info", Recusado: "badge-erro", Confirmado: "badge-ok" }[s] || "badge-neutro");
+// Situação do participante gerado a partir do convite — campo separado do
+// status do convite acima (Pendente/Aprovado/Recusado/Confirmado).
+const badgeSituacao = (s) =>
+  ({ Confirmado: "badge-ok", Pendente: "badge-alerta", "Fila de espera": "badge-info",
+     "Pré-inscrito": "badge-neutro", Desativado: "badge-erro" }[s] || "badge-neutro");
+const situacaoDoParticipante = (c) =>
+  (Array.isArray(c.participante) ? c.participante[0]?.situacao : c.participante?.situacao) || null;
 
 function filtrar() {
   return lista.filter((c) => {
@@ -94,6 +101,7 @@ function render() {
         <td>${esc(c.anfitriao?.nome || "—")}</td>
         <td>${wa ? `<a href="${wa}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(c.telefone)}</a>` : "—"}</td>
         <td><span class="badge ${badgeStatus(c.status)}">${esc(c.status)}</span></td>
+        <td>${situacaoDoParticipante(c) ? `<span class="badge ${badgeSituacao(situacaoDoParticipante(c))}">${esc(situacaoDoParticipante(c))}</span>` : `<span class="cel-tenue">—</span>`}</td>
         <td>${formatarData(c.created_at)}</td>
       </tr>`;
     })
@@ -214,6 +222,10 @@ function abrirGavetaDetalhe(id) {
             : " (defina a categoria no cadastro do anfitrião)"
         }. Reprovar remove da lista.
       </p>
+      ${situacaoDoParticipante(c) ? `<p class="pagina-sub" style="margin:6px 0 0;font-size:.72rem">
+        Situação do participante: <span class="badge ${badgeSituacao(situacaoDoParticipante(c))}">${esc(situacaoDoParticipante(c))}</span>
+        — campo separado, editável em Participantes.
+      </p>` : ""}
     </div>
 
     <div class="secao">

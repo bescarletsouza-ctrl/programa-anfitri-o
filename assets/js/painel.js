@@ -13,8 +13,15 @@ const slug = new URLSearchParams(location.search).get("a");
 
 el("marca").innerHTML = APP.marcaHtml;
 
+// status do CONVITE (aprovação pelo anfitrião/organização)
 const badgeStatus = (s) =>
   ({ Pendente: "badge-alerta", Aprovado: "badge-info", Recusado: "badge-erro", Confirmado: "badge-ok" }[s] || "badge-neutro");
+// Situação do PARTICIPANTE gerado a partir do convite (campo separado)
+const badgeSituacao = (s) =>
+  ({ Confirmado: "badge-ok", Pendente: "badge-alerta", "Fila de espera": "badge-info",
+     "Pré-inscrito": "badge-neutro", Desativado: "badge-erro" }[s] || "badge-neutro");
+const situacaoDoParticipante = (c) =>
+  (Array.isArray(c.participante) ? c.participante[0]?.situacao : c.participante?.situacao) || null;
 
 (async function iniciar() {
   if (!slug) return erro();
@@ -33,7 +40,10 @@ const badgeStatus = (s) =>
     const metaEvento = Number(evento?.meta_confirmados) || 0;
     const marcos = marcosRaw.map((m) => (m.meta_final && metaEvento ? { ...m, quantidade: metaEvento } : m));
 
-    const confirmados = convites.filter((c) => c.status === "Confirmado").length;
+    // "Confirmados" aqui é a Situação do participante gerado pelo convite
+    // (Confirmado/Pendente/Fila de espera/Pré-inscrito/Desativado) — um campo
+    // separado do status do convite em si (Pendente/Aprovado/Recusado).
+    const confirmados = convites.filter((c) => situacaoDoParticipante(c) === "Confirmado").length;
     const aprovados = convites.filter((c) => c.status === "Aprovado" || c.status === "Confirmado").length;
     const grupoNome = anfitriao.grupo?.nome;
 
@@ -324,13 +334,17 @@ function renderConvites(convites, resumo) {
     ${kpi(resumo.confirmados, "Confirmados")}`;
   el("lista-convites").innerHTML = convites.length
     ? convites
-        .map(
-          (c) => `<div>
+        .map((c) => {
+          const situacao = situacaoDoParticipante(c);
+          return `<div>
             <div><div style="font-weight:600;font-size:.9rem">${esc(c.nome || "—")}</div>
             <div class="pagina-sub" style="margin:0;font-size:.75rem">${esc(c.empresa || "")} · ${formatarData(c.created_at)}</div></div>
-            <span class="badge ${badgeStatus(c.status)}">${esc(c.status)}</span>
-          </div>`
-        )
+            <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+              <span class="badge ${badgeStatus(c.status)}" title="Status do convite">${esc(c.status)}</span>
+              ${situacao ? `<span class="badge ${badgeSituacao(situacao)}" title="Situação">${esc(situacao)}</span>` : ""}
+            </div>
+          </div>`;
+        })
         .join("")
     : `<p class="pagina-sub" style="margin:0">Você ainda não tem convidados. Compartilhe seu link!</p>`;
 }

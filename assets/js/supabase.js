@@ -98,7 +98,7 @@ export const listAnfitrioes = (eid) =>
 export const listConvidados = (eid) =>
   supabase
     .from("convidados")
-    .select("*, anfitriao:anfitrioes(id, nome, slug, grupo_id, categoria_convidado, responsavel_user_id)")
+    .select("*, anfitriao:anfitrioes(id, nome, slug, grupo_id, categoria_convidado, responsavel_user_id), participante:participantes(situacao)")
     .eq("evento_id", ev(eid))
     .order("created_at", { ascending: false })
     .then(ok);
@@ -353,7 +353,7 @@ export async function desvincularAoExcluirParticipante(participante) {
 export const listConvidadosDoAnfitriao = (anfitriaoId) =>
   supabase
     .from("convidados")
-    .select("*")
+    .select("*, participante:participantes(situacao)")
     .eq("anfitriao_id", anfitriaoId)
     .order("created_at", { ascending: false })
     .then(ok);
