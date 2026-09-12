@@ -41,6 +41,10 @@ html { scroll-behavior: smooth; }
 .n10x-hero h1 .n10x-nome {
   background-image: var(--n10x-grad); -webkit-background-clip: text; background-clip: text; color: transparent;
 }
+.n10x-hero-data {
+  font-size: .82rem; font-weight: 700; letter-spacing: .02em;
+  color: var(--n10x-texto-suave); margin: 0 0 14px;
+}
 .n10x-lead { font-size: 1.02rem; line-height: 1.6; color: var(--n10x-texto-suave); margin: 0 0 16px; }
 .n10x-lead b { color: var(--n10x-texto); }
 .n10x-logo { max-width: 220px; width: 60%; margin: 0 auto 28px; display: block; filter: drop-shadow(0 8px 24px rgba(0, 0, 0, .4)); }
