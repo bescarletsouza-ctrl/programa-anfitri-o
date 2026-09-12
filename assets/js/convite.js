@@ -72,6 +72,11 @@ el("marca").innerHTML = APP.marcaHtml;
       document.body.classList.add("tema-nitro10x");
       el("n10x-nome-anfitriao").textContent = anfitriao.nome;
       el("nitro10x").hidden = false;
+      // vídeo só carrega de verdade (iframe do YouTube) quando a pessoa clica —
+      // o embed sozinho pesava mais que o resto da página inteira
+      el("n10x-video-play")?.addEventListener("click", function ativar() {
+        this.outerHTML = `<iframe src="https://www.youtube.com/embed/O17ybCbS1FE?autoplay=1" title="Nitro 10X" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>`;
+      }, { once: true });
     }
 
     el("carregando").hidden = true;
