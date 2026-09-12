@@ -43,7 +43,8 @@ html { scroll-behavior: smooth; }
 }
 .n10x-lead { font-size: 1.02rem; line-height: 1.6; color: var(--n10x-texto-suave); margin: 0 0 16px; }
 .n10x-lead b { color: var(--n10x-texto); }
-.n10x-logo { max-width: 220px; width: 60%; margin: 28px auto 0; display: block; filter: drop-shadow(0 8px 24px rgba(0, 0, 0, .4)); }
+.n10x-logo { max-width: 220px; width: 60%; margin: 0 auto 28px; display: block; filter: drop-shadow(0 8px 24px rgba(0, 0, 0, .4)); }
+.n10x-logo-topo { max-width: 170px; margin-bottom: 32px; }
 .n10x-cta-hero { display: block; margin: 26px auto 0; max-width: 340px; }
 
 /* ---- Seções genéricas ---------------------------------------------------- */
@@ -58,6 +59,7 @@ html { scroll-behavior: smooth; }
 .n10x-secao-corpo { position: relative; max-width: 620px; margin: 0 auto; }
 .n10x-detalhes h2 {
   font-size: clamp(1.5rem, 5.5vw, 2.1rem); font-weight: 800; letter-spacing: -.02em; line-height: 1.25;
+  background-image: var(--n10x-grad); -webkit-background-clip: text; background-clip: text; color: transparent;
 }
 .n10x-data { font-size: 1.15rem; font-weight: 700; margin: 4px 0 2px; }
 .n10x-local { color: var(--n10x-texto-suave); margin: 0 0 22px; }
@@ -90,7 +92,10 @@ html { scroll-behavior: smooth; }
 .n10x-video-vazio { color: var(--n10x-texto-suave); font-size: .9rem; margin: 0; }
 
 /* ---- Benefícios ------------------------------------------------------------ */
-.n10x-beneficios h3 { font-size: 1.1rem; font-weight: 700; }
+.n10x-beneficios h3 {
+  font-size: 1.25rem; font-weight: 800;
+  background-image: var(--n10x-grad); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
 .n10x-beneficios ul {
   list-style: none; margin: 24px auto 0; padding: 0; max-width: 420px;
   display: grid; gap: 12px;
@@ -107,8 +112,8 @@ html { scroll-behavior: smooth; }
 /* ---- Idealizador / bio ----------------------------------------------------- */
 .n10x-bio { text-align: center; }
 .n10x-bio > * { max-width: 560px; margin-left: auto; margin-right: auto; }
-.n10x-bio h3 { font-size: 1.4rem; font-weight: 800; margin: 0 0 18px; }
-.n10x-bio p { line-height: 1.65; color: var(--n10x-texto-suave); margin: 0 0 14px; }
+.n10x-bio h3 { font-size: 1.4rem; font-weight: 800; margin: 0 auto 18px; }
+.n10x-bio p { line-height: 1.65; color: var(--n10x-texto-suave); margin: 0 auto 14px; }
 .n10x-disclaimer { font-size: .78rem; color: var(--n10x-texto-suave); margin-top: 16px; }
 
 @media (min-width: 620px) {
