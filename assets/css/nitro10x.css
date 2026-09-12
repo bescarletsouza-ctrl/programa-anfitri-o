@@ -58,7 +58,8 @@ html { scroll-behavior: smooth; }
 }
 .n10x-secao-corpo { position: relative; max-width: 620px; margin: 0 auto; }
 .n10x-detalhes h2 {
-  font-size: clamp(1.5rem, 5.5vw, 2.1rem); font-weight: 800; letter-spacing: -.02em; line-height: 1.25;
+  font-size: clamp(1.5rem, 5.5vw, 2.1rem); font-weight: 800; letter-spacing: -.01em; line-height: 1.25;
+  text-transform: uppercase;
   background-image: var(--n10x-grad); -webkit-background-clip: text; background-clip: text; color: transparent;
 }
 .n10x-data { font-size: 1.15rem; font-weight: 700; margin: 4px 0 2px; }
@@ -101,7 +102,7 @@ html { scroll-behavior: smooth; }
   display: grid; gap: 12px;
 }
 .n10x-beneficios li {
-  display: flex; align-items: center; gap: 12px; font-size: .96rem; font-weight: 600;
+  display: flex; align-items: center; justify-content: center; gap: 12px; font-size: .96rem; font-weight: 600;
 }
 .n10x-beneficios li::before {
   content: "✓"; flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%;
