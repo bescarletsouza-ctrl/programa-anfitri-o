@@ -2,7 +2,7 @@
 // Gestão de anfitriões — tabela, filtros, modal "novo", gaveta de detalhe.
 // =============================================================================
 import {
-  iniciarPagina, esc, debounce, formatarData, slugify, telParaWhatsApp,
+  iniciarPagina, esc, debounce, formatarData, slugify, gerarSlugAnfitriao, telParaWhatsApp,
   abrirModal, abrirGaveta, fecharGaveta, toast, confirmar, icone,
 } from "./ui.js";
 import {
@@ -186,12 +186,23 @@ function modalNovo() {
         toast("Já existe um anfitrião cadastrado com esse e-mail.", "erro");
         return false;
       }
-      const novo = await salvar("anfitrioes", {
-        tipo: f.tipo, nome: f.nome.trim(), email: email || null, telefone: f.telefone || null,
+      const nome = f.nome.trim();
+      const dados = {
+        tipo: f.tipo, nome, email: email || null, telefone: f.telefone || null,
         grupo_id: f.grupo_id || null, ingresso: f.ingresso || null, responsavel_user_id: f.responsavel_user_id || null,
         categoria_convidado: f.categoria_convidado.trim() || null,
         estagio_id: estagios[0]?.id || null,
-      });
+      };
+      let novo;
+      for (let tentativa = 0; ; tentativa++) {
+        try {
+          novo = await salvar("anfitrioes", { ...dados, slug: gerarSlugAnfitriao(nome) });
+          break;
+        } catch (e) {
+          if (tentativa < 4 && /duplicate key.*slug/i.test(e.message || "")) continue; // slug já existia, tenta outro
+          throw e;
+        }
+      }
       await sincAnfitriaoParticipante(novo).catch((e) => console.warn(e));
       toast("Anfitrião criado.", "ok");
       lista = await listAnfitrioes();
@@ -262,8 +273,10 @@ function modalImportar() {
 
       const registros = validas.map((l) => {
         const grupoId = l.grupo ? mapaGrupo.get(l.grupo.toLowerCase()) || null : null;
+        const nome = l.nome.trim();
         return {
-          nome: l.nome.trim(),
+          nome,
+          slug: gerarSlugAnfitriao(nome),
           email: (l.email || "").trim() || null,
           telefone: (l.telefone || "").trim() || null,
           tipo: TIPOS_ANFITRIAO.includes((l.tipo || "").trim()) ? l.tipo.trim() : "Titular",

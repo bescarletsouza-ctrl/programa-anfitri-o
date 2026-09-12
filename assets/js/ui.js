@@ -270,6 +270,14 @@ export function slugify(s) {
     .replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
 }
 
+// Slug curto pro link de convite: nome do anfitrião + 4 caracteres pra evitar
+// colisão (o slug é único no banco). Ex.: "joao_silva-a1b2".
+export function gerarSlugAnfitriao(nome) {
+  const raiz = slugify(nome) || "convidado";
+  const bruto = crypto.randomUUID ? crypto.randomUUID().replace(/-/g, "") : `${Date.now()}${Math.random()}`;
+  return `${raiz}-${bruto.slice(0, 4)}`;
+}
+
 export function telParaWhatsApp(tel) {
   const num = String(tel || "").replace(/\D/g, "");
   if (!num) return null;
