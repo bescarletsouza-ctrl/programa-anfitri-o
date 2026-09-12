@@ -53,8 +53,8 @@ const situacaoDoParticipante = (c) =>
     // link de convite
     const base = location.origin;
     const link =
-      `${base}${APP.urlConvitePublico}?a=${anfitriao.slug}` +
-      `&utm_source=anfitriao&utm_medium=${slugify(anfitriao.nome)}` +
+      `${base}${APP.urlConvitePublico}-${anfitriao.slug}` +
+      `?utm_source=anfitriao&utm_medium=${slugify(anfitriao.nome)}` +
       (grupoNome ? `&utm_campaign=${slugify(grupoNome)}` : "");
     el("btn-link").onclick = () => {
       navigator.clipboard.writeText(link).then(() => {

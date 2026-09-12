@@ -25,9 +25,12 @@ export const APP = {
   termoAnfitriaoPlural: "Anfitriões",
   termoConvidado: "Convidado",
   termoConvidadoPlural: "Convidados",
-  // base para os links gerados na gaveta do anfitrião (fase pública)
-  urlConvitePublico: "/convite.html",
-  urlPainelAnfitriao: "/painel.html",
+  // base para os links gerados na gaveta do anfitrião (fase pública) — o
+  // slug entra depois de um hífen (ex.: /convite-joao_silva-a1b2); o rewrite
+  // em vercel.json entrega isso como convite.html?a=joao_silva-a1b2 por trás,
+  // sem perder utm nem o vínculo com o anfitrião.
+  urlConvitePublico: "/convite",
+  urlPainelAnfitriao: "/painel",
 };
 
 export const STATUS_CONVIDADO = ["Pendente", "Aprovado", "Recusado", "Confirmado"];

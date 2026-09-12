@@ -402,10 +402,10 @@ async function abrirGavetaDetalhe(id) {
   if (!a) return;
   const convidados = await listConvidadosDoAnfitriao(id).catch(() => []);
   const base = location.origin + location.pathname.replace(/\/admin\/.*/, "");
-  const linkConvite = `${base}${APP.urlConvitePublico}?a=${a.slug}` +
-    `&utm_source=anfitriao&utm_medium=${slugify(a.nome)}` +
+  const linkConvite = `${base}${APP.urlConvitePublico}-${a.slug}` +
+    `?utm_source=anfitriao&utm_medium=${slugify(a.nome)}` +
     (a.grupo_id ? `&utm_campaign=${slugify(nomeGrupo(a.grupo_id) || "")}` : "");
-  const linkPainel = `${base}${APP.urlPainelAnfitriao}?a=${a.slug}`;
+  const linkPainel = `${base}${APP.urlPainelAnfitriao}-${a.slug}`;
 
   abrirGaveta(
     `${esc(a.nome)}`,

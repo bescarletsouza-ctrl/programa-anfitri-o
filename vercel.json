@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/convite-:slug", "destination": "/convite.html?a=:slug" },
+    { "source": "/painel-:slug", "destination": "/painel.html?a=:slug" }
+  ]
+}
