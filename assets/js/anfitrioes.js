@@ -500,7 +500,11 @@ async function abrirGavetaDetalhe(id) {
   const a = lista.find((x) => x.id === id);
   if (!a) return;
   const convidados = await listConvidadosDoAnfitriao(id).catch(() => []);
-  const base = location.origin + location.pathname.replace(/\/admin\/.*/, "");
+  // organização com domínio próprio (Plataforma → editar organização) gera os
+  // links de convite/painel nesse domínio, em vez do domínio padrão da plataforma
+  const base = CTX?.org?.dominio
+    ? `https://${CTX.org.dominio}`
+    : location.origin + location.pathname.replace(/\/admin\/.*/, "");
   const linkConvite = `${base}${APP.urlConvitePublico}-${a.slug}` +
     `?utm_source=anfitriao&utm_medium=${slugify(a.nome)}` +
     (a.grupo_id ? `&utm_campaign=${slugify(nomeGrupo(a.grupo_id) || "")}` : "");

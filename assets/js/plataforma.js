@@ -52,7 +52,7 @@ function render() {
     const st = status(o);
     const lim = o.max_eventos ? `${o.eventos_usados}/${o.max_eventos}` : `${o.eventos_usados}`;
     return `<tr data-id="${esc(o.id)}">
-      <td><strong>${esc(o.nome)}</strong>${o.email ? `<div class="cel-tenue" style="font-size:.75rem">${esc(o.email)}</div>` : ""}</td>
+      <td><strong>${esc(o.nome)}</strong>${o.email ? `<div class="cel-tenue" style="font-size:.75rem">${esc(o.email)}</div>` : ""}${o.dominio ? `<div class="cel-tenue" style="font-size:.72rem">🔗 ${esc(o.dominio)}</div>` : ""}</td>
       <td>${esc(o.ramo || "—")}</td>
       <td>${esc(ACESSOS[o.acesso] || o.acesso)}</td>
       <td class="num">${o.membros || 0}</td>
@@ -102,6 +102,9 @@ function modalOrg(o) {
         <label class="campo"><span>Nome do responsável</span><input class="input" name="responsavel_nome" /></label>
         <label class="campo"><span>E-mail do responsável *</span><input class="input" name="email" type="email" required placeholder="ele recebe o convite" /></label>
       ` : `<label class="campo"><span>E-mail de contato</span><input class="input" name="email" type="email" value="${esc(o?.email || "")}" /></label>`}
+      <label class="campo"><span>Domínio personalizado</span>
+        <input class="input" name="dominio" value="${esc(o?.dominio || "")}" placeholder="ex.: we.events.nitro10x.com.br" />
+        <span class="cel-tenue" style="font-size:.72rem">Os links de convite/painel gerados pelos anfitriões dessa organização passam a usar esse domínio. Precisa ser adicionado à parte no projeto da Vercel (Domains) e ter o DNS apontado pra lá.</span></label>
       <hr class="cfg-sep" />
       <label class="campo"><span>Nível de acesso</span>
         <select class="select" name="acesso">
@@ -116,6 +119,7 @@ function modalOrg(o) {
         nome: f.nome.trim(), empresa: f.nome.trim(), ramo: f.ramo || null,
         faturamento: f.faturamento || null, telefone: f.telefone || null, email: (f.email || "").trim() || null,
         acesso: f.acesso, max_eventos: f.max_eventos || null, expira_em: f.expira_em || null,
+        dominio: f.dominio.trim() || null,
       };
       if (novo) {
         if (!dados.email) { toast("E-mail do responsável é obrigatório.", "erro"); return false; }

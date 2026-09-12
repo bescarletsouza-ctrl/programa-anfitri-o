@@ -31,6 +31,15 @@ const svc = () =>
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
+// Domínio personalizado da organização — normaliza pra "host" puro (sem
+// protocolo, "www." ou barra final). Precisa ser adicionado à parte no
+// projeto da Vercel (Settings → Domains) pra realmente resolver.
+function normalizarDominio(v: unknown): string | null {
+  const s = String(v ?? "").trim().toLowerCase();
+  if (!s) return null;
+  return s.replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/+$/, "") || null;
+}
+
 // manda o link de convite/definição de senha por e-mail (Resend). Se não houver
 // secret, devolve o link para a dona repassar manualmente.
 async function mandarConvite(email: string, link: string, nomeOrg?: string) {
@@ -211,6 +220,7 @@ Deno.serve(async (req) => {
         acesso: ["tudo", "eventos", "anfitrioes"].includes(b.acesso) ? b.acesso : "tudo",
         max_eventos: b.max_eventos ? Number(b.max_eventos) : null,
         expira_em: b.expira_em || null,
+        dominio: normalizarDominio(b.dominio),
       }).select().single();
       if (error) return json({ erro: error.message }, 400);
       const c = await convidar(sb, email);
@@ -229,6 +239,7 @@ Deno.serve(async (req) => {
         if (k in body) patch[k] = body[k];
       if ("max_eventos" in body) patch.max_eventos = body.max_eventos ? Number(body.max_eventos) : null;
       if ("expira_em" in body) patch.expira_em = body.expira_em || null;
+      if ("dominio" in body) patch.dominio = normalizarDominio(body.dominio);
       const { data, error } = await sb.from("organizacoes").update(patch).eq("id", body.id).select().single();
       if (error) return json({ erro: error.message }, 400);
       return json({ ok: true, org: data });
