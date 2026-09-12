@@ -20,7 +20,8 @@ const el = (id) => document.getElementById(id);
 let CTX = null;
 let estagios = [], grupos = [], membrosOrg = [], tiposIngresso = [], lista = [];
 let aba = "todos";
-const filtros = { busca: "", grupo: "", categoria: "", categoriaConvidado: "", responsavel: "", estagio: "", presenca: "" };
+const FILTROS_VAZIO = { busca: "", grupo: "", categoria: "", categoriaConvidado: "", responsavel: "", estagio: "", presenca: "" };
+const filtros = { ...FILTROS_VAZIO };
 const selecionados = new Set();
 
 // Colunas opcionais da lista (Nome e ações são fixas). Ordem + visibilidade
@@ -89,6 +90,17 @@ Object.keys(CAMPO_DO_FILTRO).forEach((id) => {
     render();
   });
 });
+function filtrosAtivos() { return Object.keys(FILTROS_VAZIO).some((k) => filtros[k]); }
+el("btn-toggle-filtros").onclick = () => {
+  const painel = el("filtros-painel");
+  painel.hidden = !painel.hidden;
+  el("btn-toggle-filtros").setAttribute("aria-expanded", String(!painel.hidden));
+};
+el("btn-limpar-filtros").onclick = () => {
+  Object.assign(filtros, FILTROS_VAZIO);
+  ["busca", ...Object.keys(CAMPO_DO_FILTRO)].forEach((id) => (el(id).value = ""));
+  render();
+};
 el("abas").querySelectorAll("button").forEach((b) => {
   b.onclick = () => {
     el("abas").querySelectorAll("button").forEach((x) => x.classList.remove("ativo"));
@@ -203,6 +215,7 @@ function celulaColuna(a, c) {
 function render() {
   renderCabecalho();
   const filtrada = filtrar();
+  el("btn-toggle-filtros").classList.toggle("ativo", filtrosAtivos());
   el("contador").textContent = `Exibindo ${filtrada.length} de ${lista.length} anfitriões`;
   const vazio = filtrada.length === 0;
   el("wrap").hidden = vazio;

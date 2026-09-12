@@ -29,28 +29,41 @@
       </div>
     </div>
 
-    <div class="filtros" style="margin-bottom:14px">
-      <input class="input" id="busca" placeholder="Buscar por nome ou e-mail…" />
-      <select class="select" id="f-grupo"><option value="">Todos os tipos</option></select>
-      <select class="select" id="f-categoria"><option value="">Todas as categorias</option></select>
-      <select class="select" id="f-categoria-convidado"><option value="">Toda categoria liberada</option></select>
-      <select class="select" id="f-responsavel"><option value="">Todos os responsáveis</option></select>
-      <select class="select" id="f-estagio"><option value="">Todos os estágios</option></select>
-      <select class="select" id="f-presenca">
-        <option value="">Presença: todas</option>
-        <option value="sim">Presença confirmada</option>
-        <option value="nao">Presença não confirmada</option>
-      </select>
-    </div>
-
     <div class="barra-topo">
       <div class="toggle-abas" id="abas">
         <button data-aba="todos" class="ativo">Todos</button>
         <button data-aba="ativos">Vão ao evento</button>
         <button data-aba="nao">Não vão</button>
       </div>
-      <span class="pagina-sub" id="contador" style="margin:0"></span>
+      <div style="display:flex;gap:10px;align-items:center">
+        <span class="pagina-sub" id="contador" style="margin:0"></span>
+        <button class="btn btn-sm btn-secundario" id="btn-toggle-filtros" aria-expanded="false">Filtros</button>
+      </div>
     </div>
+
+    <section class="filtros-painel" id="filtros-painel" hidden>
+      <div class="filtros-cab">
+        <strong>Filtros</strong>
+        <button class="btn btn-sm btn-fantasma" id="btn-limpar-filtros">Limpar tudo</button>
+      </div>
+      <div class="filtros-grupo">
+        <div class="filtros-linha">
+          <label class="campo"><span>Buscar</span>
+            <input class="input" id="busca" placeholder="Nome ou e-mail…" /></label>
+          <label class="campo"><span>Tipo</span><select class="select" id="f-grupo"><option value="">Todos</option></select></label>
+          <label class="campo"><span>Categoria de ingresso</span><select class="select" id="f-categoria"><option value="">Todas</option></select></label>
+          <label class="campo"><span>Categoria liberada</span><select class="select" id="f-categoria-convidado"><option value="">Todas</option></select></label>
+          <label class="campo"><span>Responsável</span><select class="select" id="f-responsavel"><option value="">Todos</option></select></label>
+          <label class="campo"><span>Estágio</span><select class="select" id="f-estagio"><option value="">Todos</option></select></label>
+          <label class="campo"><span>Presença</span>
+            <select class="select" id="f-presenca">
+              <option value="">Todas</option>
+              <option value="sim">Confirmada</option>
+              <option value="nao">Não confirmada</option>
+            </select></label>
+        </div>
+      </div>
+    </section>
 
     <div class="barra-acoes" id="barra-acoes" hidden>
       <span class="barra-acoes-cont" id="sel-cont">0 selecionados</span>
