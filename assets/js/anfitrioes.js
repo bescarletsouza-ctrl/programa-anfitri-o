@@ -20,7 +20,7 @@ const el = (id) => document.getElementById(id);
 let CTX = null;
 let estagios = [], grupos = [], membrosOrg = [], tiposIngresso = [], lista = [];
 let aba = "todos";
-const filtros = { busca: "", grupo: "", estagio: "", presenca: "" };
+const filtros = { busca: "", grupo: "", categoria: "", categoriaConvidado: "", responsavel: "", estagio: "", presenca: "" };
 const selecionados = new Set();
 
 // Colunas opcionais da lista (Nome e ações são fixas). Ordem + visibilidade
@@ -58,6 +58,13 @@ async function carregar() {
     ]);
     preencherSelect(el("f-grupo"), grupos, "Todos os tipos");
     preencherSelect(el("f-estagio"), estagios, "Todos os estágios");
+    el("f-categoria").innerHTML = `<option value="">Todas as categorias</option>` +
+      categoriasIngresso().map((c) => `<option>${esc(c)}</option>`).join("");
+    el("f-categoria-convidado").innerHTML = `<option value="">Toda categoria liberada</option>` +
+      categoriasUsadas().map((c) => `<option>${esc(c)}</option>`).join("");
+    el("f-responsavel").innerHTML = `<option value="">Todos os responsáveis</option>` +
+      `<option value="_nenhum_">— sem responsável —</option>` +
+      membrosOrg.map((m) => `<option value="${esc(m.user_id)}">${esc(m.nome || m.email)}</option>`).join("");
     el("carregando").hidden = true;
     render();
   } catch (e) {
@@ -72,9 +79,13 @@ function preencherSelect(sel, arr, placeholder, valorAtual) {
 
 /* ---- filtros ---- */
 el("busca").addEventListener("input", debounce((e) => { filtros.busca = e.target.value.toLowerCase(); render(); }, 200));
-["f-grupo", "f-estagio", "f-presenca"].forEach((id) => {
+const CAMPO_DO_FILTRO = {
+  "f-grupo": "grupo", "f-categoria": "categoria", "f-categoria-convidado": "categoriaConvidado",
+  "f-responsavel": "responsavel", "f-estagio": "estagio", "f-presenca": "presenca",
+};
+Object.keys(CAMPO_DO_FILTRO).forEach((id) => {
   el(id).addEventListener("change", (e) => {
-    filtros[id.replace("f-", "")] = e.target.value;
+    filtros[CAMPO_DO_FILTRO[id]] = e.target.value;
     render();
   });
 });
@@ -105,6 +116,10 @@ function filtrar() {
     if (aba === "nao" && a.vai !== false) return false;
     // aba "todos": sem filtro por "vai"
     if (filtros.grupo && a.grupo_id !== filtros.grupo) return false;
+    if (filtros.categoria && (a.ingresso || "").trim() !== filtros.categoria) return false;
+    if (filtros.categoriaConvidado && (a.categoria_convidado || "").trim() !== filtros.categoriaConvidado) return false;
+    if (filtros.responsavel === "_nenhum_" && a.responsavel_user_id) return false;
+    if (filtros.responsavel && filtros.responsavel !== "_nenhum_" && a.responsavel_user_id !== filtros.responsavel) return false;
     if (filtros.estagio && a.estagio_id !== filtros.estagio) return false;
     if (filtros.presenca === "sim" && !a.presenca) return false;
     if (filtros.presenca === "nao" && a.presenca) return false;
@@ -287,6 +302,13 @@ const categoriasUsadas = () =>
   [...new Set([
     ...tiposIngresso.map((t) => (t.nome || "").trim()),
     ...lista.map((a) => (a.categoria_convidado || "").trim()),
+  ].filter(Boolean))].sort();
+
+// Categorias de ingresso do PRÓPRIO anfitrião (campo "ingresso") — pro filtro
+const categoriasIngresso = () =>
+  [...new Set([
+    ...lista.map((a) => (a.ingresso || "").trim()),
+    ...tiposIngresso.map((t) => (t.nome || "").trim()),
   ].filter(Boolean))].sort();
 
 function emailDuplicado(email, idExcluir) {
