@@ -48,10 +48,21 @@
       <span class="pagina-sub" id="contador" style="margin:0"></span>
     </div>
 
+    <div class="barra-acoes" id="barra-acoes" hidden>
+      <span class="barra-acoes-cont" id="sel-cont">0 selecionados</span>
+      <button class="btn btn-sm btn-secundario" data-acao="tipo">Tipo</button>
+      <button class="btn btn-sm btn-secundario" data-acao="categoria">Categoria de ingresso</button>
+      <button class="btn btn-sm btn-secundario" data-acao="responsavel">Responsável</button>
+      <button class="btn btn-sm btn-secundario" data-acao="exportar">Exportar</button>
+      <button class="btn btn-sm btn-perigo" data-acao="excluir">Excluir</button>
+      <button class="btn btn-sm btn-fantasma" data-acao="limpar">Limpar seleção</button>
+    </div>
+
     <div id="carregando" class="vazio">Carregando…</div>
     <div class="tabela-wrap" id="wrap" hidden>
-      <table class="tabela">
+      <table class="tabela tabela-part">
         <thead><tr>
+          <th class="col-check"><input type="checkbox" id="check-todos" aria-label="Selecionar todos" /></th>
           <th>Nome</th><th>Tipo</th><th>E-mail</th><th>Telefone</th>
           <th>Presença</th><th>Enviados</th><th>Aprovados</th><th></th>
         </tr></thead>

@@ -3,11 +3,12 @@
 // =============================================================================
 import {
   iniciarPagina, esc, debounce, formatarData, slugify, gerarSlugAnfitriao, telParaWhatsApp,
-  abrirModal, abrirGaveta, fecharGaveta, toast, confirmar, icone,
+  abrirModal, abrirGaveta, fecharGaveta, abrirMenu, toast, confirmar, icone,
 } from "./ui.js";
 import {
   listEstagios, listGrupos, listAnfitrioes, listarEquipe, listTiposIngresso,
-  listConvidadosDoAnfitriao, salvar, remover, inserirLote, reSincCategoriaAnfitriao, reSincResponsavelAnfitriao,
+  listConvidadosDoAnfitriao, salvar, remover, inserirLote, atualizarEmLote, removerEmLote,
+  reSincCategoriaAnfitriao, reSincResponsavelAnfitriao,
   sincAnfitriaoParticipante, desvincularAoExcluirAnfitriao,
 } from "./supabase.js";
 import { APP, TIPOS_ANFITRIAO } from "./config.js";
@@ -20,6 +21,7 @@ let CTX = null;
 let estagios = [], grupos = [], membrosOrg = [], tiposIngresso = [], lista = [];
 let aba = "todos";
 const filtros = { busca: "", grupo: "", estagio: "", presenca: "" };
+const selecionados = new Set();
 
 _iniciando.then((ctx) => { if (ctx) { CTX = ctx; carregar(ctx); } });
 
@@ -67,6 +69,15 @@ el("btn-importar").innerHTML = icone("subir") + "Importar lista";
 el("btn-importar").onclick = modalImportar;
 el("btn-exportar").innerHTML = icone("baixar") + "Exportar Excel";
 el("btn-exportar").onclick = () => exportar(filtrar());
+el("barra-acoes").querySelectorAll("[data-acao]").forEach((b) => {
+  b.onclick = () => acaoEmMassa(b.dataset.acao);
+});
+el("check-todos").onchange = (e) => {
+  const dados = filtrar();
+  if (e.target.checked) dados.forEach((a) => selecionados.add(a.id));
+  else dados.forEach((a) => selecionados.delete(a.id));
+  render();
+};
 
 /* ---- render ---- */
 function filtrar() {
@@ -89,9 +100,39 @@ function filtrar() {
 function nomeGrupo(id) { return grupos.find((g) => g.id === id)?.nome; }
 function nomeEstagio(id) { return estagios.find((s) => s.id === id)?.nome || "—"; }
 function respDoGrupo(grupoId) { return grupos.find((g) => g.id === grupoId)?.responsavel_user_id || null; }
+
+// Igual à Participantes: a categoria de ingresso manda primeiro (tem
+// responsável mais específico); o Tipo é o fallback.
+function responsavelAutomatico(grupoId, ingressoNome) {
+  if (ingressoNome) {
+    const t = tiposIngresso.find((x) => (x.nome || "").trim().toLowerCase() === ingressoNome.trim().toLowerCase());
+    if (t?.responsavel_user_id) return t.responsavel_user_id;
+  }
+  return respDoGrupo(grupoId);
+}
+
+// Quem sobe como anfitrião entra com o Tipo "Anfitrião" por padrão — mesmo
+// Tipo usado em Participantes. Cria o grupo na primeira vez que for preciso.
+async function grupoAnfitriaoId() {
+  const existente = grupos.find((g) => (g.nome || "").trim().toLowerCase() === "anfitrião");
+  if (existente) return existente.id;
+  const novo = await salvar("grupos", { nome: "Anfitrião" });
+  grupos = [...grupos, novo];
+  return novo.id;
+}
 function nomeMembro(uid) {
   const m = membrosOrg.find((x) => x.user_id === uid);
   return m ? (m.nome || m.email) : "";
+}
+
+function sincronizarBarra(dados) {
+  const n = selecionados.size;
+  el("barra-acoes").hidden = n === 0;
+  el("sel-cont").textContent = `${n} selecionado${n === 1 ? "" : "s"}`;
+  const todos = el("check-todos");
+  const noFiltro = dados.filter((a) => selecionados.has(a.id)).length;
+  todos.checked = dados.length > 0 && noFiltro === dados.length;
+  todos.indeterminate = noFiltro > 0 && noFiltro < dados.length;
 }
 
 function render() {
@@ -100,12 +141,15 @@ function render() {
   const vazio = filtrada.length === 0;
   el("wrap").hidden = vazio;
   el("vazio").hidden = !vazio;
+  [...selecionados].forEach((id) => { if (!filtrada.some((a) => a.id === id)) selecionados.delete(id); });
+  sincronizarBarra(filtrada);
   if (vazio) return;
 
   el("linhas").innerHTML = filtrada
     .map((a) => {
       const g = nomeGrupo(a.grupo_id);
       return `<tr data-id="${a.id}">
+        <td class="col-check"><input type="checkbox" data-check ${selecionados.has(a.id) ? "checked" : ""} /></td>
         <td><strong>${esc(a.nome)}</strong><div class="pagina-sub" style="margin:0;font-size:.75rem">${esc(a.tipo || "")}</div></td>
         <td>${g ? `<span class="badge badge-laranja">${esc(g)}</span>` : "—"}</td>
         <td>${esc(a.email || "—")}</td>
@@ -123,9 +167,15 @@ function render() {
 
   el("linhas").querySelectorAll("tr").forEach((tr) => {
     const id = tr.dataset.id;
+    tr.querySelector("[data-check]").onclick = (e) => e.stopPropagation();
+    tr.querySelector("[data-check]").onchange = (e) => {
+      e.target.checked ? selecionados.add(id) : selecionados.delete(id);
+      sincronizarBarra(filtrar());
+    };
     tr.onclick = (e) => {
       if (e.target.closest("[data-excluir]")) return excluir(id);
       if (e.target.closest("[data-editar]")) return abrirGavetaDetalhe(id);
+      if (e.target.closest("[data-check]")) return;
       abrirGavetaDetalhe(id);
     };
   });
@@ -148,6 +198,7 @@ function emailDuplicado(email, idExcluir) {
 
 /* ---- Novo anfitrião ---- */
 function modalNovo() {
+  const grupoAnfitriaoLocal = grupos.find((g) => (g.nome || "").trim().toLowerCase() === "anfitrião")?.id || "";
   abrirModal({
     titulo: "Novo anfitrião",
     textoConfirmar: "Criar",
@@ -158,8 +209,10 @@ function modalNovo() {
       <label class="campo"><span>E-mail</span><input class="input" name="email" type="email" /></label>
       <label class="campo"><span>Telefone</span><input class="input" name="telefone" /></label>
       <label class="campo"><span>Tipo</span>
-        <select class="select" name="grupo_id"><option value="">—</option>
-          ${grupos.map((g) => `<option value="${g.id}">${esc(g.nome)}</option>`).join("")}</select></label>
+        <select class="select" name="grupo_id">
+          ${grupoAnfitriaoLocal ? "" : `<option value="" selected>Anfitrião</option>`}
+          ${grupos.map((g) => `<option value="${g.id}" ${g.id === grupoAnfitriaoLocal ? "selected" : ""}>${esc(g.nome)}</option>`).join("")}</select>
+        <span class="cel-tenue" style="font-size:.72rem">Por padrão, todo anfitrião entra com o Tipo "Anfitrião" — mesmo Tipo usado em Participantes.</span></label>
       <label class="campo"><span>Categoria de ingresso</span>
         <select class="select" name="ingresso"><option value="">— sem categoria —</option>
           ${tiposIngresso.map((t) => `<option>${esc(t.nome)}</option>`).join("")}</select>
@@ -170,14 +223,18 @@ function modalNovo() {
       <label class="campo"><span>Responsável</span>
         <select class="select" name="responsavel_user_id"><option value="">—</option>
           ${membrosOrg.map((m) => `<option value="${esc(m.user_id)}">${esc(m.nome || m.email)}</option>`).join("")}</select>
-        <span class="cel-tenue" style="font-size:.72rem">Preenchido sozinho conforme o Tipo, se ele tiver um responsável.</span></label>`,
+        <span class="cel-tenue" style="font-size:.72rem">Preenchido sozinho conforme a Categoria de ingresso ou o Tipo, se algum deles tiver um responsável.</span></label>`,
     aoMontar: (root) => {
       const selTipo = root.querySelector('[name="grupo_id"]');
+      const selIngresso = root.querySelector('[name="ingresso"]');
       const selResp = root.querySelector('[name="responsavel_user_id"]');
-      selTipo.onchange = () => {
-        const r = respDoGrupo(selTipo.value);
+      const atualizarResp = () => {
+        const r = responsavelAutomatico(selTipo.value, selIngresso.value || null);
         if (r) selResp.value = r;
       };
+      selTipo.onchange = atualizarResp;
+      selIngresso.onchange = atualizarResp;
+      atualizarResp();
     },
     onConfirmar: async (form) => {
       const f = Object.fromEntries(new FormData(form));
@@ -187,9 +244,10 @@ function modalNovo() {
         return false;
       }
       const nome = f.nome.trim();
+      const grupoId = f.grupo_id || (await grupoAnfitriaoId());
       const dados = {
         tipo: f.tipo, nome, email: email || null, telefone: f.telefone || null,
-        grupo_id: f.grupo_id || null, ingresso: f.ingresso || null, responsavel_user_id: f.responsavel_user_id || null,
+        grupo_id: grupoId, ingresso: f.ingresso || null, responsavel_user_id: f.responsavel_user_id || null,
         categoria_convidado: f.categoria_convidado.trim() || null,
         estagio_id: estagios[0]?.id || null,
       };
@@ -214,15 +272,18 @@ function modalNovo() {
 
 /* ---- Importar lista ---- */
 const MODELO_LINHAS = [
-  ["nome", "email", "telefone", "tipo", "grupo", "categoria"],
-  ["Maria Silva", "maria@exemplo.com", "11999990000", "Titular", "Turma 1", "VIP"],
-  ["João Souza", "joao@exemplo.com", "11988887777", "Titular", "Turma 1", ""],
+  ["nome", "email", "telefone", "tipo", "grupo", "categoria", "categoria_convidados"],
+  ["Maria Silva", "maria@exemplo.com", "11999990000", "Titular", "Turma 1", "VIP", "GOLD"],
+  ["João Souza", "joao@exemplo.com", "11988887777", "Titular", "Turma 1", "", ""],
 ];
 
 const ALIAS = {
   "nome completo": "nome", "e-mail": "email",
   whatsapp: "telefone", celular: "telefone", fone: "telefone",
   turma: "grupo", ingresso: "categoria", "categoria de ingresso": "categoria",
+  categoria_convidados: "categoria_convidado", "categoria dos convidados": "categoria_convidado",
+  "categoria liberada": "categoria_convidado", "categoria liberada para convidados": "categoria_convidado",
+  "ingresso dos convidados": "categoria_convidado", "ingresso liberado": "categoria_convidado",
 };
 
 function modalImportar() {
@@ -233,9 +294,12 @@ function modalImportar() {
       <p class="pagina-sub" style="margin:0 0 10px">
         Cole uma tabela (do Excel/Sheets) ou selecione um arquivo Excel (.xlsx).
         Colunas aceitas: <b>nome</b> (obrigatória), email, telefone, tipo, grupo,
-        categoria. Grupo (Tipo) é criado automaticamente se ainda não existir —
-        e se esse Tipo já tiver um responsável cadastrado em Configurações, ele
-        é atribuído ao anfitrião automaticamente.
+        categoria (a categoria de ingresso do próprio anfitrião) e
+        categoria_convidados (a categoria liberada para os convidados dele).
+        Grupo (Tipo) é criado automaticamente se ainda não existir — sem essa
+        coluna, o anfitrião entra com o Tipo "Anfitrião". O responsável é
+        atribuído sozinho a partir da categoria de ingresso ou do Tipo, se
+        algum dos dois já tiver um responsável cadastrado em Configurações.
       </p>
       <button type="button" id="imp-modelo" style="font-size:.8rem;font-weight:600;color:var(--cor-laranja-forte);background:none;border:none;padding:0;cursor:pointer;text-decoration:underline">↓ baixar modelo</button>
       <label class="campo" style="margin-top:12px"><span>Colar tabela</span>
@@ -257,22 +321,24 @@ function modalImportar() {
         return false;
       }
 
-      // resolve/cria grupos (Tipo) por nome; responsável vem do Tipo, sozinho
+      // resolve/cria grupos (Tipo) por nome; sem grupo na planilha, usa "Anfitrião"
       const mapaGrupo = new Map(grupos.map((g) => [g.nome.toLowerCase(), g.id]));
-      const mapaGrupoResp = new Map(grupos.map((g) => [g.id, g.responsavel_user_id || null]));
       let criouAux = false;
 
       for (const l of validas) {
         if (l.grupo && !mapaGrupo.has(l.grupo.toLowerCase())) {
           const g = await salvar("grupos", { nome: l.grupo.trim() });
           mapaGrupo.set(g.nome.toLowerCase(), g.id);
-          mapaGrupoResp.set(g.id, g.responsavel_user_id || null);
+          grupos = [...grupos, g];
           criouAux = true;
         }
       }
+      const grupoPadraoId = validas.some((l) => !l.grupo) ? await grupoAnfitriaoId() : null;
+      if (grupoPadraoId) criouAux = true;
 
       const registros = validas.map((l) => {
-        const grupoId = l.grupo ? mapaGrupo.get(l.grupo.toLowerCase()) || null : null;
+        const grupoId = l.grupo ? mapaGrupo.get(l.grupo.toLowerCase()) || null : grupoPadraoId;
+        const ingresso = (l.categoria || "").trim() || null;
         const nome = l.nome.trim();
         return {
           nome,
@@ -281,8 +347,9 @@ function modalImportar() {
           telefone: (l.telefone || "").trim() || null,
           tipo: TIPOS_ANFITRIAO.includes((l.tipo || "").trim()) ? l.tipo.trim() : "Titular",
           grupo_id: grupoId,
-          ingresso: (l.categoria || "").trim() || null,
-          responsavel_user_id: grupoId ? mapaGrupoResp.get(grupoId) || null : null,
+          ingresso,
+          categoria_convidado: (l.categoria_convidado || "").trim() || null,
+          responsavel_user_id: responsavelAutomatico(grupoId, ingresso),
           estagio_id: estagios[0]?.id || null,
         };
       });
@@ -410,10 +477,12 @@ async function abrirGavetaDetalhe(id) {
   );
 
   const g = document.getElementById("gaveta");
-  g.querySelector("#d-grupo").onchange = (e) => {
-    const r = respDoGrupo(e.target.value);
+  const atualizarRespGaveta = () => {
+    const r = responsavelAutomatico(g.querySelector("#d-grupo").value, g.querySelector("#d-ingresso").value || null);
     if (r) g.querySelector("#d-resp").value = r;
   };
+  g.querySelector("#d-grupo").onchange = atualizarRespGaveta;
+  g.querySelector("#d-ingresso").onchange = atualizarRespGaveta;
   g.querySelector("#d-salvar").onclick = async () => {
     try {
       const emailNovo = g.querySelector("#d-email").value.trim();
@@ -481,6 +550,64 @@ async function excluir(id) {
   } catch (e) {
     toast(e.message, "erro");
   }
+}
+
+/* ---- Ações em massa ---- */
+async function acaoEmMassa(acao) {
+  const ids = [...selecionados];
+  if (!ids.length && acao !== "limpar") return;
+
+  if (acao === "limpar") { selecionados.clear(); render(); return; }
+
+  if (acao === "exportar") {
+    exportar(lista.filter((a) => selecionados.has(a.id)));
+    return;
+  }
+
+  if (acao === "excluir") {
+    if (!confirmar(`Excluir ${ids.length} anfitrião(ões) e seus convidados?`)) return;
+    try {
+      for (const id of ids) {
+        await desvincularAoExcluirAnfitriao(lista.find((x) => x.id === id)).catch(() => {});
+      }
+      await removerEmLote("anfitrioes", ids);
+      selecionados.clear();
+      toast(`${ids.length} anfitrião(ões) excluído(s).`, "ok");
+      lista = await listAnfitrioes();
+      render();
+    } catch (e) { toast(e.message, "erro"); }
+    return;
+  }
+
+  // tipo / categoria / responsável → menu ancorado no botão
+  const btn = el("barra-acoes").querySelector(`[data-acao="${acao}"]`);
+  let itens;
+  if (acao === "tipo") itens = grupos.map((g) => ({ valor: g.id, rotulo: g.nome }));
+  else if (acao === "categoria") itens = [{ valor: "", rotulo: "— sem categoria —" }, ...tiposIngresso.map((t) => ({ valor: t.nome, rotulo: t.nome }))];
+  else itens = [{ valor: "", rotulo: "Sem responsável" }, ...membrosOrg.map((m) => ({ valor: m.user_id, rotulo: m.nome || m.email }))];
+  const escolha = await abrirMenu(btn, itens);
+  if (escolha === null) return;
+  try {
+    if (acao === "responsavel") {
+      await atualizarEmLote("anfitrioes", ids, { responsavel_user_id: escolha || null });
+    } else {
+      // tipo/categoria: o responsável (que depende dos dois juntos) é
+      // recalculado por linha, igual em Participantes
+      const patch = acao === "tipo" ? { grupo_id: escolha || null } : { ingresso: escolha || null };
+      await atualizarEmLote("anfitrioes", ids, patch);
+      lista = await listAnfitrioes();
+      for (const a of lista.filter((x) => selecionados.has(x.id))) {
+        const atualizado = await salvar("anfitrioes", {
+          id: a.id, responsavel_user_id: responsavelAutomatico(a.grupo_id, a.ingresso),
+        }).catch((e) => { console.warn(e); return null; });
+        if (atualizado) await sincAnfitriaoParticipante(atualizado).catch((e) => console.warn(e));
+      }
+    }
+    selecionados.clear();
+    toast(`${ids.length} anfitrião(ões) atualizado(s).`, "ok");
+    lista = await listAnfitrioes();
+    render();
+  } catch (e) { toast(e.message, "erro"); }
 }
 
 function badgeStatus(s) {
