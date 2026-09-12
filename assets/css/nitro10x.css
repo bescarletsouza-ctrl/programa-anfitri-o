@@ -93,9 +93,16 @@ html { scroll-behavior: smooth; }
 .n10x-video-vazio { color: var(--n10x-texto-suave); font-size: .9rem; margin: 0; }
 
 /* ---- Benefícios ------------------------------------------------------------ */
+.n10x-beneficios { text-align: center; }
 .n10x-beneficios h3 {
   font-size: 1.25rem; font-weight: 800;
   background-image: var(--n10x-grad); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.n10x-categoria {
+  display: inline-block; margin: 8px 0 4px; padding: 6px 20px;
+  border: 1px solid var(--n10x-ouro); border-radius: 999px;
+  color: var(--n10x-ouro); font-weight: 800; font-size: .82rem;
+  letter-spacing: .07em; text-transform: uppercase;
 }
 .n10x-beneficios ul {
   list-style: none; margin: 24px auto 0; padding: 0; max-width: 420px;
