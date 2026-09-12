@@ -270,10 +270,13 @@ export function slugify(s) {
     .replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
 }
 
-// Slug curto pro link de convite: nome do anfitrião + 4 caracteres pra evitar
-// colisão (o slug é único no banco). Ex.: "joao_silva-a1b2".
+// Slug curto pro link de convite: primeiro nome + sobrenome (sem os nomes do
+// meio) + 4 caracteres pra evitar colisão (o slug é único no banco).
+// Ex.: "João Pedro Nogueira da Silva" → "joao_silva-a1b2".
 export function gerarSlugAnfitriao(nome) {
-  const raiz = slugify(nome) || "convidado";
+  const partes = String(nome || "").trim().split(/\s+/).filter(Boolean);
+  const nomeCurto = partes.length > 1 ? `${partes[0]} ${partes[partes.length - 1]}` : partes[0];
+  const raiz = slugify(nomeCurto) || "convidado";
   const bruto = crypto.randomUUID ? crypto.randomUUID().replace(/-/g, "") : `${Date.now()}${Math.random()}`;
   return `${raiz}-${bruto.slice(0, 4)}`;
 }
