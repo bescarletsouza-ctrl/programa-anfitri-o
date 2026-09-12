@@ -22,6 +22,7 @@
         <p class="pagina-sub">Cadastre e acompanhe quem convida.</p>
       </div>
       <div style="display:flex;gap:8px">
+        <button class="btn btn-secundario" id="btn-colunas">Colunas</button>
         <button class="btn btn-secundario" id="btn-importar">Importar lista</button>
         <button class="btn btn-secundario" id="btn-exportar">Exportar</button>
         <button class="btn btn-primario" id="btn-novo">+ Novo anfitrião</button>
@@ -61,11 +62,7 @@
     <div id="carregando" class="vazio">Carregando…</div>
     <div class="tabela-wrap" id="wrap" hidden>
       <table class="tabela tabela-part">
-        <thead><tr>
-          <th class="col-check"><input type="checkbox" id="check-todos" aria-label="Selecionar todos" /></th>
-          <th>Nome</th><th>Tipo</th><th>E-mail</th><th>Telefone</th>
-          <th>Presença</th><th>Enviados</th><th>Aprovados</th><th></th>
-        </tr></thead>
+        <thead><tr id="thead-anf"></tr></thead>
         <tbody id="linhas"></tbody>
       </table>
     </div>

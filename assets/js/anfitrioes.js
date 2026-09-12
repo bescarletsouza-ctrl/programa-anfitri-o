@@ -23,6 +23,29 @@ let aba = "todos";
 const filtros = { busca: "", grupo: "", estagio: "", presenca: "" };
 const selecionados = new Set();
 
+// Colunas opcionais da lista (Nome e ações são fixas). Ordem + visibilidade
+// ficam salvas no navegador.
+const COLUNAS = {
+  tipo:      "Tipo",
+  email:     "E-mail",
+  telefone:  "Telefone",
+  categoria: "Categoria de ingresso",
+  categoriaConvidado: "Categoria liberada",
+  responsavel: "Responsável",
+  estagio:   "Estágio",
+  presenca:  "Presença",
+  enviados:  "Enviados",
+  aprovados: "Aprovados",
+  cadastro:  "Cadastro",
+};
+const COLUNAS_PADRAO = ["tipo", "email", "telefone", "presenca", "enviados", "aprovados"];
+let colunas = [...COLUNAS_PADRAO];
+try {
+  const s = JSON.parse(localStorage.getItem("anf_colunas") || "null");
+  if (Array.isArray(s) && s.length) colunas = s.filter((c) => COLUNAS[c]);
+} catch {}
+const salvarColunas = () => { try { localStorage.setItem("anf_colunas", JSON.stringify(colunas)); } catch {} };
+
 _iniciando.then((ctx) => { if (ctx) { CTX = ctx; carregar(ctx); } });
 
 async function carregar() {
@@ -69,15 +92,11 @@ el("btn-importar").innerHTML = icone("subir") + "Importar lista";
 el("btn-importar").onclick = modalImportar;
 el("btn-exportar").innerHTML = icone("baixar") + "Exportar Excel";
 el("btn-exportar").onclick = () => exportar(filtrar());
+el("btn-colunas").innerHTML = icone("filtro") + "Colunas";
+el("btn-colunas").onclick = modalColunas;
 el("barra-acoes").querySelectorAll("[data-acao]").forEach((b) => {
   b.onclick = () => acaoEmMassa(b.dataset.acao);
 });
-el("check-todos").onchange = (e) => {
-  const dados = filtrar();
-  if (e.target.checked) dados.forEach((a) => selecionados.add(a.id));
-  else dados.forEach((a) => selecionados.delete(a.id));
-  render();
-};
 
 /* ---- render ---- */
 function filtrar() {
@@ -135,7 +154,39 @@ function sincronizarBarra(dados) {
   todos.indeterminate = noFiltro > 0 && noFiltro < dados.length;
 }
 
+function renderCabecalho() {
+  el("thead-anf").innerHTML =
+    `<th class="col-check"><input type="checkbox" id="check-todos" aria-label="Selecionar todos" /></th>
+     <th>Nome</th>
+     ${colunas.map((c) => `<th>${esc(COLUNAS[c])}</th>`).join("")}
+     <th></th>`;
+  el("check-todos").onchange = (e) => {
+    const dados = filtrar();
+    if (e.target.checked) dados.forEach((a) => selecionados.add(a.id));
+    else dados.forEach((a) => selecionados.delete(a.id));
+    render();
+  };
+}
+
+function celulaColuna(a, c) {
+  switch (c) {
+    case "tipo": { const g = nomeGrupo(a.grupo_id); return g ? `<span class="badge badge-laranja">${esc(g)}</span>` : "—"; }
+    case "email": return esc(a.email || "—");
+    case "telefone": return esc(a.telefone || "—");
+    case "categoria": return esc(a.ingresso || "—");
+    case "categoriaConvidado": return esc(a.categoria_convidado || "—");
+    case "responsavel": return esc(nomeMembro(a.responsavel_user_id) || "—");
+    case "estagio": return `<span class="badge badge-neutro">${esc(nomeEstagio(a.estagio_id))}</span>`;
+    case "presenca": return a.presenca ? '<span class="badge badge-ok">Sim</span>' : '<span class="badge badge-neutro">Não</span>';
+    case "enviados": return a.enviados || 0;
+    case "aprovados": return a.aprovados || 0;
+    case "cadastro": return esc(formatarData(a.created_at));
+    default: return "—";
+  }
+}
+
 function render() {
+  renderCabecalho();
   const filtrada = filtrar();
   el("contador").textContent = `Exibindo ${filtrada.length} de ${lista.length} anfitriões`;
   const vazio = filtrada.length === 0;
@@ -147,16 +198,10 @@ function render() {
 
   el("linhas").innerHTML = filtrada
     .map((a) => {
-      const g = nomeGrupo(a.grupo_id);
       return `<tr data-id="${a.id}">
         <td class="col-check"><input type="checkbox" data-check ${selecionados.has(a.id) ? "checked" : ""} /></td>
         <td><strong>${esc(a.nome)}</strong><div class="pagina-sub" style="margin:0;font-size:.75rem">${esc(a.tipo || "")}</div></td>
-        <td>${g ? `<span class="badge badge-laranja">${esc(g)}</span>` : "—"}</td>
-        <td>${esc(a.email || "—")}</td>
-        <td>${esc(a.telefone || "—")}</td>
-        <td>${a.presenca ? '<span class="badge badge-ok">Sim</span>' : '<span class="badge badge-neutro">Não</span>'}</td>
-        <td>${a.enviados || 0}</td>
-        <td>${a.aprovados || 0}</td>
+        ${colunas.map((c) => `<td>${celulaColuna(a, c)}</td>`).join("")}
         <td class="linha-acoes">
           <button class="icone-btn" data-editar title="Editar">${icone("editar")}</button>
           <button class="icone-btn" data-excluir title="Excluir">${icone("excluir")}</button>
@@ -178,6 +223,60 @@ function render() {
       if (e.target.closest("[data-check]")) return;
       abrirGavetaDetalhe(id);
     };
+  });
+}
+
+function modalColunas() {
+  let ordem = [...colunas, ...Object.keys(COLUNAS).filter((c) => !colunas.includes(c))];
+  const visiveis = new Set(colunas);
+  const corpo = () => ordem.map((c, i) => `
+    <div class="col-cfg" data-c="${c}">
+      <label><input type="checkbox" data-vis ${visiveis.has(c) ? "checked" : ""} /> ${esc(COLUNAS[c])}</label>
+      <span class="linha-acoes">
+        <button type="button" class="icone-btn" data-mv="-1" ${i === 0 ? "disabled" : ""} aria-label="Subir">▲</button>
+        <button type="button" class="icone-btn" data-mv="1" ${i === ordem.length - 1 ? "disabled" : ""} aria-label="Descer">▼</button>
+      </span>
+    </div>`).join("");
+
+  abrirModal({
+    titulo: "Colunas da lista",
+    textoConfirmar: "Aplicar",
+    corpoHtml: `<p class="pagina-sub" style="margin:0 0 12px">Marque as colunas que aparecem e use ▲ ▼ para reordenar. Nome fica sempre visível.</p>
+      <div id="col-lista">${corpo()}</div>
+      <button type="button" class="btn btn-fantasma btn-sm" id="col-reset" style="margin-top:8px">Restaurar padrão</button>`,
+    aoMontar: (root) => {
+      const redraw = () => { root.querySelector("#col-lista").innerHTML = corpo(); wire(); };
+      const wire = () => {
+        root.querySelectorAll(".col-cfg").forEach((row) => {
+          const c = row.dataset.c;
+          row.querySelector("[data-vis]").onchange = (e) => {
+            e.target.checked ? visiveis.add(c) : visiveis.delete(c);
+          };
+          row.querySelectorAll("[data-mv]").forEach((b) => {
+            b.onclick = () => {
+              const i = ordem.indexOf(c);
+              const j = i + Number(b.dataset.mv);
+              if (j < 0 || j >= ordem.length) return;
+              [ordem[i], ordem[j]] = [ordem[j], ordem[i]];
+              redraw();
+            };
+          });
+        });
+      };
+      wire();
+      root.querySelector("#col-reset").onclick = () => {
+        ordem = [...COLUNAS_PADRAO, ...Object.keys(COLUNAS).filter((c) => !COLUNAS_PADRAO.includes(c))];
+        visiveis.clear();
+        COLUNAS_PADRAO.forEach((c) => visiveis.add(c));
+        redraw();
+      };
+    },
+    onConfirmar: () => {
+      colunas = ordem.filter((c) => visiveis.has(c));
+      if (!colunas.length) colunas = [...COLUNAS_PADRAO];
+      salvarColunas();
+      render();
+    },
   });
 }
 
