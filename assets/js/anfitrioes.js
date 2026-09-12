@@ -631,7 +631,8 @@ function linkBox(rotulo, url) {
     <span>${esc(rotulo)}</span>
     <div style="display:flex;gap:6px">
       <input class="input" readonly value="${esc(url)}" style="font-size:.78rem" />
-      <button class="btn btn-secundario" data-copiar="${esc(url)}">Copiar</button>
+      <button class="icone-btn" data-copiar="${esc(url)}" title="Copiar link" aria-label="Copiar link">${icone("copiar")}</button>
+      <a class="icone-btn" href="${esc(url)}" target="_blank" rel="noopener" title="Abrir em outra aba" aria-label="Abrir em outra aba" style="text-decoration:none">${icone("externo")}</a>
     </div>
   </div>`;
 }
