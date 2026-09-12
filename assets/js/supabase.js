@@ -538,6 +538,22 @@ export async function inserirLote(tabela, registros) {
   return ok(await supabase.from(tabela).insert(rs).select());
 }
 
+// supabase.functions.invoke() só devolve uma mensagem genérica em `error.message`
+// ("Edge Function returned a non-2xx status code") — o { erro: "..." } de
+// verdade que cada function manda vai no corpo da resposta, acessível via
+// error.context (a Response bruta). Sem isso, qualquer erro 4xx/5xx da
+// function aparece como esse texto sem sentido pro usuário.
+async function mensagemErroFuncao(error, naoEncontrada) {
+  let msg = error?.message || "Falha na operação.";
+  if (error?.context && typeof error.context.json === "function") {
+    try {
+      const corpo = await error.context.json();
+      if (corpo?.erro) msg = corpo.erro;
+    } catch {}
+  }
+  return /Failed to (send|fetch)|not found|Function not found/i.test(msg) ? naoEncontrada : msg;
+}
+
 /* ---- E-mail (Edge Function "enviar-email" + Resend) ------------------ */
 // participanteIds: ids do evento atual. A function busca os e-mails no banco,
 // personaliza ({nome}/{codigo}/{email}/{evento}) e dispara pelo Resend.
@@ -546,11 +562,9 @@ export async function enviarEmail({ participanteIds, assunto, corpo, de }) {
     body: { evento_id: eventoId(), participante_ids: participanteIds, assunto, corpo, de: de || null },
   });
   if (error) {
-    throw new Error(
-      /Failed to (send|fetch)|not found|Function not found/i.test(error.message || "")
-        ? "Função de e-mail não encontrada. Faça o deploy de supabase/functions/enviar-email e configure os secrets."
-        : error.message || "Falha ao enviar."
-    );
+    throw new Error(await mensagemErroFuncao(
+      error, "Função de e-mail não encontrada. Faça o deploy de supabase/functions/enviar-email e configure os secrets."
+    ));
   }
   if (data?.erro) throw new Error(data.erro);
   return data; // { enviados, falhas, total }
@@ -585,11 +599,7 @@ export async function dispararIntegracoes(gatilho, dados = {}) {
 async function chamarEquipe(body) {
   const { data, error } = await supabase.functions.invoke("equipe", { body });
   if (error) {
-    throw new Error(
-      /Failed to (send|fetch)|not found|Function not found/i.test(error.message || "")
-        ? "Função não encontrada. Faça o deploy de supabase/functions/equipe."
-        : error.message || "Falha na operação."
-    );
+    throw new Error(await mensagemErroFuncao(error, "Função não encontrada. Faça o deploy de supabase/functions/equipe."));
   }
   if (data?.erro) throw new Error(data.erro);
   return data;
@@ -603,11 +613,7 @@ export const removerMembroEquipe = (orgId, membroId) => chamarEquipe({ acao: "re
 async function chamarPlataforma(body) {
   const { data, error } = await supabase.functions.invoke("plataforma", { body });
   if (error) {
-    throw new Error(
-      /Failed to (send|fetch)|not found|Function not found/i.test(error.message || "")
-        ? "Função não encontrada. Faça o deploy de supabase/functions/plataforma."
-        : error.message || "Falha na operação."
-    );
+    throw new Error(await mensagemErroFuncao(error, "Função não encontrada. Faça o deploy de supabase/functions/plataforma."));
   }
   if (data?.erro) throw new Error(data.erro);
   return data;
@@ -629,11 +635,7 @@ export async function testarIntegracao(integracaoId) {
     body: { evento_id: eventoId(), integracao_id: integracaoId, teste: true },
   });
   if (error) {
-    throw new Error(
-      /Failed to (send|fetch)|not found|Function not found/i.test(error.message || "")
-        ? "Função não encontrada. Faça o deploy de supabase/functions/integracoes."
-        : error.message || "Falha ao testar."
-    );
+    throw new Error(await mensagemErroFuncao(error, "Função não encontrada. Faça o deploy de supabase/functions/integracoes."));
   }
   if (data?.erro) throw new Error(data.erro);
   return data; // { disparadas, entregas: [{ ok, status, erro }] }
