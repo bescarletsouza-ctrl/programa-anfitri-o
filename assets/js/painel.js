@@ -9,7 +9,9 @@ import {
 } from "./supabase.js";
 
 const el = (id) => document.getElementById(id);
-const slug = new URLSearchParams(location.search).get("a");
+// Link curto (/painel-<slug>, via rewrite do Vercel) não chega com ?a= pro JS
+// do navegador — vale a mesma observação de convite.js.
+const slug = new URLSearchParams(location.search).get("a") || location.pathname.match(/^\/painel-(.+)$/)?.[1] || null;
 
 el("marca").innerHTML = APP.marcaHtml;
 

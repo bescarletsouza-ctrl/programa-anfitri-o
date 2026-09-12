@@ -10,7 +10,11 @@ import {
 
 const el = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
-const slug = params.get("a");
+// Link curto (/convite-<slug>, via rewrite do Vercel) não chega com ?a= pro
+// JS do navegador — o rewrite só decide qual arquivo servir, a URL visível
+// (e o location do navegador) continua sendo a curta. Por isso lê o slug do
+// caminho também; ?a= continua funcionando pros links antigos.
+const slug = params.get("a") || location.pathname.match(/^\/convite-(.+)$/)?.[1] || null;
 const utm = {
   utm_source: params.get("utm_source"),
   utm_medium: params.get("utm_medium"),
