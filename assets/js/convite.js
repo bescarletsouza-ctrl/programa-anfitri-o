@@ -234,7 +234,10 @@ async function enviar() {
     el("sucesso-texto").textContent =
       config?.texto_confirmacao || "Recebemos sua aplicação. Em breve nossa equipe entra em contato.";
     el("btn-acompanhar").href = `status.html?c=${novo.id}`;
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    // rola até a mensagem de sucesso, não até o topo da página — nas landings
+    // com tema (Nitro 10X, Branding Training) o topo é a arte/hero, bem longe
+    // daqui, e a pessoa ficaria sem ver a confirmação sem rolar de volta.
+    el("sucesso").scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (e) {
     console.error(e);
     el("passo-erro").textContent = "Não foi possível enviar agora. Tente de novo.";
