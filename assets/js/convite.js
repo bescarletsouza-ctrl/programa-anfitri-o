@@ -73,6 +73,10 @@ el("marca").innerHTML = APP.marcaHtml;
       el("n10x-video-play")?.addEventListener("click", function ativar() {
         this.outerHTML = `<iframe src="https://www.youtube.com/embed/O17ybCbS1FE?autoplay=1" title="Nitro 10X" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>`;
       }, { once: true });
+    } else if (config?.tema_convite === "branding_training") {
+      document.body.classList.add("tema-branding-training");
+      el("bt-nome-anfitriao").textContent = anfitriao.nome;
+      el("brandingtraining").hidden = false;
     }
 
     el("carregando").hidden = true;

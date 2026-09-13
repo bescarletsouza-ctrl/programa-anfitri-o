@@ -42,7 +42,7 @@ async function carregar() {
     textos.forEach((k) => { if (form[k]) form[k].value = config[k] || ""; });
     if (form.data_evento) form.data_evento.value = config.data_evento || "";
     form.meta_confirmados.value = config.meta_confirmados ?? 0;
-    if (form.tema_nitro10x) form.tema_nitro10x.checked = config.tema_convite === "nitro10x";
+    if (form.tema_convite) form.tema_convite.value = config.tema_convite || "";
     form.onsubmit = async (e) => {
       e.preventDefault();
       try {
@@ -51,7 +51,7 @@ async function carregar() {
           data_evento: form.data_evento.value || null,
           local: form.local.value.trim() || null,
           meta_confirmados: Number(form.meta_confirmados.value) || 0,
-          tema_convite: form.tema_nitro10x?.checked ? "nitro10x" : null,
+          tema_convite: form.tema_convite?.value || null,
         };
         ["subtitulo_convite", "texto_confirmacao", "texto_em_analise", "texto_aprovado", "texto_recusado"]
           .forEach((k) => { if (form[k]) patch[k] = form[k].value.trim() || null; });

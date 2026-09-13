@@ -1,0 +1,125 @@
+/* =============================================================================
+   Landing exclusiva do tema "Branding Training" (convite.html, quando o
+   evento tem tema_convite = 'branding_training'). Fica escondida
+   (#brandingtraining[hidden]) por padrão; convite.js decide se mostra.
+   ========================================================================== */
+:root {
+  --bt-bg: #0a0a0a;
+  --bt-verde: #c6ff3d;
+  --bt-verde-escuro: #4c6b0f;
+  --bt-texto: #f5f5f0;
+  --bt-texto-suave: rgba(245, 245, 240, .72);
+  --bt-borda: rgba(245, 245, 240, .14);
+}
+
+.bt { background: var(--bt-bg); color: var(--bt-texto); }
+.bt * { box-sizing: border-box; }
+
+.bt-eyebrow {
+  display: inline-block; font-size: .74rem; font-weight: 800; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--bt-verde); margin-bottom: 10px;
+}
+
+/* ---- Hero -------------------------------------------------------------- */
+.bt-hero { padding-bottom: 8px; }
+.bt-poster { width: 100%; display: block; }
+.bt-hero-corpo { max-width: 620px; margin: 0 auto; text-align: center; padding: 40px 20px 56px; }
+.bt-data { font-size: .95rem; font-weight: 700; color: var(--bt-texto-suave); margin: 0 0 16px; }
+.bt-hero h1 {
+  font-size: clamp(1.6rem, 6vw, 2.3rem); font-weight: 800; letter-spacing: -.02em;
+  line-height: 1.25; margin: 0 0 18px;
+}
+.bt-nome { color: var(--bt-verde); }
+.bt-lead { font-size: 1.02rem; line-height: 1.6; color: var(--bt-texto-suave); margin: 0 0 22px; }
+.bt-lead b { color: var(--bt-texto); }
+
+/* ---- Seções genéricas ---------------------------------------------------- */
+.bt-secao { padding: 48px 20px; border-top: 1px solid var(--bt-borda); text-align: center; }
+.bt-secao-corpo, .bt-secao { }
+.bt-secao > h2, .bt-secao > h3 {
+  max-width: 620px; margin: 0 auto 18px; font-weight: 800; letter-spacing: -.01em; line-height: 1.25;
+  text-transform: uppercase;
+}
+.bt-secao > h2 { font-size: clamp(1.4rem, 5vw, 1.9rem); }
+.bt-secao > h3 { font-size: 1.15rem; }
+.bt-frase { max-width: 560px; margin: 0 auto 14px; font-size: 1.02rem; line-height: 1.6; color: var(--bt-texto-suave); }
+.bt-frase:last-of-type { margin-bottom: 20px; }
+.bt-local { font-size: .85rem; font-weight: 700; color: var(--bt-verde); margin: 18px 0 0; }
+.bt-nomes {
+  max-width: 560px; margin: 0 auto 20px; font-size: .92rem; font-weight: 700;
+  color: var(--bt-texto); letter-spacing: .01em;
+}
+
+.bt-cta {
+  display: inline-block; margin-top: 6px; padding: 18px 40px;
+  background: var(--bt-verde); color: #06110b; font-weight: 800; font-size: 1rem;
+  text-decoration: none; border-radius: 999px; letter-spacing: .04em; text-transform: uppercase;
+  box-shadow: 0 12px 32px rgba(198, 255, 61, .22);
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.bt-cta:hover { transform: translateY(-2px); box-shadow: 0 16px 40px rgba(198, 255, 61, .32); }
+
+/* ---- Benefícios (lista com título + descrição) --------------------------- */
+.bt-lista {
+  list-style: none; margin: 8px auto 26px; padding: 0; max-width: 480px;
+  display: grid; gap: 18px; text-align: left;
+}
+.bt-lista li { border-left: 3px solid var(--bt-verde); padding-left: 16px; }
+.bt-lista h4 { margin: 0 0 4px; font-size: 1rem; font-weight: 800; }
+.bt-lista p { margin: 0; font-size: .9rem; line-height: 1.5; color: var(--bt-texto-suave); }
+
+.bt-em-breve { color: var(--bt-texto-suave); font-size: .9rem; margin: 0 0 20px; }
+
+@media (min-width: 620px) {
+  .bt-secao { padding: 64px 20px; }
+}
+
+/* Página inteira no tema Branding Training: some a marca genérica "We.events"
+   e a introdução curta do card do formulário — a landing acima já apresentou
+   tudo isso. O formulário em si (#cartao) continua igual, com a mesma
+   identidade visual. */
+body.tema-branding-training .pub-marca,
+body.tema-branding-training .pub-hero { display: none; }
+body.tema-branding-training { background: var(--bt-bg); }
+body.tema-branding-training .pub-wrap { padding-top: 24px; }
+
+body.tema-branding-training .pub-card {
+  background: #101010; color: var(--bt-texto);
+  border: 1px solid var(--bt-borda);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, .5);
+}
+body.tema-branding-training .pergunta-rotulo { color: var(--bt-texto); }
+body.tema-branding-training .pergunta-obrig { color: var(--bt-verde); }
+body.tema-branding-training .stepper-barra { background: rgba(245, 245, 240, .12); }
+body.tema-branding-training .stepper-barra > i { background: var(--bt-verde); }
+body.tema-branding-training .stepper-contagem { color: var(--bt-texto-suave); }
+body.tema-branding-training .pub-input,
+body.tema-branding-training .pub-select,
+body.tema-branding-training textarea.pub-input {
+  background: rgba(245, 245, 240, .06); color: var(--bt-texto); border-color: var(--bt-borda);
+}
+body.tema-branding-training .pub-input::placeholder,
+body.tema-branding-training textarea.pub-input::placeholder { color: var(--bt-texto-suave); }
+body.tema-branding-training .pub-input:focus,
+body.tema-branding-training .pub-select:focus,
+body.tema-branding-training textarea.pub-input:focus {
+  border-color: var(--bt-verde); box-shadow: 0 0 0 3px rgba(198, 255, 61, .22);
+}
+body.tema-branding-training .opcoes-radio label { border-color: var(--bt-borda); color: var(--bt-texto); }
+body.tema-branding-training .opcoes-radio label:hover { border-color: var(--bt-verde); }
+body.tema-branding-training .opcoes-radio label.marcado { border-color: var(--bt-verde); background: rgba(198, 255, 61, .1); }
+body.tema-branding-training .opcoes-radio input { accent-color: var(--bt-verde); }
+body.tema-branding-training .passo-erro { color: #ff8a8a; }
+body.tema-branding-training .btn-primario {
+  background: var(--bt-verde); background-image: none; color: #06110b;
+  text-transform: uppercase; letter-spacing: .04em; font-weight: 800;
+}
+body.tema-branding-training .btn-secundario { background: transparent; border-color: var(--bt-borda); color: var(--bt-texto); }
+body.tema-branding-training .passo-acoes .btn { height: 54px; font-size: 1rem; border-radius: 999px; }
+body.tema-branding-training .pub-sucesso .marca-ok { background: rgba(198, 255, 61, .15); color: var(--bt-verde); }
+body.tema-branding-training .pub-sucesso h2 { color: var(--bt-texto); }
+body.tema-branding-training .pub-sucesso p { color: var(--bt-texto-suave); }
+body.tema-branding-training .pub-erro-central h2 { color: var(--bt-texto); }
+body.tema-branding-training #link-acompanhar a { color: var(--bt-texto-suave); }
+body.tema-branding-training .pub-credito { color: rgba(245, 245, 240, .35); }
+body.tema-branding-training .pub-credito b { color: rgba(245, 245, 240, .6); }

@@ -57,10 +57,13 @@
             <label class="campo"><span>Mensagem — inscrição não aprovada</span>
               <textarea class="input" name="texto_recusado" rows="2"></textarea></label>
             <hr class="cfg-sep" />
-            <label class="campo" style="display:flex;gap:8px;align-items:center">
-              <input type="checkbox" name="tema_nitro10x" />
-              <span style="margin:0">Usar o layout personalizado do Nitro 10X no link de convite</span></label>
-            <p class="pagina-sub" style="margin:0 0 12px">Substitui só a página pública de convite (convite.html) por uma landing com a identidade visual e o texto do Nitro 10X. O formulário de inscrição continua o mesmo.</p>
+            <label class="campo"><span>Layout personalizado do link de convite</span>
+              <select class="select" name="tema_convite">
+                <option value="">Padrão We.events</option>
+                <option value="nitro10x">Nitro 10X</option>
+                <option value="branding_training">Branding Training</option>
+              </select></label>
+            <p class="pagina-sub" style="margin:0 0 12px">Substitui só a página pública de convite (convite.html) por uma landing com a identidade visual e o texto do evento escolhido. O formulário de inscrição continua o mesmo.</p>
             <button class="btn btn-primario" type="submit">Salvar dados do evento</button>
           </form>
         </section>
