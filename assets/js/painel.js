@@ -4,9 +4,7 @@
 // =============================================================================
 import { esc, slugify, formatarData } from "./ui.js";
 import { APP } from "./config.js";
-import {
-  getAnfitriaoPorSlug, listConvidadosDoAnfitriao, listMarcos, listRankingPublico, getEvento,
-} from "./supabase.js";
+import { pubPainel } from "./publico-api.js";
 
 const el = (id) => document.getElementById(id);
 // Link curto (/painel-<slug>, via rewrite do Vercel) não chega com ?a= pro JS
@@ -28,15 +26,13 @@ const situacaoDoParticipante = (c) =>
 (async function iniciar() {
   if (!slug) return erro();
   try {
-    const anfitriao = await getAnfitriaoPorSlug(slug);
-    if (!anfitriao) return erro();
-
-    const [convites, marcosRaw, ranking, evento] = await Promise.all([
-      listConvidadosDoAnfitriao(anfitriao.id),
-      listMarcos(anfitriao.evento_id).catch(() => []),
-      listRankingPublico(anfitriao.evento_id).catch(() => []),
-      getEvento(anfitriao.evento_id).catch(() => null),
-    ]);
+    const r = await pubPainel(slug);
+    if (!r?.anfitriao) return erro();
+    const anfitriao = r.anfitriao;
+    const convites = r.convites || [];
+    const marcosRaw = r.marcos || [];
+    const ranking = r.ranking || [];
+    const evento = r.evento;
     // o marco "prêmio final" acompanha a Meta de confirmados do evento, mesmo
     // que ela mude depois de o marco ter sido criado
     const metaEvento = Number(evento?.meta_confirmados) || 0;

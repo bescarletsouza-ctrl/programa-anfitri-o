@@ -20,6 +20,7 @@ async function chamar(body) {
 
 // convite.html
 export const pubConvite = (slug) => chamar({ acao: "convite", slug });
+export const pubExisteEmail = (slug, email) => chamar({ acao: "existe_email", slug, email }).then((r) => r.existe);
 export const pubEnviarConvite = (slug, registro) => chamar({ acao: "enviar_convite", slug, registro });
 
 // painel.html

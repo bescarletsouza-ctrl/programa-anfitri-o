@@ -3,20 +3,17 @@
 // =============================================================================
 import { esc, formatarData } from "./ui.js";
 import { APP } from "./config.js";
-import { getConvidadoStatus, listConvidadosPorEmail, getEvento } from "./supabase.js";
+import { pubStatus, pubStatusEmail } from "./publico-api.js";
 
 const el = (id) => document.getElementById(id);
 const idConvidado = new URLSearchParams(location.search).get("c");
-const cacheEvento = {};
+let eventosCarregados = {};
 
 el("marca").innerHTML = APP.marcaHtml;
 
-async function textoStatus(c) {
+function textoStatus(c) {
   const m = MAPA[c.status] || MAPA.Pendente;
-  if (c.evento_id && !(c.evento_id in cacheEvento)) {
-    cacheEvento[c.evento_id] = await getEvento(c.evento_id).catch(() => null);
-  }
-  const ev = cacheEvento[c.evento_id];
+  const ev = eventosCarregados[c.evento_id];
   return { m, texto: (ev && ev[m.chave]) || m.fallback };
 }
 
@@ -35,9 +32,10 @@ const MAPA = {
   if (idConvidado) {
     el("carregando").hidden = false;
     try {
-      const c = await getConvidadoStatus(idConvidado);
-      if (!c) return semResultado("Não encontramos essa inscrição.");
-      mostrarResultado([c], null);
+      const r = await pubStatus(idConvidado);
+      if (!r?.convidado) return semResultado("Não encontramos essa inscrição.");
+      eventosCarregados = r.evento ? { [r.convidado.evento_id]: r.evento } : {};
+      mostrarResultado([r.convidado], null);
     } catch (e) {
       console.error(e);
       mostrarBusca();
@@ -65,8 +63,10 @@ el("form-busca").addEventListener("submit", async (e) => {
   btn.disabled = true;
   btn.textContent = "Buscando…";
   try {
-    const lista = await listConvidadosPorEmail(email);
+    const r = await pubStatusEmail(email);
+    const lista = r?.convidados || [];
     if (!lista.length) return semResultado("Não encontramos nenhuma inscrição com esse e-mail.");
+    eventosCarregados = r.eventos || {};
     mostrarResultado(lista, email);
   } catch (err) {
     console.error(err);
@@ -89,24 +89,22 @@ function semResultado(msg) {
   el("busca-erro").textContent = msg;
 }
 
-async function mostrarResultado(lista, email) {
+function mostrarResultado(lista, email) {
   el("cartao-busca").hidden = true;
   el("cartao-resultado").hidden = false;
-  const linhas = await Promise.all(
-    lista.map(async (c) => {
-      const { m, texto } = await textoStatus(c);
-      return `<div style="padding:16px 0;border-bottom:1px solid var(--cinza-100)">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-          <strong style="font-size:1.05rem">${esc(c.nome || "Inscrição")}</strong>
-          <span class="badge ${m.cls}" style="font-size:.78rem">${m.rotulo}</span>
-        </div>
-        <p style="margin:8px 0 0;color:var(--texto-suave);line-height:1.5">${esc(texto)}</p>
-        <p class="pagina-sub" style="margin:8px 0 0;font-size:.75rem">
-          Convite de ${esc(c.anfitriao?.nome || "—")} · enviado em ${formatarData(c.created_at)}
-        </p>
-      </div>`;
-    })
-  );
+  const linhas = lista.map((c) => {
+    const { m, texto } = textoStatus(c);
+    return `<div style="padding:16px 0;border-bottom:1px solid var(--cinza-100)">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <strong style="font-size:1.05rem">${esc(c.nome || "Inscrição")}</strong>
+        <span class="badge ${m.cls}" style="font-size:.78rem">${m.rotulo}</span>
+      </div>
+      <p style="margin:8px 0 0;color:var(--texto-suave);line-height:1.5">${esc(texto)}</p>
+      <p class="pagina-sub" style="margin:8px 0 0;font-size:.75rem">
+        Convite de ${esc(c.anfitriao?.nome || "—")} · enviado em ${formatarData(c.created_at)}
+      </p>
+    </div>`;
+  });
   el("resultado").innerHTML =
     (email ? `<p class="pagina-sub" style="margin:0 0 14px">Inscrições de <b>${esc(email)}</b></p>` : "") +
     linhas.join("");

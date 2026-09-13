@@ -4,9 +4,7 @@
 // =============================================================================
 import { esc, slugify } from "./ui.js";
 import { APP } from "./config.js";
-import {
-  getAnfitriaoPorSlug, listFormPerguntas, getEvento, criarConvidado, existeConvidadoComEmail,
-} from "./supabase.js";
+import { pubConvite, pubExisteEmail, pubEnviarConvite } from "./publico-api.js";
 
 const el = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -55,13 +53,11 @@ el("marca").innerHTML = APP.marcaHtml;
 (async function iniciar() {
   if (!slug) return mostrarErro();
   try {
-    anfitriao = await getAnfitriaoPorSlug(slug);
-    if (!anfitriao) return mostrarErro();
-    [perguntas, config] = await Promise.all([
-      listFormPerguntas(anfitriao.evento_id),
-      getEvento(anfitriao.evento_id).catch(() => null),
-    ]);
-    perguntas = perguntas.filter((p) => p.ativo);
+    const r = await pubConvite(slug);
+    if (!r?.anfitriao) return mostrarErro();
+    anfitriao = r.anfitriao;
+    config = r.evento;
+    perguntas = (r.perguntas || []).filter((p) => p.ativo);
     if (!perguntas.length) return mostrarErro();
 
     el("hero").innerHTML = `
@@ -175,7 +171,7 @@ async function avancar() {
     btn.disabled = true;
     btn.textContent = "Verificando…";
     try {
-      const duplicado = await existeConvidadoComEmail(anfitriao.evento_id, v);
+      const duplicado = await pubExisteEmail(slug, v);
       if (duplicado) {
         el("passo-erro").textContent = "Este e-mail já está inscrito neste evento.";
         btn.disabled = false;
@@ -215,9 +211,6 @@ async function enviar() {
   btn.textContent = "Enviando…";
 
   const registro = {
-    anfitriao_id: anfitriao.id,
-    evento_id: anfitriao.evento_id,
-    status: "Pendente",
     respostas: {},
     utm_source: utm.utm_source || "anfitriao",
     utm_medium: utm.utm_medium || slugify(anfitriao.nome),
@@ -230,7 +223,7 @@ async function enviar() {
   });
 
   try {
-    const novo = await criarConvidado(registro);
+    const novo = await pubEnviarConvite(slug, registro);
     el("cartao").hidden = true;
     el("link-acompanhar").hidden = true;
     el("sucesso").hidden = false;

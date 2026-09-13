@@ -18,7 +18,7 @@ const json = (o: unknown, s = 200) =>
 
 const TEXTOS_EVENTO = [
   "id", "nome", "subtitulo_convite", "texto_confirmacao",
-  "texto_em_analise", "texto_aprovado", "texto_recusado",
+  "texto_em_analise", "texto_aprovado", "texto_recusado", "tema_convite",
 ];
 
 const svc = () =>
@@ -52,6 +52,17 @@ Deno.serve(async (req) => {
       return json({ anfitriao: a, perguntas: perguntas || [], evento: evento || null });
     }
 
+    if (acao === "existe_email") {
+      const a = await anfitriaoPorSlug(sb, String(body.slug || ""));
+      if (!a) return json({ erro: "Link inválido." }, 404);
+      const email = String(body.email || "").trim();
+      if (!email) return json({ existe: false });
+      const { count } = await sb.from("convidados")
+        .select("id", { count: "exact", head: true })
+        .eq("evento_id", a.evento_id).ilike("email", email);
+      return json({ existe: (count || 0) > 0 });
+    }
+
     if (acao === "enviar_convite") {
       const a = await anfitriaoPorSlug(sb, String(body.slug || ""));
       if (!a) return json({ erro: "Link inválido." }, 404);
@@ -69,12 +80,15 @@ Deno.serve(async (req) => {
     if (acao === "painel") {
       const a = await anfitriaoPorSlug(sb, String(body.slug || ""));
       if (!a) return json({ erro: "Link inválido." }, 404);
-      const [{ data: convites }, { data: marcos }, { data: ranking }] = await Promise.all([
-        sb.from("convidados").select("id, nome, status, created_at").eq("anfitriao_id", a.id).order("created_at", { ascending: false }),
+      const [{ data: convites }, { data: marcos }, { data: ranking }, { data: evento }] = await Promise.all([
+        sb.from("convidados")
+          .select("id, nome, status, created_at, participante:participantes(situacao)")
+          .eq("anfitriao_id", a.id).order("created_at", { ascending: false }),
         sb.from("marcos").select("*").eq("evento_id", a.evento_id).order("quantidade"),
         sb.from("ranking_publico").select("*").eq("evento_id", a.evento_id).order("aprovados", { ascending: false }),
+        sb.from("eventos").select("id, meta_confirmados").eq("id", a.evento_id).maybeSingle(),
       ]);
-      return json({ anfitriao: a, convites: convites || [], marcos: marcos || [], ranking: ranking || [] });
+      return json({ anfitriao: a, convites: convites || [], marcos: marcos || [], ranking: ranking || [], evento: evento || null });
     }
 
     if (acao === "status") {
