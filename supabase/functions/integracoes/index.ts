@@ -119,15 +119,22 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ erro: "Método não suportado." }, 405);
 
   try {
-    const anon = Deno.env.get("SUPABASE_ANON_KEY") || "";
-    const auth = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
-    const apikey = req.headers.get("apikey") || "";
-    if (anon && auth !== anon && apikey !== anon) return json({ erro: "Não autorizado." }, 401);
-
     const { evento_id, gatilho, dados, integracao_id, teste } = await req.json();
     if (!evento_id) return json({ erro: "evento_id obrigatório." }, 400);
 
-    const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    // Autorização real: exige um usuário logado com acesso a este evento.
+    // Reaproveita a RLS da tabela "eventos" (em vez de só checar a chave anon,
+    // que é pública por design e não prova que quem chamou é da organização).
+    const jwt = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+    if (!jwt) return json({ erro: "Não autorizado." }, 401);
+    const supaUrl = Deno.env.get("SUPABASE_URL")!;
+    const asUser = createClient(supaUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: `Bearer ${jwt}` } },
+    });
+    const { data: evVisivel } = await asUser.from("eventos").select("id").eq("id", evento_id).maybeSingle();
+    if (!evVisivel) return json({ erro: "Não autorizado." }, 401);
+
+    const sb = createClient(supaUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
     const { data: ev } = await sb.from("eventos").select("nome").eq("id", evento_id).maybeSingle();
     const ctx = { ...(dados || {}), evento_nome: ev?.nome || "" };

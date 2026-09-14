@@ -8,8 +8,8 @@ project_id = "xiuhqkvkiexmbgwyvunr"
 [functions.enviar-email]
 verify_jwt = false
 
-# Dispara webhooks/conectores de saída. Chamada pelo admin com a chave
-# publishable; valida a chave e escopa pelo evento.
+# Dispara webhooks/conectores de saída. Chamada pelo admin autenticado; exige
+# o JWT do usuário e confere (via RLS de "eventos") que ele tem acesso ao evento.
 [functions.integracoes]
 verify_jwt = false
 
