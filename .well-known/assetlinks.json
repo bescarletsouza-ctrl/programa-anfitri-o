@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "br.com.mirapontocom.events.we.twa",
+        "sha256_cert_fingerprints": ["E4:D0:E1:44:5E:06:51:E0:D3:FB:AB:71:F9:B1:4D:8D:C8:70:31:71:4A:4F:CD:27:EF:9D:49:73:FE:36:1F:49"]
+      }
+    }]
