@@ -31,10 +31,11 @@ const rotuloGatilho = (v) => GATILHOS.find((g) => g.valor === v)?.rotulo || v;
 // Conectores disponíveis (provedor → como cadastrar)
 const CONECTORES = {
   activecampaign: {
-    nome: "ActiveCampaign", desc: "Sincroniza o contato (nome, e-mail, telefone) na sua conta.",
+    nome: "ActiveCampaign", desc: "Sincroniza o contato e inscreve numa lista — use o gatilho \"inscrito na lista\" de uma automação lá pra disparar o e-mail.",
     campos: [
       { k: "base_url", rotulo: "URL da conta", ex: "https://suaconta.api-us1.com", req: true },
       { k: "api_key",  rotulo: "API Key", tipo: "password", req: true },
+      { k: "lista_id", rotulo: "ID da lista", ex: "98 (Configurações → Listas → editar a lista → o número vem na URL)" },
     ],
   },
   zapi: {

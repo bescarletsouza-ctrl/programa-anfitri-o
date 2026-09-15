@@ -43,28 +43,6 @@ function montar(intg: Record<string, unknown>, gatilho: string, dados: Record<st
   const prov = String(intg.provedor || "generico");
   const corpoPadrao = { gatilho, evento_id: intg.evento_id, dados, enviado_em: new Date().toISOString() };
 
-  if (intg.tipo === "conector" && prov === "activecampaign") {
-    const base = (cfg.base_url || "").replace(/\/+$/, "");
-    if (!base || !cfg.api_key) return null;
-    const p = dados.participante as Record<string, string> | undefined;
-    if (!p?.email) return null;
-    return {
-      url: `${base}/api/3/contact/sync`,
-      init: {
-        method: "POST",
-        headers: { "Api-Token": cfg.api_key, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contact: {
-            email: p.email,
-            firstName: (p.nome || "").split(" ")[0],
-            lastName: (p.nome || "").split(" ").slice(1).join(" "),
-            phone: p.telefone || "",
-          },
-        }),
-      },
-    };
-  }
-
   if (intg.tipo === "conector" && prov === "zapi") {
     const inst = cfg.instancia, tok = cfg.token;
     if (!inst || !tok) return null;
@@ -88,23 +66,68 @@ function montar(intg: Record<string, unknown>, gatilho: string, dados: Record<st
   return { url: String(intg.url), init: { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpoPadrao) } };
 }
 
+// ActiveCampaign precisa de 2 chamadas (sincronizar o contato, depois
+// inscrever numa lista) pra disparar automações que começam em "inscrito
+// na lista X" — é o gatilho mais comum lá. Por isso tem lógica própria,
+// fora do padrão de 1 request do montar()/fetch genérico.
+async function entregarActiveCampaign(cfg: Record<string, string>, dados: Record<string, unknown>) {
+  const base = (cfg.base_url || "").replace(/\/+$/, "");
+  const p = dados.participante as Record<string, string> | undefined;
+  if (!base || !cfg.api_key || !p?.email) return { ok: false, erro: "Configuração incompleta." };
+  const headers = { "Api-Token": cfg.api_key, "Content-Type": "application/json" };
+
+  const syncRes = await fetch(`${base}/api/3/contact/sync`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      contact: {
+        email: p.email,
+        firstName: (p.nome || "").split(" ")[0],
+        lastName: (p.nome || "").split(" ").slice(1).join(" "),
+        phone: p.telefone || "",
+      },
+    }),
+  });
+  const syncBody = await syncRes.json().catch(() => ({}));
+  if (!syncRes.ok) return { ok: false, status: syncRes.status, erro: JSON.stringify(syncBody).slice(0, 500) };
+
+  const contactId = syncBody?.contact?.id;
+  if (cfg.lista_id && contactId) {
+    const listRes = await fetch(`${base}/api/3/contactLists`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ contactList: { list: Number(cfg.lista_id), contact: Number(contactId), status: 1 } }),
+    });
+    if (!listRes.ok) {
+      const listErr = await listRes.text().catch(() => "");
+      return { ok: false, status: listRes.status, erro: listErr.slice(0, 500) };
+    }
+  }
+  return { ok: true, status: syncRes.status };
+}
+
 async function entregar(sb: ReturnType<typeof createClient>, intg: Record<string, unknown>, gatilho: string, dados: Record<string, unknown>) {
   const reg: Record<string, unknown> = {
     integracao_id: intg.id, evento_id: intg.evento_id, gatilho, payload: dados,
   };
   try {
-    const m = montar(intg, gatilho, dados);
-    if (!m) { reg.ok = false; reg.erro = "Configuração incompleta."; }
-    else {
-      const init = m.init as RequestInit & { headers: Record<string, string> };
-      if (intg.segredo && init.body) init.headers["X-WeEvents-Signature"] = "sha256=" + await hmac(String(intg.segredo), String(init.body));
-      const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 10000);
-      const r = await fetch(m.url, { ...init, signal: ctrl.signal });
-      clearTimeout(t);
-      reg.status = r.status;
-      reg.ok = r.ok;
-      if (!r.ok) reg.erro = (await r.text().catch(() => "")).slice(0, 500);
+    if (intg.tipo === "conector" && String(intg.provedor) === "activecampaign") {
+      const r = await entregarActiveCampaign((intg.config || {}) as Record<string, string>, dados);
+      reg.ok = r.ok; reg.status = r.status; if (!r.ok) reg.erro = r.erro;
+    } else {
+      const m = montar(intg, gatilho, dados);
+      if (!m) { reg.ok = false; reg.erro = "Configuração incompleta."; }
+      else {
+        const init = m.init as RequestInit & { headers: Record<string, string> };
+        if (intg.segredo && init.body) init.headers["X-WeEvents-Signature"] = "sha256=" + await hmac(String(intg.segredo), String(init.body));
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 10000);
+        const r = await fetch(m.url, { ...init, signal: ctrl.signal });
+        clearTimeout(t);
+        reg.status = r.status;
+        reg.ok = r.ok;
+        if (!r.ok) reg.erro = (await r.text().catch(() => "")).slice(0, 500);
+      }
     }
   } catch (e) {
     reg.ok = false;
