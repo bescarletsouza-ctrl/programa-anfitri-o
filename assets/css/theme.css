@@ -829,14 +829,17 @@ table.tabela tbody tr:last-child td { border-bottom: none; }
   background: #fff; overflow: hidden; position: relative;
 }
 .cracha-texto { display: flex; flex-direction: column; gap: 1mm; max-width: 100%; }
-.cracha-cartao.tem-qr .cracha-texto { padding-right: 27mm; }
+.cracha-cartao.tem-qr .cracha-texto { padding-right: 34mm; }
 .cracha-cartao > div, .cracha-texto > div { max-width: 100%; overflow-wrap: anywhere; line-height: 1.08; }
 .cracha-evento { font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: #666; margin-bottom: .5mm; }
 .cracha-nome { font-weight: 800; letter-spacing: -.02em; line-height: 1; }
 .cracha-linha { color: #333; }
 .cracha-tipo { color: #7c3aed; font-weight: 700; }
-.cracha-qr { position: absolute; right: 6mm; bottom: 6mm; line-height: 0; }
-.cracha-qr img { width: 23mm; height: 23mm; image-rendering: pixelated; }
+.cracha-qr {
+  position: absolute; right: 6mm; bottom: 6mm; line-height: 0;
+  padding: 1.5mm; border: .6mm solid #111; border-radius: 1.8mm; background: #fff;
+}
+.cracha-qr img { width: 25mm; height: 25mm; image-rendering: pixelated; display: block; }
 .cracha-semqr { font-weight: 800; letter-spacing: .08em; }
 .cracha-codigo { font-weight: 700; letter-spacing: .12em; font-variant-numeric: tabular-nums; color: #444; margin-top: 1.5mm; }
 
