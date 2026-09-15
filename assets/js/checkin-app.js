@@ -13,6 +13,8 @@ import { imprimirCracha, CRACHA_PADRAO, TAMANHOS_CRACHA, snapTamanho, limparConf
 
 const el = (id) => document.getElementById(id);
 const AVATAR = `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="8.5" r="4"/><path d="M4 21a8 8 0 0 1 16 0z"/></svg>`;
+const ICONE_SOL = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`;
+const ICONE_LUA = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
 
 const TELAS = ["tela-abrir", "tela-login", "tela-eventos", "tela-modo", "app", "tela-busca"];
 let scanner = null;
@@ -62,6 +64,9 @@ async function mostrarTela(alvo) {
   el("menu-sair").onclick = () => { fecharMenu(); sair(); };
   el("config-voltar").onclick = fecharConfig;
   el("cfg-salvar").onclick = salvarConfig;
+  el("btn-tema").onclick = alternarTema;
+  el("menu-tema").onclick = alternarTema;
+  aplicarTema(temaSalvo() || "dark");
 
   supabase.auth.onAuthStateChange((ev) => {
     if (ev === "SIGNED_OUT") { sessao = null; mostrarTela("tela-login"); }
@@ -437,6 +442,25 @@ function renderBusca() {
   el("busca-lista").querySelectorAll("[data-id]").forEach((b) => {
     b.onclick = () => { el("tela-busca").hidden = true; abrirSheet(participantes.find((x) => x.id === b.dataset.id)); };
   });
+}
+
+/* ---- tema claro/escuro ------------------------------------------------ */
+const TEMA_KEY = "ck_tema";
+function temaSalvo() {
+  try { return localStorage.getItem(TEMA_KEY); } catch { return null; }
+}
+function aplicarTema(t) {
+  const claro = t === "light";
+  document.documentElement.dataset.theme = claro ? "light" : "dark";
+  try { localStorage.setItem(TEMA_KEY, claro ? "light" : "dark"); } catch {}
+  const rot = claro ? "Tema escuro" : "Tema claro";
+  const ic = claro ? ICONE_LUA : ICONE_SOL;
+  if (el("btn-tema")) { el("btn-tema").innerHTML = ic; el("btn-tema").setAttribute("aria-label", rot); }
+  if (el("menu-tema-ic")) el("menu-tema-ic").innerHTML = ic;
+  if (el("menu-tema-txt")) el("menu-tema-txt").textContent = rot;
+}
+function alternarTema() {
+  aplicarTema(document.documentElement.dataset.theme === "light" ? "dark" : "light");
 }
 
 /* ---- menu lateral --------------------------------------------------- */

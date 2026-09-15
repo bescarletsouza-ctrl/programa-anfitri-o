@@ -1,11 +1,41 @@
 /* =============================================================================
-   Check-in mobile — app de câmera. Tela cheia, escura, cara de aplicativo.
+   Check-in mobile — app de câmera. Tela cheia, cara de aplicativo, com suporte
+   a tema claro/escuro (alternado pelo usuário, ver checkin-app.js).
    Carrega DEPOIS do theme.css (usa os tokens de cor dele).
    ========================================================================== */
-:root { --ck-bg: #0c0c0d; --ck-surface: #fff; --ck-laranja: #a78bfa; }
+:root {
+  --ck-bg: #0c0c0d;
+  --ck-surface: #fff;      /* card do bottom sheet — sempre claro, de propósito */
+  --ck-laranja: #a78bfa;
+
+  --ck-superficie: #18181b;
+  --ck-superficie-2: #131316;
+  --ck-superficie-hover: #202024;
+  --ck-borda: #1f1f22;
+  --ck-borda-forte: #262629;
+  --ck-borda-sutil: #1a1a1d;
+  --ck-input-borda: #3f3f46;
+  --ck-texto: #fff;
+  --ck-texto-suave: #a1a1aa;
+  --ck-texto-tenue: #71717a;
+  --ck-texto-fraco: #52525b;
+}
+
+:root[data-theme="light"] {
+  --ck-bg: #f6f6f5;
+  --ck-superficie: #fff;
+  --ck-superficie-2: #ffffff;
+  --ck-superficie-hover: #efefee;
+  --ck-borda: #e6e6e4;
+  --ck-borda-forte: #dcdcda;
+  --ck-borda-sutil: #ededec;
+  --ck-input-borda: #d4d4d2;
+  --ck-texto: #18181b;
+  --ck-texto-suave: #52525b;
+}
 
 html, body.ck-app {
-  margin: 0; height: 100%; background: var(--ck-bg); color: #fff;
+  margin: 0; height: 100%; background: var(--ck-bg); color: var(--ck-texto);
   overscroll-behavior: none; -webkit-tap-highlight-color: transparent;
   font-family: Inter, system-ui, sans-serif;
 }
@@ -18,14 +48,14 @@ body.ck-app {
 
 .ck-tela { position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column; background: var(--ck-bg); }
 
-/* ---- splash / código do evento ---- */
+/* ---- splash / login ---- */
 .ck-abrir { align-items: center; justify-content: center; text-align: center; padding: 32px; gap: 6px; }
 .ck-abrir-marca { font-weight: 800; font-size: 1.15rem; letter-spacing: -.02em; margin-bottom: 20px; }
 .ck-abrir-marca b { background-image: var(--marca-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .ck-abrir h1 { margin: 0; font-size: 1.8rem; letter-spacing: -.03em; }
-.ck-abrir p { margin: 6px 0 0; color: #a1a1aa; font-size: .95rem; max-width: 300px; }
+.ck-abrir p { margin: 6px 0 0; color: var(--ck-texto-suave); font-size: .95rem; max-width: 300px; }
 .ck-abrir form { margin-top: 26px; width: 100%; max-width: 340px; display: grid; gap: 16px; text-align: left; }
-.ck-abrir form label { font-size: .86rem; color: #a1a1aa; display: grid; gap: 7px; }
+.ck-abrir form label { font-size: .86rem; color: var(--ck-texto-suave); display: grid; gap: 7px; }
 .ck-form-erro { margin: 0; color: #f87171; font-size: .82rem; text-align: center; }
 
 /* ---- telas de lista (evento / modo) ---- */
@@ -33,36 +63,42 @@ body.ck-app {
 .ck-lista-topo {
   display: flex; align-items: center; gap: 14px;
   padding: calc(env(safe-area-inset-top) + 18px) 20px 18px;
-  border-bottom: 1px solid #1f1f22;
+  border-bottom: 1px solid var(--ck-borda);
 }
 .ck-lista-topo strong { display: block; font-size: 1.24rem; letter-spacing: -.01em; }
 .ck-lista-topo > div { flex: 1; min-width: 0; }
-.ck-lista-sub { font-size: .84rem; color: #a1a1aa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; display: block; }
+.ck-lista-sub { font-size: .84rem; color: var(--ck-texto-suave); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; display: block; }
 .ck-btn-txt { background: none; border: none; color: #a78bfa; font: inherit; font-weight: 650; font-size: .92rem; cursor: pointer; flex-shrink: 0; }
-.ck-icone-btn-claro { background: #1f1f22; }
-.ck-icone-btn-claro:active { background: #2f2f33; }
+.ck-icone-btn-claro { background: var(--ck-borda); color: var(--ck-texto); }
+.ck-icone-btn-claro:active { background: var(--ck-borda-forte); }
+
+/* cabeçalho de "Escolha o evento" — título centralizado, ações à direita */
+.ck-eventos-topo { position: relative; justify-content: center; }
+.ck-eventos-titulo { flex: none !important; text-align: center; }
+.ck-eventos-titulo strong { font-size: 1.4rem; }
+.ck-eventos-acoes { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 10px; }
 
 .ck-lista-corpo { flex: 1; overflow-y: auto; padding: 18px 20px calc(env(safe-area-inset-bottom) + 28px); }
-.ck-lista-rotulo { margin: 22px 4px 10px; font-size: .78rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #71717a; }
-.ck-lista-vazio { color: #71717a; text-align: center; padding: 40px 20px; font-size: .95rem; }
+.ck-lista-rotulo { margin: 22px 4px 10px; font-size: .78rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ck-texto-tenue); }
+.ck-lista-vazio { color: var(--ck-texto-tenue); text-align: center; padding: 40px 20px; font-size: .95rem; }
 
 .ck-lista-item {
   width: 100%; display: flex; align-items: center; gap: 14px; text-align: left;
   padding: 18px 18px; margin-bottom: 12px; border-radius: 16px;
-  background: #18181b; border: 1px solid #262629; color: #fff; cursor: pointer;
+  background: var(--ck-superficie); border: 1px solid var(--ck-borda-forte); color: var(--ck-texto); cursor: pointer;
 }
-.ck-lista-item:active { background: #202024; }
+.ck-lista-item:active { background: var(--ck-superficie-hover); }
 .ck-lista-item-txt { flex: 1; min-width: 0; display: grid; gap: 4px; }
 .ck-lista-item-txt strong { font-size: 1.06rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ck-lista-item-txt span { font-size: .84rem; color: #a1a1aa; }
-.ck-chevron { flex-shrink: 0; color: #52525b; font-size: 1.4rem; line-height: 1; }
+.ck-lista-item-txt span { font-size: .84rem; color: var(--ck-texto-suave); }
+.ck-chevron { flex-shrink: 0; color: var(--ck-texto-fraco); font-size: 1.4rem; line-height: 1; }
 
 .ck-modo-card {
   width: 100%; display: flex; align-items: center; gap: 16px; text-align: left;
   padding: 20px 18px; margin-bottom: 13px; border-radius: 18px;
-  background: #18181b; border: 1px solid #262629; color: #fff; cursor: pointer;
+  background: var(--ck-superficie); border: 1px solid var(--ck-borda-forte); color: var(--ck-texto); cursor: pointer;
 }
-.ck-modo-card:active { background: #202024; }
+.ck-modo-card:active { background: var(--ck-superficie-hover); }
 .ck-modo-ic {
   flex-shrink: 0; width: 54px; height: 54px; border-radius: 14px; background: rgba(167,139,250,.18);
   color: #a78bfa; display: grid; place-items: center; font-size: 1.4rem;
@@ -70,9 +106,9 @@ body.ck-app {
 .ck-modo-ic svg { width: 26px; height: 26px; }
 .ck-modo-txt { display: grid; gap: 4px; }
 .ck-modo-txt strong { font-size: 1.08rem; }
-.ck-modo-txt span { font-size: .86rem; color: #a1a1aa; line-height: 1.35; }
+.ck-modo-txt span { font-size: .86rem; color: var(--ck-texto-suave); line-height: 1.35; }
 
-/* ---- app ---- */
+/* ---- app (scanner) — overlay sobre câmera ao vivo, cores fixas de propósito ---- */
 #app { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 
 .ck-topo {
@@ -83,7 +119,7 @@ body.ck-app {
 }
 .ck-topo > * { pointer-events: auto; }
 .ck-topo-info { flex: 1; min-width: 0; display: grid; text-align: center; }
-.ck-topo-evento { font-weight: 700; font-size: 1.04rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ck-topo-evento { font-weight: 700; font-size: 1.04rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ck-topo-sub { font-size: .82rem; color: #d4d4d8; margin-top: 1px; }
 .ck-topo-sub b { color: #fff; }
 .ck-icone-btn {
@@ -120,11 +156,11 @@ body.ck-app {
   position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 12px; padding: 32px; text-align: center; background: var(--ck-bg);
 }
-.ck-cam-erro p { margin: 0; color: #d4d4d8; }
+.ck-cam-erro p { margin: 0; color: var(--ck-texto-suave); }
 
 .ck-rodape {
   padding: 14px 16px calc(env(safe-area-inset-bottom) + 14px);
-  background: var(--ck-bg); border-top: 1px solid #1f1f22;
+  background: var(--ck-bg); border-top: 1px solid var(--ck-borda);
 }
 
 /* ---- botões ---- */
@@ -137,17 +173,17 @@ body.ck-app {
 .ck-btn-primario { background: var(--marca-grad); color: #fff; }
 .ck-btn-primario:active { filter: brightness(.93); }
 .ck-btn-secundario { background: #ededed; color: #18181b; }
-.ck-btn-fantasma { background: transparent; color: #71717a; min-height: 46px; }
-.ck-btn-grande { min-height: 56px; background: rgba(255,255,255,.12); color: #fff; }
+.ck-btn-fantasma { background: transparent; color: var(--ck-texto-tenue); min-height: 46px; }
+.ck-btn-grande { min-height: 56px; background: var(--ck-borda-forte); color: var(--ck-texto); }
 .ck-btn:disabled { opacity: .6; }
 
 .ck-input {
-  width: 100%; height: 50px; border-radius: 12px; border: 1px solid #3f3f46;
-  background: #18181b; color: #fff; font: inherit; font-size: 1rem; padding: 0 16px;
+  width: 100%; height: 50px; border-radius: 12px; border: 1px solid var(--ck-input-borda);
+  background: var(--ck-superficie); color: var(--ck-texto); font: inherit; font-size: 1rem; padding: 0 16px;
 }
 .ck-input:focus { outline: none; border-color: var(--ck-laranja); }
 
-/* ---- bottom sheet ---- */
+/* ---- bottom sheet — sempre um cartão claro, independente do tema do app ---- */
 .ck-sheet-fundo { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 30; opacity: 0; transition: opacity .24s; }
 .ck-sheet-fundo.aberto { opacity: 1; }
 .ck-sheet {
@@ -200,47 +236,47 @@ body.ck-app {
 .ck-sucesso strong { font-size: 1.3rem; letter-spacing: -.02em; }
 .ck-sucesso span { color: rgba(255,255,255,.85); }
 
-/* ---- busca manual ---- */
+/* ---- busca manual / lista de participantes ---- */
 .ck-busca { background: var(--ck-bg); z-index: 25; }
 .ck-busca-topo {
   display: flex; align-items: center; gap: 12px;
   padding: calc(env(safe-area-inset-top) + 16px) 18px 16px;
-  border-bottom: 1px solid #1f1f22;
+  border-bottom: 1px solid var(--ck-borda);
 }
 .ck-busca-lista { flex: 1; overflow-y: auto; padding: 10px 14px calc(env(safe-area-inset-bottom) + 90px); }
 .ck-busca-item {
   width: 100%; display: flex; align-items: center; gap: 14px; text-align: left;
-  padding: 14px 12px; background: none; border: none; border-bottom: 1px solid #1a1a1d; color: #fff; cursor: pointer;
+  padding: 14px 12px; background: none; border: none; border-bottom: 1px solid var(--ck-borda-sutil); color: var(--ck-texto); cursor: pointer;
 }
-.ck-busca-item:active { background: #18181b; }
+.ck-busca-item:active { background: var(--ck-superficie); }
 .ck-busca-item-txt { flex: 1; min-width: 0; display: grid; gap: 3px; }
 .ck-busca-item-txt strong { font-size: 1.02rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ck-busca-item-txt span { font-size: .82rem; color: #a1a1aa; }
+.ck-busca-item-txt span { font-size: .82rem; color: var(--ck-texto-suave); }
 .ck-tag-ok { flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; background: rgba(21,128,61,.2); color: #4ade80; display: grid; place-items: center; font-size: .82rem; }
-.ck-busca-vazio { color: #71717a; text-align: center; padding: 30px; font-size: .95rem; }
+.ck-busca-vazio { color: var(--ck-texto-tenue); text-align: center; padding: 30px; font-size: .95rem; }
 
 /* ---- menu lateral ---- */
 .ck-menu-fundo { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 34; opacity: 0; transition: opacity .22s; }
 .ck-menu-fundo.aberto { opacity: 1; }
 .ck-menu {
   position: fixed; top: 0; bottom: 0; left: 0; z-index: 35;
-  width: min(78vw, 300px); background: #131316; color: #fff;
+  width: min(78vw, 300px); background: var(--ck-superficie-2); color: var(--ck-texto);
   display: flex; flex-direction: column;
   padding: calc(env(safe-area-inset-top) + 22px) 16px calc(env(safe-area-inset-bottom) + 16px);
   transform: translateX(-105%); transition: transform .26s cubic-bezier(.32,.72,0,1);
-  border-right: 1px solid #232327;
+  border-right: 1px solid var(--ck-borda-forte);
 }
 .ck-menu.aberto { transform: translateX(0); }
 .ck-menu-cab { margin-bottom: 26px; }
-.ck-menu-sub { display: block; font-size: .82rem; color: #a1a1aa; margin-top: 5px; word-break: break-all; }
+.ck-menu-sub { display: block; font-size: .82rem; color: var(--ck-texto-suave); margin-top: 5px; word-break: break-all; }
 .ck-menu-corpo { flex: 1; display: flex; flex-direction: column; gap: 6px; }
 .ck-menu-item {
   display: flex; align-items: center; gap: 14px; width: 100%; text-align: left;
-  padding: 15px 12px; border-radius: 14px; background: none; border: none; color: #fff;
+  padding: 15px 12px; border-radius: 14px; background: none; border: none; color: var(--ck-texto);
   font: inherit; font-size: 1rem; font-weight: 550; cursor: pointer;
 }
 .ck-menu-item svg { width: 21px; height: 21px; flex-shrink: 0; color: var(--ck-laranja); }
-.ck-menu-item:active { background: #1f1f22; }
+.ck-menu-item:active { background: var(--ck-borda); }
 .ck-menu-sair {
   background: none; border: none; color: #f87171; font: inherit; font-size: .95rem;
   font-weight: 600; text-align: left; padding: 14px 12px; cursor: pointer;
@@ -264,18 +300,14 @@ body.ck-app {
 
 /* ---- tela de configuração (impressora/etiqueta) ---- */
 .ck-campo { display: block; margin-bottom: 16px; }
-.ck-campo > span { display: block; font-size: .82rem; color: #a1a1aa; margin-bottom: 7px; }
+.ck-campo > span { display: block; font-size: .82rem; color: var(--ck-texto-suave); margin-bottom: 7px; }
 .ck-check-row { display: flex; align-items: center; gap: 10px; font-size: .92rem; margin-bottom: 14px; cursor: pointer; }
 .ck-check-row input { width: 18px; height: 18px; accent-color: var(--ck-laranja); flex-shrink: 0; }
 .ck-select {
-  width: 100%; height: 44px; border-radius: 10px; border: 1px solid #3f3f46;
-  background: #18181b; color: #fff; font: inherit; font-size: .9rem; padding: 0 12px;
+  width: 100%; height: 44px; border-radius: 10px; border: 1px solid var(--ck-input-borda);
+  background: var(--ck-superficie); color: var(--ck-texto); font: inherit; font-size: .9rem; padding: 0 12px;
 }
-.ck-linha-cfg { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid #1f1f22; }
+.ck-linha-cfg { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--ck-borda); }
 .ck-linha-cfg .ck-check-row { margin: 0; flex: 1; }
 .ck-linha-cfg .ck-select { width: 126px; flex-shrink: 0; height: 40px; }
-.pagina-sub-ck { font-size: .82rem; color: #71717a; line-height: 1.55; margin: 16px 0 0; }
-
-@media (prefers-color-scheme: light) {
-  .ck-sheet { color: #18181b; }
-}
+.pagina-sub-ck { font-size: .82rem; color: var(--ck-texto-tenue); line-height: 1.55; margin: 16px 0 0; }

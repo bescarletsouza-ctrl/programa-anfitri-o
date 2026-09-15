@@ -49,12 +49,15 @@
 
   <!-- Seleção de evento -->
   <section id="tela-eventos" class="ck-tela ck-lista-tela" hidden>
-    <header class="ck-lista-topo">
-      <div>
+    <header class="ck-lista-topo ck-eventos-topo">
+      <div class="ck-eventos-titulo">
         <strong>Escolha o evento</strong>
         <span id="eventos-usuario" class="ck-lista-sub"></span>
       </div>
-      <button class="ck-btn-txt" id="btn-sair">Sair</button>
+      <div class="ck-eventos-acoes">
+        <button class="ck-icone-btn ck-icone-btn-claro" id="btn-tema" aria-label="Tema claro"></button>
+        <button class="ck-btn-txt" id="btn-sair">Sair</button>
+      </div>
     </header>
     <div class="ck-lista-corpo" id="eventos-lista"></div>
   </section>
@@ -145,7 +148,7 @@
   <!-- Busca manual -->
   <section class="ck-tela ck-busca" id="tela-busca" hidden>
     <header class="ck-busca-topo">
-      <button class="ck-icone-btn" id="busca-voltar" aria-label="Voltar">
+      <button class="ck-icone-btn ck-icone-btn-claro" id="busca-voltar" aria-label="Voltar">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
       </button>
       <input class="ck-input" id="in-busca" placeholder="Nome, e-mail ou código" autocomplete="off" />
@@ -160,7 +163,7 @@
   <!-- Impressora e etiqueta -->
   <section class="ck-tela ck-busca" id="tela-config" hidden>
     <header class="ck-busca-topo">
-      <button class="ck-icone-btn" id="config-voltar" aria-label="Voltar">
+      <button class="ck-icone-btn ck-icone-btn-claro" id="config-voltar" aria-label="Voltar">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
       </button>
       <strong style="font-size:1rem">Impressora e etiqueta</strong>
@@ -198,6 +201,10 @@
       <button class="ck-menu-item" id="menu-config">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         Impressora e etiqueta
+      </button>
+      <button class="ck-menu-item" id="menu-tema">
+        <span id="menu-tema-ic"></span>
+        <span id="menu-tema-txt">Tema claro</span>
       </button>
     </div>
     <button class="ck-menu-sair" id="menu-sair">Sair</button>
