@@ -1277,7 +1277,7 @@ function modalImportar() {
           empresa: (l.empresa || "").trim() || null,
           tipo, ingresso,
           faturamento: (l.faturamento || "").trim() || null,
-          situacao: normSituacao(l.situacao) || "Confirmado",
+          situacao: normSituacao(l.situacao) || "Pré-inscrito",
           pagamento: normPag(l.pagamento) || "Gratuito",
           quantidade: Number(l.quantidade) || 1,
           etapa_id: etapas[0]?.id || null,

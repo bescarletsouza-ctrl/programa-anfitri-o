@@ -324,6 +324,7 @@ export async function sincAnfitriaoParticipante(anfitriao) {
       nome: a.nome, email: a.email || null, telefone: a.telefone || null,
       tipo: "Anfitrião", pagamento: "Gratuito", anfitriao_id: a.id, origem_anfitriao: true,
       ingresso: a.ingresso || null, responsavel_user_id: a.responsavel_user_id || null,
+      situacao: "Pré-inscrito",
       etapa_id: await primeiraEtapaId(a.evento_id),
     });
     await salvar("anfitrioes", { id: a.id, participante_id: novo.id });
