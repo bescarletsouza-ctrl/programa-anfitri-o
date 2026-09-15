@@ -5,13 +5,14 @@
 // Tudo client-side, sem lib de gráfico.
 // =============================================================================
 import { iniciarPagina, esc, formatarData } from "./ui.js";
-import { listParticipantes, listTiposIngresso } from "./supabase.js";
+import { listParticipantes, listTiposIngresso, listCamposPersonalizados } from "./supabase.js";
 
 const _iniciando = iniciarPagina("painel-evento");
 const el = (id) => document.getElementById(id);
 
 let participantes = [];
 let tipos = [];
+let camposPersonalizados = [];
 
 const SITUACOES = ["Confirmado", "Pendente", "Fila de espera", "Pré-inscrito", "Desativado"];
 const situ = (p) => p.situacao || "Confirmado";
@@ -33,9 +34,10 @@ el("btn-atualizar").onclick = () => carregar();
 
 async function carregar() {
   try {
-    [participantes, tipos] = await Promise.all([
+    [participantes, tipos, camposPersonalizados] = await Promise.all([
       listParticipantes(),
       listTiposIngresso().catch(() => []),
+      listCamposPersonalizados().catch(() => []),
     ]);
     el("carregando").hidden = true;
     el("painel").hidden = false;
@@ -75,6 +77,7 @@ function render() {
   renderQuebra("rel-tipo", ativos, (p) => p.tipo || "—");
   renderQuebra("rel-situacao", participantes, situ, SITUACOES);
   renderFaturamento(ativos);
+  renderCamposPersonalizados(ativos);
 }
 
 function renderDias(dados) {
@@ -117,6 +120,36 @@ function renderQuebra(alvo, dados, chave, ordemFixa) {
       </div>`;
     })
     .join("");
+}
+
+// valores de um campo personalizado pra um participante (texto/única = 1 valor; múltipla = N)
+function valoresCampo(campo, p) {
+  const v = p.campos_extra?.[campo.chave];
+  if (campo.tipo === "multipla_escolha") return Array.isArray(v) && v.length ? v : ["— não preenchido —"];
+  return [v || "— não preenchido —"];
+}
+
+function renderCamposPersonalizados(dados) {
+  const wrap = el("rel-campos");
+  const ativos = camposPersonalizados.filter((c) => c.ativo);
+  if (!ativos.length) { wrap.innerHTML = ""; return; }
+  wrap.innerHTML = ativos.map((c) => {
+    const mapa = new Map();
+    dados.forEach((p) => valoresCampo(c, p).forEach((v) => mapa.set(v, (mapa.get(v) || 0) + 1)));
+    const total = dados.length || 1;
+    const linhas = [...mapa.entries()].sort((a, b) => b[1] - a[1]);
+    return `<div class="rel-secao">
+      <h2>${esc(c.nome)}</h2>
+      ${linhas.map(([k, n]) => {
+        const pct = Math.round((n / total) * 100);
+        return `<div class="rel-barra">
+          <span class="rel-barra-nome" title="${esc(k)}">${esc(k)}</span>
+          <span class="rel-barra-trilha"><i style="width:${pct}%"></i></span>
+          <span class="rel-barra-valor">${n}</span>
+        </div>`;
+      }).join("")}
+    </div>`;
+  }).join("");
 }
 
 function renderFaturamento(dados) {

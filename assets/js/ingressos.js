@@ -4,27 +4,31 @@
 // distribuição por situação + vagas preenchidas.
 // =============================================================================
 import { iniciarPagina, esc, debounce, formatarData, abrirModal, toast, confirmar, icone } from "./ui.js";
-import { listTiposIngresso, listParticipantes, salvar, remover } from "./supabase.js";
+import { listTiposIngresso, listParticipantes, listCamposPersonalizados, salvar, remover } from "./supabase.js";
 import { baixarXLSX } from "./tabela.js";
+import { TIPOS_CAMPO_PERSONALIZADO } from "./config.js";
 
 const _iniciando = iniciarPagina("ingressos");
 const el = (id) => document.getElementById(id);
 
-let tipos = [], participantes = [];
+let tipos = [], participantes = [], campos = [];
 let termo = "";
 
 const SIT_ORDEM = ["Confirmado", "Pendente", "Fila de espera", "Pré-inscrito", "Desativado"];
+const rotuloTipoCampo = (v) => TIPOS_CAMPO_PERSONALIZADO.find((t) => t.valor === v)?.rotulo || v;
 
 _iniciando.then((ctx) => { if (ctx) carregar(ctx); });
 el("btn-novo").onclick = () => editar(null);
 el("btn-exportar").onclick = exportar;
+el("add-campo").onclick = () => modalCampo(null);
 el("busca").addEventListener("input", debounce((e) => { termo = e.target.value.trim().toLowerCase(); render(); }, 150));
 
 async function carregar() {
   try {
-    [tipos, participantes] = await Promise.all([
+    [tipos, participantes, campos] = await Promise.all([
       listTiposIngresso(),
       listParticipantes().catch(() => []),
+      listCamposPersonalizados().catch(() => []),
     ]);
     el("carregando").hidden = true;
     el("painel").hidden = false;
@@ -57,13 +61,99 @@ function render() {
   const lista = filtrados();
   el("wrap").hidden = lista.length === 0;
   el("vazio").hidden = lista.length !== 0;
-  if (!lista.length) { el("linhas").innerHTML = ""; return; }
+  if (lista.length) {
+    el("linhas").innerHTML = lista.map(linhaHtml).join("");
+    el("linhas").querySelectorAll("tr").forEach((tr) => {
+      const t = tipos.find((x) => x.id === tr.dataset.id);
+      tr.querySelector("[data-editar]").onclick = () => editar(t);
+      tr.querySelector("[data-excluir]").onclick = () => excluir(t);
+    });
+  } else {
+    el("linhas").innerHTML = "";
+  }
+  renderCampos();
+}
 
-  el("linhas").innerHTML = lista.map(linhaHtml).join("");
-  el("linhas").querySelectorAll("tr").forEach((tr) => {
-    const t = tipos.find((x) => x.id === tr.dataset.id);
-    tr.querySelector("[data-editar]").onclick = () => editar(t);
-    tr.querySelector("[data-excluir]").onclick = () => excluir(t);
+/* ---- Campos personalizados ---- */
+function renderCampos() {
+  const c = el("lista-campos");
+  c.innerHTML = campos.length ? campos.map((cp) => `
+    <div class="integ-linha" data-id="${cp.id}">
+      <div class="integ-linha-info">
+        <div class="integ-linha-nome">${esc(cp.nome)} ${cp.ativo ? `<span class="badge badge-ok">Ativo</span>` : `<span class="badge badge-neutro">Pausado</span>`}
+          <span class="badge badge-info">${esc(rotuloTipoCampo(cp.tipo))}</span></div>
+        ${cp.tipo !== "texto" && cp.opcoes?.length ? `<div class="integ-tags">${cp.opcoes.map((o) => `<span class="integ-tag">${esc(o)}</span>`).join("")}</div>` : ""}
+      </div>
+      <span class="linha-acoes">
+        <button class="icone-btn" data-toggle-campo="${cp.id}" title="${cp.ativo ? "Pausar" : "Ativar"}">${icone(cp.ativo ? "pausar" : "play")}</button>
+        <button class="icone-btn" data-editar-campo="${cp.id}" title="Editar">${icone("editar")}</button>
+        <button class="icone-btn" data-excluir-campo="${cp.id}" title="Excluir">${icone("excluir")}</button>
+      </span>
+    </div>`).join("") : `<p class="pagina-sub" style="margin:0">Nenhum campo personalizado ainda.</p>`;
+  c.querySelectorAll("[data-editar-campo]").forEach((b) => {
+    b.onclick = () => modalCampo(campos.find((x) => x.id === b.dataset.editarCampo));
+  });
+  c.querySelectorAll("[data-excluir-campo]").forEach((b) => {
+    b.onclick = async () => {
+      if (!confirmar("Excluir este campo? As respostas já preenchidas pelos participantes continuam salvas, só somem da tela.")) return;
+      try { await remover("campos_personalizados", b.dataset.excluirCampo); toast("Excluído.", "ok"); carregar(); }
+      catch (e) { toast(e.message, "erro"); }
+    };
+  });
+  c.querySelectorAll("[data-toggle-campo]").forEach((b) => {
+    b.onclick = async () => {
+      const cp = campos.find((x) => x.id === b.dataset.toggleCampo);
+      try { await salvar("campos_personalizados", { id: cp.id, ativo: !cp.ativo }); carregar(); }
+      catch (e) { toast(e.message, "erro"); }
+    };
+  });
+}
+
+function modalCampo(cp) {
+  abrirModal({
+    titulo: cp ? "Editar campo" : "Novo campo personalizado",
+    textoConfirmar: cp ? "Salvar" : "Criar",
+    corpoHtml: `
+      <label class="campo"><span>Nome *</span>
+        <input class="input" name="nome" required value="${esc(cp?.nome || "")}" placeholder="Ex.: Renda mensal" /></label>
+      <label class="campo"><span>Tipo *</span>
+        <select class="select" name="tipo">
+          ${TIPOS_CAMPO_PERSONALIZADO.map((t) => `<option value="${t.valor}" ${t.valor === (cp?.tipo || "texto") ? "selected" : ""}>${esc(t.rotulo)}</option>`).join("")}
+        </select></label>
+      <div id="opcoes-box" ${!cp || cp.tipo === "texto" ? "hidden" : ""}>
+        <label class="campo"><span>Opções (uma por linha)</span>
+          <textarea class="input" name="opcoes" rows="4" placeholder="Até R$ 5 mil&#10;R$ 5 mil – R$ 15 mil&#10;Acima de R$ 15 mil">${esc((cp?.opcoes || []).join("\n"))}</textarea></label>
+      </div>
+      <label class="campo" style="display:flex;gap:8px;align-items:center">
+        <input type="checkbox" name="ativo" ${cp?.ativo !== false ? "checked" : ""} /> <span style="margin:0">Ativo</span></label>`,
+    aoMontar: (root) => {
+      const selTipo = root.querySelector('[name="tipo"]');
+      const box = root.querySelector("#opcoes-box");
+      selTipo.onchange = () => { box.hidden = selTipo.value === "texto"; };
+    },
+    onConfirmar: async (form) => {
+      const fd = new FormData(form);
+      const tipo = fd.get("tipo");
+      const opcoes = tipo === "texto" ? [] : (fd.get("opcoes") || "").toString().split("\n").map((s) => s.trim()).filter(Boolean);
+      if (tipo !== "texto" && !opcoes.length) { toast("Adicione ao menos uma opção.", "erro"); return false; }
+      const reg = {
+        nome: fd.get("nome").trim(),
+        tipo, opcoes,
+        ativo: form.querySelector('[name="ativo"]').checked,
+      };
+      if (cp) reg.id = cp.id;
+      else reg.chave = fd.get("nome").trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+        .replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || `campo_${Date.now()}`;
+      try {
+        await salvar("campos_personalizados", reg);
+      } catch (e) {
+        const msg = e.message || "";
+        toast(/unique|duplicate/.test(msg) ? "Já existe um campo com esse nome." : msg, "erro");
+        return false;
+      }
+      toast("Salvo.", "ok");
+      carregar();
+    },
   });
 }
 

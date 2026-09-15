@@ -45,3 +45,11 @@ export const TIPOS_PERGUNTA = [
   { valor: "url", rotulo: "Site / URL" },
   { valor: "selecao", rotulo: "Múltipla escolha" },
 ];
+
+// Campos personalizados do evento (tela "Tipos de ingresso"), preenchidos por
+// participante — diferente de TIPOS_PERGUNTA, que é do formulário de convite.
+export const TIPOS_CAMPO_PERSONALIZADO = [
+  { valor: "texto", rotulo: "Texto" },
+  { valor: "unica_escolha", rotulo: "Única escolha" },
+  { valor: "multipla_escolha", rotulo: "Múltipla escolha" },
+];

@@ -10,13 +10,14 @@ import {
 } from "./ui.js";
 import {
   listParticipantes, listEtapasParticipante, listAtividades, listCheckins, listTiposIngresso, listGrupos,
+  listCamposPersonalizados,
   salvar, remover, inserirLote, atualizarEmLote, removerEmLote, registrarCheckin, listarEquipe,
   sincParticipanteAnfitriao, desvincularAoExcluirParticipante, dispararIntegracoes, definirStatusConvidado,
 } from "./supabase.js";
 import { STATUS_CONVIDADO } from "./config.js";
 import { eventoNome } from "./evento.js";
 import { imprimirCracha } from "./cracha.js";
-import { parsearTabela, lerXlsx, baixarXLSX, baixarModeloXLSX } from "./tabela.js";
+import { parsearTabela, lerXlsx, baixarXLSX, baixarModeloXLSX, normalizarCab } from "./tabela.js";
 import { abrirEnvioEmail } from "./email.js";
 
 const _iniciando = iniciarPagina("participantes");
@@ -34,8 +35,9 @@ const FAIXAS = [
 const POR_PAGINA = 50;
 
 // Colunas opcionais da lista (Nome e ações são fixas). Ordem + visibilidade
-// ficam salvas no navegador.
-const COLUNAS = {
+// ficam salvas no navegador. Campos personalizados ativos entram como colunas
+// extras ("campo_<chave>"), mescladas em COLUNAS depois de carregar (mesclarColunasCampos).
+const COLUNAS_BASE = {
   codigo:     "Código",
   tipo:       "Tipo",
   categoria:  "Categoria",
@@ -49,13 +51,22 @@ const COLUNAS = {
   presenca:   "Presença",
   cadastro:   "Cadastro",
 };
+let COLUNAS = { ...COLUNAS_BASE };
 const COLUNAS_PADRAO = ["codigo", "tipo", "categoria", "responsavel", "situacao", "statusConvite", "pagamento", "etapa", "presenca", "cadastro"];
 let colunas = [...COLUNAS_PADRAO];
 try {
   const s = JSON.parse(localStorage.getItem("part_colunas") || "null");
-  if (Array.isArray(s) && s.length) colunas = s.filter((c) => COLUNAS[c]);
+  if (Array.isArray(s) && s.length) colunas = s;
 } catch {}
 const salvarColunas = () => { try { localStorage.setItem("part_colunas", JSON.stringify(colunas)); } catch {} };
+const chaveColCampo = (chave) => `campo_${chave}`;
+function mesclarColunasCampos() {
+  COLUNAS = {
+    ...COLUNAS_BASE,
+    ...Object.fromEntries(camposPersonalizados.filter((c) => c.ativo).map((c) => [chaveColCampo(c.chave), c.nome])),
+  };
+  colunas = colunas.filter((c) => COLUNAS[c]);
+}
 const COL_DB = { categoria: "ingresso" };
 const ALIAS_IMPORT = {
   "nome completo": "nome", "e-mail": "email", whatsapp: "telefone", celular: "telefone",
@@ -70,7 +81,7 @@ const normSituacao = (v) => {
 };
 
 let CTX = null;
-let participantes = [], etapas = [], atividades = [], checkins = [], tiposIngresso = [], grupos = [], membrosOrg = [];
+let participantes = [], etapas = [], atividades = [], checkins = [], tiposIngresso = [], grupos = [], membrosOrg = [], camposPersonalizados = [];
 let vista = "lista";
 let pagina = 1;
 const selecionados = new Set();
@@ -166,13 +177,15 @@ _iniciando.then((ctx) => { if (ctx) { CTX = ctx; carregar(ctx); } });
 
 async function carregar() {
   try {
-    [participantes, etapas, atividades, checkins, tiposIngresso, grupos, membrosOrg] = await Promise.all([
+    [participantes, etapas, atividades, checkins, tiposIngresso, grupos, membrosOrg, camposPersonalizados] = await Promise.all([
       listParticipantes(), listEtapasParticipante(),
       listAtividades().catch(() => []), listCheckins().catch(() => []),
       listTiposIngresso().catch(() => []),
       listGrupos().catch(() => []),
       CTX?.org?.id ? listarEquipe(CTX.org.id).catch(() => []) : Promise.resolve([]),
+      listCamposPersonalizados().catch(() => []),
     ]);
+    mesclarColunasCampos();
     TIPOS = grupos.length ? grupos.map((g) => g.nome) : [...TIPOS_PADRAO];
     opcoes(el("f-tipo"), TIPOS, "Todos os tipos");
     opcoes(el("f-pagamento"), PAGAMENTOS, "Todos os pagamentos");
@@ -374,6 +387,13 @@ function linhaHtml(p) {
 }
 
 function celulaHtml(p, c) {
+  if (c.startsWith("campo_")) {
+    const chave = c.slice(6);
+    const v = p.campos_extra?.[chave];
+    if (v == null || v === "" || (Array.isArray(v) && !v.length)) return `<td><span class="cel-tenue">—</span></td>`;
+    if (Array.isArray(v)) return `<td>${v.map((x) => `<span class="chip-cat" style="margin:1px 4px 1px 0">${esc(x)}</span>`).join("")}</td>`;
+    return `<td>${esc(v)}</td>`;
+  }
   switch (c) {
     case "codigo":
       return `<td><span class="chip-codigo">${esc(p.codigo || "—")}</span></td>`;
@@ -912,6 +932,47 @@ function cardPart(p) {
   </div>`;
 }
 
+/* ---- Campos personalizados (form de participante) ---- */
+function camposFormHtml(valores) {
+  const ativos = camposPersonalizados.filter((c) => c.ativo);
+  if (!ativos.length) return "";
+  return `<div class="secao" style="border-top:1px solid var(--borda);margin-top:6px;padding-top:14px">
+    <h4 style="margin:0 0 10px;font-size:.7rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--texto-tenue)">Campos personalizados</h4>
+    ${ativos.map((c) => {
+      const v = valores?.[c.chave];
+      if (c.tipo === "unica_escolha") {
+        return `<label class="campo"><span>${esc(c.nome)}</span>
+          <select class="select" name="campo_${esc(c.chave)}"><option value="">—</option>
+            ${(c.opcoes || []).map((o) => `<option ${o === v ? "selected" : ""}>${esc(o)}</option>`).join("")}
+          </select></label>`;
+      }
+      if (c.tipo === "multipla_escolha") {
+        const marcados = new Set(Array.isArray(v) ? v : []);
+        return `<div class="campo"><span>${esc(c.nome)}</span>
+          <div class="integ-checks">
+            ${(c.opcoes || []).map((o) => `<label><input type="checkbox" name="campo_${esc(c.chave)}" value="${esc(o)}" ${marcados.has(o) ? "checked" : ""} /> ${esc(o)}</label>`).join("")}
+          </div></div>`;
+      }
+      return `<label class="campo"><span>${esc(c.nome)}</span><input class="input" name="campo_${esc(c.chave)}" value="${esc(v || "")}" /></label>`;
+    }).join("")}
+  </div>`;
+}
+
+function camposExtraDoForm(fd, valoresAtuais) {
+  const campos_extra = { ...(valoresAtuais || {}) };
+  camposPersonalizados.filter((c) => c.ativo).forEach((c) => {
+    const nome = `campo_${c.chave}`;
+    if (c.tipo === "multipla_escolha") {
+      const vals = fd.getAll(nome).map((v) => v.toString().trim()).filter(Boolean);
+      if (vals.length) campos_extra[c.chave] = vals; else delete campos_extra[c.chave];
+    } else {
+      const v = (fd.get(nome) || "").toString().trim();
+      if (v) campos_extra[c.chave] = v; else delete campos_extra[c.chave];
+    }
+  });
+  return campos_extra;
+}
+
 /* ---- Cadastrar / editar ---- */
 function abrirForm(p) {
   const respPadrao = p ? (p.responsavel_user_id || "") : (responsavelAutomatico("Convidado", null) || "");
@@ -945,7 +1006,8 @@ function abrirForm(p) {
       <label class="campo"><span>Quantidade</span><input class="input" name="quantidade" type="number" min="1" value="${p?.quantidade ?? 1}" /></label>
       <label class="campo"><span>Etapa do pipeline</span>
         <select class="select" name="etapa_id"><option value="">Sem etapa</option>
-          ${etapas.map((e) => `<option value="${e.id}" ${(p ? e.id === p.etapa_id : e.id === etapas[0]?.id) ? "selected" : ""}>${esc(e.nome)}</option>`).join("")}</select></label>`,
+          ${etapas.map((e) => `<option value="${e.id}" ${(p ? e.id === p.etapa_id : e.id === etapas[0]?.id) ? "selected" : ""}>${esc(e.nome)}</option>`).join("")}</select></label>
+      ${camposFormHtml(p?.campos_extra)}`,
     aoMontar: (root) => {
       const selTipo = root.querySelector('[name="tipo"]');
       const selIngresso = root.querySelector('[name="ingresso"]');
@@ -966,6 +1028,7 @@ function abrirForm(p) {
         situacao: f.situacao || "Confirmado",
         pagamento: f.pagamento, quantidade: Number(f.quantidade) || 1, etapa_id: f.etapa_id || null,
         responsavel_user_id: f.responsavel_user_id || null,
+        campos_extra: camposExtraDoForm(new FormData(form), p?.campos_extra),
       };
       if (p) reg.id = p.id;
       const salvo = await salvar("participantes", reg);
@@ -983,6 +1046,8 @@ function abrirForm(p) {
 async function recarregar() {
   tiposIngresso = await listTiposIngresso().catch(() => tiposIngresso);
   grupos = await listGrupos().catch(() => grupos);
+  camposPersonalizados = await listCamposPersonalizados().catch(() => camposPersonalizados);
+  mesclarColunasCampos();
   TIPOS = grupos.length ? grupos.map((g) => g.nome) : [...TIPOS_PADRAO];
   participantes = await listParticipantes();
   render();
@@ -1139,7 +1204,32 @@ const MODELO_LINHAS = [
   ["João Souza", "joao@ex.com", "11988887777", "JS Co", "Anfitrião", "Convite", "", "Gratuito", 1],
 ];
 
+// alias de importação + colunas do modelo, incluindo os campos personalizados ativos
+function aliasImportCompleto() {
+  const extra = {};
+  camposPersonalizados.filter((c) => c.ativo).forEach((c) => { extra[normalizarCab(c.nome)] = chaveColCampo(c.chave); });
+  return { ...ALIAS_IMPORT, ...extra };
+}
+function modeloLinhas() {
+  const ativos = camposPersonalizados.filter((c) => c.ativo);
+  return [
+    [...MODELO_LINHAS[0], ...ativos.map((c) => c.nome)],
+    ...MODELO_LINHAS.slice(1).map((linha) => [...linha, ...ativos.map(() => "")]),
+  ];
+}
+// valor de um campo personalizado numa linha importada (texto/única = string; múltipla = array)
+function valorCampoImport(l, c) {
+  const raw = (l[chaveColCampo(c.chave)] || "").toString().trim();
+  if (!raw) return null;
+  if (c.tipo === "multipla_escolha") {
+    const vals = raw.split(/[;,|]/).map((s) => s.trim()).filter(Boolean);
+    return vals.length ? vals : null;
+  }
+  return raw;
+}
+
 function modalImportar() {
+  const camposAtivos = camposPersonalizados.filter((c) => c.ativo);
   abrirModal({
     titulo: "Importar participantes",
     textoConfirmar: "Importar",
@@ -1147,7 +1237,8 @@ function modalImportar() {
       <p class="pagina-sub" style="margin:0 0 10px">
         Cole a tabela (Excel/Sheets) ou selecione um arquivo Excel (.xlsx). Colunas: <b>nome</b>
         (obrigatória), email, telefone, empresa, tipo, ingresso, faturamento,
-        pagamento, quantidade. Quem vier com <b>tipo = Anfitrião</b> também entra
+        pagamento, quantidade${camposAtivos.length ? `, ${camposAtivos.map((c) => esc(c.nome)).join(", ")}` : ""}.
+        Quem vier com <b>tipo = Anfitrião</b> também entra
         na Gestão de anfitriões (sem duplicar, casando por e-mail).
       </p>
       <button type="button" id="imp-modelo" style="font-size:.8rem;font-weight:600;color:var(--cor-laranja-forte);background:none;border:none;padding:0;cursor:pointer;text-decoration:underline">↓ baixar modelo</button>
@@ -1156,19 +1247,25 @@ function modalImportar() {
       <label class="campo"><span>…ou arquivo Excel (.xlsx)</span>
         <input class="input" type="file" name="arquivo" accept=".xlsx,.xls" /></label>`,
     aoMontar: (root) => {
-      root.querySelector("#imp-modelo").onclick = () => baixarModeloXLSX("modelo-participantes.xlsx", MODELO_LINHAS);
+      root.querySelector("#imp-modelo").onclick = () => baixarModeloXLSX("modelo-participantes.xlsx", modeloLinhas());
     },
     onConfirmar: async (form) => {
+      const alias = aliasImportCompleto();
       const arquivo = form.querySelector('[name="arquivo"]').files[0];
       const linhas = arquivo
-        ? await lerXlsx(arquivo, ALIAS_IMPORT)
-        : parsearTabela(form.querySelector('[name="texto"]').value, ALIAS_IMPORT);
+        ? await lerXlsx(arquivo, alias)
+        : parsearTabela(form.querySelector('[name="texto"]').value, alias);
       const validas = linhas.filter((l) => (l.nome || "").trim());
       if (!validas.length) { toast("Nenhuma linha com nome.", "erro"); return false; }
 
       const registros = validas.map((l) => {
         const tipo = normTipo(l.tipo) || "Convidado";
         const ingresso = (l.ingresso || "").trim() || null;
+        const campos_extra = {};
+        camposAtivos.forEach((c) => {
+          const v = valorCampoImport(l, c);
+          if (v != null) campos_extra[c.chave] = v;
+        });
         return {
           nome: l.nome.trim(),
           email: (l.email || "").trim() || null,
@@ -1181,6 +1278,7 @@ function modalImportar() {
           quantidade: Number(l.quantidade) || 1,
           etapa_id: etapas[0]?.id || null,
           responsavel_user_id: responsavelAutomatico(tipo, ingresso),
+          campos_extra,
         };
       });
       const criados = await inserirLote("participantes", registros);
@@ -1216,6 +1314,10 @@ async function exportar(dados) {
     { rotulo: "Presente", valor: (p) => (p.presente ? "Sim" : "Não") },
     { rotulo: "Check-in", valor: (p) => formatarData(p.checkin_at, true) },
     { rotulo: "Data de cadastro", valor: (p) => formatarData(p.created_at) },
+    ...camposPersonalizados.filter((c) => c.ativo).map((c) => ({
+      rotulo: c.nome,
+      valor: (p) => { const v = p.campos_extra?.[c.chave]; return Array.isArray(v) ? v.join(", ") : (v || ""); },
+    })),
   ]);
   toast("Arquivo gerado.", "ok");
 }

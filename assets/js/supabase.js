@@ -32,6 +32,7 @@ const TABELAS_EVENTO = new Set([
   "grupos", "responsaveis", "estagios", "anfitrioes", "convidados",
   "form_perguntas", "marcos", "etapas_participante", "participantes", "checkins",
   "atividades", "tipos_ingresso", "integracoes", "webhook_entregas",
+  "campos_personalizados",
 ]);
 
 // eid: id explícito (páginas públicas). Sem argumento → evento atual do admin.
@@ -91,6 +92,10 @@ export const listMarcos = (eid) =>
 
 export const listFormPerguntas = (eid) =>
   supabase.from("form_perguntas").select("*").eq("evento_id", ev(eid)).order("ordem").then(ok);
+
+export const listCamposPersonalizados = (eid) =>
+  supabase.from("campos_personalizados").select("*").eq("evento_id", ev(eid))
+    .order("ordem").order("created_at").then(ok);
 
 export const listAnfitrioes = (eid) =>
   supabase.from("anfitrioes_com_stats").select("*").eq("evento_id", ev(eid)).order("nome").then(ok);
