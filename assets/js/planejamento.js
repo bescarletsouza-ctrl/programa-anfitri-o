@@ -1,6 +1,6 @@
 // =============================================================================
 // Planejamento — metas de inscritos/confirmados/presentes/não vai (geral,
-// multiplicador, compradores, showrate) e a quebra por Tipo × categoria de
+// multiplicador, compradores) e a quebra por Tipo × categoria de
 // ingresso (ex.: LIFE / MASTER). Multiplicador = quem indica/multiplica
 // (Anfitrião, Convidado, Acompanhante) — Comprador fica de fora, é quem
 // comprou direto.
@@ -24,7 +24,6 @@ const METAS_PADRAO = {
   geral: { ...GRUPO_PADRAO },
   multiplicador: { ...GRUPO_PADRAO },
   compradores: { ...GRUPO_PADRAO },
-  showrate: { convidado: 0, comprador: 0 },
 };
 const metasAtuais = () => {
   const salvo = evento?.metas_planejamento || {};
@@ -33,7 +32,6 @@ const metasAtuais = () => {
     geral: { ...GRUPO_PADRAO, ...(salvo.geral || {}) },
     multiplicador: { ...GRUPO_PADRAO, ...(salvo.multiplicador || {}) },
     compradores: { ...GRUPO_PADRAO, ...(salvo.compradores || {}) },
-    showrate: { ...METAS_PADRAO.showrate, ...(salvo.showrate || {}) },
   };
 };
 
@@ -95,12 +93,6 @@ function render() {
     cardMeta("Compradores", compradores, metas.compradores),
   ].join("");
 
-  const rateConvidado = multiplicador.inscritos > 0 ? Math.round((multiplicador.presentes / multiplicador.inscritos) * 100) : 0;
-  const rateComprador = compradores.inscritos > 0 ? Math.round((compradores.presentes / compradores.inscritos) * 100) : 0;
-  el("metas-showrate").innerHTML =
-    linhaShowrate("Multiplicador (anfitrião/convidado/acompanhante)", rateConvidado, metas.showrate.convidado) +
-    linhaShowrate("Comprador", rateComprador, metas.showrate.comprador);
-
   el("quebra-aviso").hidden = !!(A && B);
   el("quebra-categorias").innerHTML = (A || B) ? [
     statCard(`Qtd. ${A || "Categoria A"}`, grupo(null, A)),
@@ -135,17 +127,6 @@ function cardMeta(titulo, atual, alvo) {
     ${barraHtml("Confirmados", atual.confirmados, alvo.confirmados)}
     ${barraHtml("Presentes", atual.presentes, alvo.presentes)}
     ${barraHtml("Não vai", atual.naoVai, alvo.naoVai)}
-  </div>`;
-}
-
-function linhaShowrate(rotulo, atualPct, metaPct) {
-  const ok = atualPct >= metaPct;
-  return `<div style="margin-bottom:14px">
-    <div style="display:flex;justify-content:space-between;font-size:.85rem;margin-bottom:5px">
-      <span>${esc(rotulo)}</span>
-      <span><b>${atualPct}%</b> <span class="cel-tenue">(meta ${metaPct}%)</span></span>
-    </div>
-    <div class="checkin-barra"><i style="width:${Math.min(100, atualPct)}%;background:${ok ? "var(--ok-solid)" : "var(--erro)"}"></i></div>
   </div>`;
 }
 
@@ -184,14 +165,7 @@ function modalMetas() {
       </div>
       ${blocoNumeros("Meta geral", "geral", metas.geral)}
       ${blocoNumeros("Meta multiplicador (anfitrião + convidados + acompanhantes)", "mult", metas.multiplicador)}
-      ${blocoNumeros("Meta compradores", "comp", metas.compradores)}
-      <div class="secao" style="border-top:1px solid var(--borda);margin-top:6px;padding-top:14px">
-        <h4 style="margin:0 0 10px;font-size:.7rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--texto-tenue)">Meta de showrate (%)</h4>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-          <label class="campo"><span>Multiplicador</span><input class="input" type="number" min="0" max="100" name="show_convidado" value="${metas.showrate.convidado}" /></label>
-          <label class="campo"><span>Comprador</span><input class="input" type="number" min="0" max="100" name="show_comprador" value="${metas.showrate.comprador}" /></label>
-        </div>
-      </div>`,
+      ${blocoNumeros("Meta compradores", "comp", metas.compradores)}`,
     onConfirmar: async (form) => {
       const f = Object.fromEntries(new FormData(form));
       const ler = (p) => ({
@@ -206,7 +180,6 @@ function modalMetas() {
         geral: ler("geral"),
         multiplicador: ler("mult"),
         compradores: ler("comp"),
-        showrate: { convidado: Number(f.show_convidado) || 0, comprador: Number(f.show_comprador) || 0 },
       };
       try {
         evento = await salvarEvento({ metas_planejamento: novo });
