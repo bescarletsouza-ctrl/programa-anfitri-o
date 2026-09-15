@@ -44,10 +44,12 @@ async function mostrarTela(alvo) {
   el("btn-manual-2").onclick = abrirBusca;
   el("btn-cam-manual").onclick = abrirBusca;
   el("busca-voltar").onclick = fecharBusca;
-  el("fab-scanner").onclick = fecharBusca;
+  el("fab-scanner").onclick = irParaScanner;
   el("btn-cam-retry").onclick = abrirCamera;
   el("modo-evento-btn").onclick = () => escolherModo("");
   el("modo-atividade-btn").onclick = mostrarAtividades;
+  el("hub-lista-btn").onclick = abrirListaDoHub;
+  el("hub-config-btn").onclick = abrirConfig;
   let deb;
   el("in-busca").addEventListener("input", () => { clearTimeout(deb); deb = setTimeout(renderBusca, 150); });
 
@@ -385,6 +387,13 @@ function telaSucesso(p, atvNome) {
 }
 
 /* ---- lista de participantes / busca manual ------------------------ */
+// aberta direto do menu principal (tela-modo), sem passar pelo scanner —
+// evento geral por padrão (mesmos dados de "Controle de acesso").
+async function abrirListaDoHub() {
+  modo = "";
+  await carregarDados();
+  abrirBusca();
+}
 function abrirBusca() {
   pausar();
   el("tela-busca").hidden = false;
@@ -394,6 +403,14 @@ function abrirBusca() {
 function fecharBusca() {
   el("tela-busca").hidden = true;
   if (el("app").hidden === false) retomar();
+}
+// botão flutuante "Ler QRCode": se já estava no scanner, só retoma a câmera;
+// se veio do menu/lista direto, inicia o scanner de verdade.
+function irParaScanner() {
+  const jaNoScanner = el("app").hidden === false;
+  el("tela-busca").hidden = true;
+  if (jaNoScanner) retomar();
+  else escolherModo(modo);
 }
 function renderBusca() {
   const t = el("in-busca").value.trim().toLowerCase();

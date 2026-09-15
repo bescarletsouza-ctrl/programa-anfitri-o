@@ -59,25 +59,41 @@
     <div class="ck-lista-corpo" id="eventos-lista"></div>
   </section>
 
-  <!-- Tipo de check-in -->
+  <!-- Menu principal do evento -->
   <section id="tela-modo" class="ck-tela ck-lista-tela" hidden>
     <header class="ck-lista-topo">
       <button class="ck-icone-btn ck-icone-btn-claro" id="modo-voltar" aria-label="Voltar">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
       </button>
       <div>
-        <strong>Tipo de check-in</strong>
+        <strong>O que você quer fazer?</strong>
         <span class="ck-lista-sub" id="modo-evento"></span>
       </div>
     </header>
     <div class="ck-lista-corpo">
       <button class="ck-modo-card" id="modo-evento-btn">
-        <span class="ck-modo-ic">◎</span>
-        <span class="ck-modo-txt"><strong>Check-in do evento</strong><span>Credencia e imprime o crachá</span></span>
+        <span class="ck-modo-ic">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 14v3M14 19h3"/></svg>
+        </span>
+        <span class="ck-modo-txt"><strong>Controle de acesso</strong><span>Escaneia o crachá, credencia e imprime</span></span>
       </button>
       <button class="ck-modo-card" id="modo-atividade-btn">
-        <span class="ck-modo-ic">▤</span>
+        <span class="ck-modo-ic">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg>
+        </span>
         <span class="ck-modo-txt"><strong>Check-in de atividade</strong><span>Controle de acesso a uma sessão / palestra</span></span>
+      </button>
+      <button class="ck-modo-card" id="hub-lista-btn">
+        <span class="ck-modo-ic">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </span>
+        <span class="ck-modo-txt"><strong>Lista de participantes</strong><span>Buscar, ver situação e credenciar pelo nome</span></span>
+      </button>
+      <button class="ck-modo-card" id="hub-config-btn">
+        <span class="ck-modo-ic">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </span>
+        <span class="ck-modo-txt"><strong>Impressora e etiqueta</strong><span>Tamanho e dados que saem no crachá</span></span>
       </button>
       <div id="modo-atividades" hidden>
         <p class="ck-lista-rotulo">Qual atividade?</p>
