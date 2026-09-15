@@ -154,6 +154,7 @@ export async function sincParticipanteConvidado(convidado) {
       email: convidado.email || null,
       telefone: convidado.telefone || null,
       empresa: convidado.empresa || null,
+      faturamento: convidado.faturamento || null,
       tipo: "Convidado",
       pagamento: "Convidado",
       ingresso,
