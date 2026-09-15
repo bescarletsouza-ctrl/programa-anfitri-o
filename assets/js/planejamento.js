@@ -95,8 +95,6 @@ function render() {
 
   el("quebra-aviso").hidden = !!(A && B);
   el("quebra-categorias").innerHTML = (A || B) ? [
-    statCard(`Qtd. ${A || "Categoria A"}`, grupo(null, A)),
-    statCard(`Qtd. ${B || "Categoria B"}`, grupo(null, B)),
     statCard(`Anfitrião ${A || "A"}`, grupo(["Anfitrião"], A)),
     statCard(`Anfitrião ${B || "B"}`, grupo(["Anfitrião"], B)),
     statCard(`Convidado ${A || "A"}`, grupo(["Convidado"], A)),
