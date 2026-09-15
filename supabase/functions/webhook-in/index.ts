@@ -78,10 +78,12 @@ Deno.serve(async (req) => {
     const statusMap = (cfg.status_map || {}) as Record<string, string>;
     let situacao = statusMap[statusRaw] || (cfg.situacao_padrao as string) || "";
     if (!situacao) {
-      if (/paid|approved|aprovad|pago|confirm|complete/.test(statusRaw)) situacao = "Confirmado";
+      // Sem "Situação padrão" configurada na Origem, entra sempre como
+      // Pré-inscrito (mesmo pago/aprovado) — a equipe confirma manualmente
+      // depois. Só cancelamento/estorno já cai como Desativado direto.
+      if (/refund|cancel|estorn|reembols|charged?back/.test(statusRaw)) situacao = "Desativado";
       else if (/pending|pendente|waiting|aguard/.test(statusRaw)) situacao = "Pendente";
-      else if (/refund|cancel|estorn|reembols|charged?back/.test(statusRaw)) situacao = "Desativado";
-      else situacao = "Confirmado";
+      else situacao = "Pré-inscrito";
     }
 
     const reg: Record<string, unknown> = {
