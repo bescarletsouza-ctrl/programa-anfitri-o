@@ -1,9 +1,7 @@
 // =============================================================================
 // Planejamento — metas de inscritos/confirmados/presentes/não vai (geral,
-// multiplicador, compradores) e a quebra por Tipo × categoria de
-// ingresso (ex.: LIFE / MASTER). Multiplicador = quem indica/multiplica
-// (Anfitrião, Convidado, Acompanhante) — Comprador fica de fora, é quem
-// comprou direto.
+// anfitriões, convidados, compradores) e a quebra por Tipo × categoria de
+// ingresso (ex.: LIFE / MASTER).
 // Metas ficam em eventos.metas_planejamento (jsonb), editáveis em "Ajustar
 // metas". Contagens são sempre calculadas ao vivo a partir de listParticipantes().
 // =============================================================================
@@ -22,7 +20,8 @@ const GRUPO_PADRAO = { inscritos: 0, confirmados: 0, presentes: 0, naoVai: 0 };
 const METAS_PADRAO = {
   ingresso_a: "", ingresso_b: "",
   geral: { ...GRUPO_PADRAO },
-  multiplicador: { ...GRUPO_PADRAO },
+  anfitrioes: { ...GRUPO_PADRAO },
+  convidados: { ...GRUPO_PADRAO },
   compradores: { ...GRUPO_PADRAO },
 };
 const metasAtuais = () => {
@@ -30,14 +29,14 @@ const metasAtuais = () => {
   return {
     ...METAS_PADRAO, ...salvo,
     geral: { ...GRUPO_PADRAO, ...(salvo.geral || {}) },
-    multiplicador: { ...GRUPO_PADRAO, ...(salvo.multiplicador || {}) },
+    anfitrioes: { ...GRUPO_PADRAO, ...(salvo.anfitrioes || {}) },
+    convidados: { ...GRUPO_PADRAO, ...(salvo.convidados || {}) },
     compradores: { ...GRUPO_PADRAO, ...(salvo.compradores || {}) },
   };
 };
 
-// tipos que "multiplicam" o evento (indicam/trazem gente) — Comprador fica
-// de fora porque comprou direto, não veio por indicação.
-const TIPOS_MULTIPLICADOR = ["Anfitrião", "Convidado", "Acompanhante"];
+// convidados agrupa Convidado + Acompanhante; anfitriões fica separado.
+const TIPOS_CONVIDADOS = ["Convidado", "Acompanhante"];
 
 _iniciando.then((ctx) => { if (ctx) carregar(ctx); });
 el("btn-metas").onclick = modalMetas;
@@ -84,12 +83,14 @@ function render() {
   const A = metas.ingresso_a, B = metas.ingresso_b;
 
   const geral = grupo(null, null);
-  const multiplicador = grupo(TIPOS_MULTIPLICADOR, null);
+  const anfitrioes = grupo(["Anfitrião"], null);
+  const convidados = grupo(TIPOS_CONVIDADOS, null);
   const compradores = grupo(["Comprador"], null);
 
   el("metas-principais").innerHTML = [
     cardMeta("Meta geral", geral, metas.geral),
-    cardMeta(`Multiplicador${A || B ? ` (${[A, B].filter(Boolean).join(" + ")})` : ""}`, multiplicador, metas.multiplicador),
+    cardMeta("Anfitriões", anfitrioes, metas.anfitrioes),
+    cardMeta("Convidados (+ acompanhantes)", convidados, metas.convidados),
     cardMeta("Compradores", compradores, metas.compradores),
   ].join("");
 
@@ -162,7 +163,8 @@ function modalMetas() {
         <label class="campo"><span>Categoria B (ex.: MASTER)</span><select class="select" name="ingresso_b">${opcoesIngresso(metas.ingresso_b)}</select></label>
       </div>
       ${blocoNumeros("Meta geral", "geral", metas.geral)}
-      ${blocoNumeros("Meta multiplicador (anfitrião + convidados + acompanhantes)", "mult", metas.multiplicador)}
+      ${blocoNumeros("Meta anfitriões", "anf", metas.anfitrioes)}
+      ${blocoNumeros("Meta convidados (+ acompanhantes)", "conv", metas.convidados)}
       ${blocoNumeros("Meta compradores", "comp", metas.compradores)}`,
     onConfirmar: async (form) => {
       const f = Object.fromEntries(new FormData(form));
@@ -176,7 +178,8 @@ function modalMetas() {
         ingresso_a: f.ingresso_a || "",
         ingresso_b: f.ingresso_b || "",
         geral: ler("geral"),
-        multiplicador: ler("mult"),
+        anfitrioes: ler("anf"),
+        convidados: ler("conv"),
         compradores: ler("comp"),
       };
       try {
