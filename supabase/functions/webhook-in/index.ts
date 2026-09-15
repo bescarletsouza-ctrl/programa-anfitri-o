@@ -68,6 +68,7 @@ Deno.serve(async (req) => {
     const telefone = val("telefone", ["telefone", "phone", "celular", "whatsapp", "mobile", "phone_number"]).trim();
     const empresa = val("empresa", ["empresa", "company", "organization"]).trim();
     const ingresso = val("ingresso", ["ingresso", "ticket", "ticket_name", "product", "produto", "plano", "categoria"]).trim();
+    const faturamento = val("faturamento", ["faturamento", "revenue", "billing", "faturamento_mensal"]).trim();
     const statusRaw = val("status", ["status", "payment_status", "situacao", "state"]).trim().toLowerCase();
     const qtd = Number(val("quantidade", ["quantidade", "quantity", "qty"])) || 1;
 
@@ -88,6 +89,7 @@ Deno.serve(async (req) => {
     if (telefone) reg.telefone = telefone;
     if (empresa) reg.empresa = empresa;
     if (ingresso) reg.ingresso = ingresso;
+    if (faturamento) reg.faturamento = faturamento;
 
     // primeira etapa do pipeline
     const { data: et } = await sb.from("etapas_participante").select("id")
@@ -107,6 +109,7 @@ Deno.serve(async (req) => {
       if (telefone) patch.telefone = telefone;
       if (empresa) patch.empresa = empresa;
       if (ingresso) patch.ingresso = ingresso;
+      if (faturamento) patch.faturamento = faturamento;
       const { data, error } = await sb.from("participantes").update(patch).eq("id", existente.id).select("id, codigo").single();
       if (error) return json({ erro: error.message }, 500);
       resultado = { acao: "atualizado", ...data };
