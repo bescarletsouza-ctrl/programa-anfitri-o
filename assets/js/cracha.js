@@ -8,7 +8,9 @@ import { getEvento } from "./supabase.js";
 import { eventoId } from "./evento.js";
 
 const QR_SRC = "https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js";
+const H2C_SRC = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
 let qrPronto = null;
+let h2cPronto = null;
 let eventoCache = null;
 
 export const CRACHA_PADRAO = {
@@ -63,6 +65,29 @@ export async function qrDataURL(texto) {
   } catch {
     return null;
   }
+}
+
+function carregarHtml2Canvas() {
+  if (h2cPronto) return h2cPronto;
+  h2cPronto = new Promise((resolve) => {
+    if (typeof window.html2canvas === "function") return resolve(window.html2canvas);
+    const s = document.createElement("script");
+    s.src = H2C_SRC;
+    s.onload = () => resolve(typeof window.html2canvas === "function" ? window.html2canvas : null);
+    s.onerror = () => resolve(null);
+    document.head.appendChild(s);
+  });
+  return h2cPronto;
+}
+
+// Renderiza o cartão (já no DOM) como PNG — usado pra compartilhar direto com
+// o app do fabricante da impressora (ex.: Brother iPrint&Label), que lida
+// melhor com etiquetas do que a caixa de diálogo de impressão do navegador.
+async function gerarImagemCracha(cartaoEl) {
+  const html2canvas = await carregarHtml2Canvas();
+  if (!html2canvas) return null;
+  const canvas = await html2canvas(cartaoEl, { scale: 4, backgroundColor: "#fff" });
+  return new Promise((res) => canvas.toBlob((b) => res(b), "image/png"));
 }
 
 function garantirCaixa() {
@@ -136,6 +161,43 @@ export async function imprimirCracha(participante, nomeEvento = "") {
   const alt = Number(config.altura_mm) || 55;
   const uri = config.qr !== false ? await qrDataURL(participante.codigo || participante.id || "") : null;
 
+  box.innerHTML = montarCrachaHtml(participante, nome, config, uri);
+  box.hidden = false;
+
+  // garante que a imagem do QR já decodificou antes de capturar/imprimir
+  const img = box.querySelector(".cracha-qr img");
+  if (img && !img.complete) {
+    await new Promise((res) => { img.onload = img.onerror = res; setTimeout(res, 700); });
+  }
+  try { await img?.decode?.(); } catch {}
+
+  // Caminho preferido em celular: gera uma imagem do crachá e manda pelo
+  // "Compartilhar" do sistema — o app da impressora (Brother iPrint&Label,
+  // etc.) recebe e imprime com o driver certo dela. Muito mais confiável do
+  // que window.print() em impressoras de etiqueta.
+  const cartao = box.querySelector(".cracha-cartao");
+  const blob = cartao ? await gerarImagemCracha(cartao).catch(() => null) : null;
+  const arquivo = blob
+    ? new File([blob], `cracha-${(participante.codigo || participante.nome || "convidado").replace(/\s+/g, "-")}.png`, { type: "image/png" })
+    : null;
+  const podeCompartilhar = arquivo && navigator.canShare?.({ files: [arquivo] });
+
+  if (podeCompartilhar) {
+    box.hidden = true;
+    try {
+      await navigator.share({ files: [arquivo], title: `Crachá — ${participante.nome || ""}` });
+      return;
+    } catch (e) {
+      if (e?.name === "AbortError") return; // cancelou o compartilhamento, não insiste no print
+    }
+  }
+
+  // Reserva: caixa de diálogo de impressão do navegador (funciona bem em
+  // desktop e impressoras comuns; pra etiqueta, prefira o compartilhamento acima).
+  imprimirViaCaixaDialogo(box, larg, alt);
+}
+
+function imprimirViaCaixaDialogo(box, larg, alt) {
   document.getElementById("cracha-page-style")?.remove();
   const st = document.createElement("style");
   st.id = "cracha-page-style";
@@ -152,16 +214,7 @@ export async function imprimirCracha(participante, nomeEvento = "") {
       }
     }`;
   document.head.appendChild(st);
-
-  box.innerHTML = montarCrachaHtml(participante, nome, config, uri);
   box.hidden = false;
-
-  // garante que a imagem do QR já decodificou antes de abrir a impressão
-  const img = box.querySelector(".cracha-qr img");
-  if (img && !img.complete) {
-    await new Promise((res) => { img.onload = img.onerror = res; setTimeout(res, 700); });
-  }
-  try { await img?.decode?.(); } catch {}
 
   const limpar = () => { box.hidden = true; window.removeEventListener("afterprint", limpar); };
   window.addEventListener("afterprint", limpar);
