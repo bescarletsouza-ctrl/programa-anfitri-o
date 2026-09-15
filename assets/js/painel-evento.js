@@ -77,6 +77,7 @@ function render() {
   renderQuebra("rel-tipo", ativos, (p) => p.tipo || "—");
   renderQuebra("rel-situacao", participantes, situ, SITUACOES);
   renderFaturamento(ativos);
+  renderQuebra("rel-faturamento-perfil", ativos, (p) => p.faturamento || "Não informado");
   renderCamposPersonalizados(ativos);
 }
 
