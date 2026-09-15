@@ -23,7 +23,7 @@ import { abrirEnvioEmail } from "./email.js";
 const _iniciando = iniciarPagina("participantes");
 const el = (id) => document.getElementById(id);
 
-const TIPOS_PADRAO = ["Convidado", "Anfitrião", "Acompanhante", "Comprador", "Mentorado", "Membro", "Outro"];
+const TIPOS_PADRAO = ["Convidado", "Anfitrião", "Acompanhante", "Comprador", "Membro", "Outro"];
 let TIPOS = [...TIPOS_PADRAO];
 const PAGAMENTOS = ["Gratuito", "Pago", "Convidado", "Cancelado", "Reembolsado"];
 const SITUACOES = ["Confirmado", "Pendente", "Fila de espera", "Pré-inscrito", "Desativado"];

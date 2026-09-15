@@ -24,7 +24,6 @@ const METAS_PADRAO = {
   geral: { ...GRUPO_PADRAO },
   multiplicador: { ...GRUPO_PADRAO },
   compradores: { ...GRUPO_PADRAO },
-  mentorados: { ...GRUPO_PADRAO },
 };
 const metasAtuais = () => {
   const salvo = evento?.metas_planejamento || {};
@@ -33,7 +32,6 @@ const metasAtuais = () => {
     geral: { ...GRUPO_PADRAO, ...(salvo.geral || {}) },
     multiplicador: { ...GRUPO_PADRAO, ...(salvo.multiplicador || {}) },
     compradores: { ...GRUPO_PADRAO, ...(salvo.compradores || {}) },
-    mentorados: { ...GRUPO_PADRAO, ...(salvo.mentorados || {}) },
   };
 };
 
@@ -88,13 +86,11 @@ function render() {
   const geral = grupo(null, null);
   const multiplicador = grupo(TIPOS_MULTIPLICADOR, null);
   const compradores = grupo(["Comprador"], null);
-  const mentorados = grupo(["Mentorado"], null);
 
   el("metas-principais").innerHTML = [
     cardMeta("Meta geral", geral, metas.geral),
     cardMeta(`Multiplicador${A || B ? ` (${[A, B].filter(Boolean).join(" + ")})` : ""}`, multiplicador, metas.multiplicador),
     cardMeta("Compradores", compradores, metas.compradores),
-    cardMeta("Mentorados", mentorados, metas.mentorados),
   ].join("");
 
   el("quebra-aviso").hidden = !!(A && B);
@@ -167,8 +163,7 @@ function modalMetas() {
       </div>
       ${blocoNumeros("Meta geral", "geral", metas.geral)}
       ${blocoNumeros("Meta multiplicador (anfitrião + convidados + acompanhantes)", "mult", metas.multiplicador)}
-      ${blocoNumeros("Meta compradores", "comp", metas.compradores)}
-      ${blocoNumeros("Meta mentorados", "ment", metas.mentorados)}`,
+      ${blocoNumeros("Meta compradores", "comp", metas.compradores)}`,
     onConfirmar: async (form) => {
       const f = Object.fromEntries(new FormData(form));
       const ler = (p) => ({
@@ -183,7 +178,6 @@ function modalMetas() {
         geral: ler("geral"),
         multiplicador: ler("mult"),
         compradores: ler("comp"),
-        mentorados: ler("ment"),
       };
       try {
         evento = await salvarEvento({ metas_planejamento: novo });
