@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<script>try{var t=localStorage.getItem('tema')==='dark'?'dark':'light';document.documentElement.dataset.theme=t;document.documentElement.style.background=t==='dark'?'#0c0c0d':'#f7f7f6';}catch(e){}</script>
+<script>try{if(!localStorage.getItem("sb-xiuhqkvkiexmbgwyvunr-auth-token")){try{sessionStorage.setItem("we_next",location.pathname+location.search);}catch(e){}location.replace("/login.html");}}catch(e){}</script>
+<title>Planejamento — We.events</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../assets/css/theme.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside id="sidebar" class="sidebar"></aside>
+  <main class="conteudo">
+    <div class="barra-topo">
+      <div>
+        <h1 class="pagina-titulo">Planejamento</h1>
+        <p class="pagina-sub">Metas de inscritos e presentes — atualizadas automaticamente conforme os participantes entram.</p>
+      </div>
+      <button class="btn btn-secundario" id="btn-metas">Ajustar metas</button>
+    </div>
+
+    <div id="carregando" class="vazio">Carregando…</div>
+
+    <div id="painel" hidden>
+      <div class="grid grid-2" id="metas-principais" style="margin-bottom:20px"></div>
+
+      <div class="rel-secao">
+        <h2>Showrate</h2>
+        <div class="card" id="metas-showrate"></div>
+      </div>
+
+      <div class="rel-secao">
+        <h2>Por tipo e categoria de ingresso</h2>
+        <p class="pagina-sub" id="quebra-aviso" style="margin:0 0 12px" hidden>
+          Defina as duas categorias (ex.: LIFE / MASTER) em "Ajustar metas" pra ver essa quebra.
+        </p>
+        <div class="grid grid-4" id="quebra-categorias"></div>
+      </div>
+    </div>
+  </main>
+</div>
+<script type="module" src="../assets/js/planejamento.js"></script>
+</body>
+</html>
