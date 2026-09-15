@@ -34,7 +34,43 @@ async function mostrarTela(alvo) {
   TELAS.forEach((t) => { const n = el(t); if (n) n.hidden = t !== alvo; });
   if (alvo === "app") await abrirCamera();
   else await pararCamera();
+  garantirHistorico();
 }
+
+/* ---- botão físico/gesto de voltar do Android -------------------------
+   Sem histórico próprio, o "voltar" do celular fecha o app direto (o
+   WebView não tem pra onde voltar). Empilha 1 entrada de histórico
+   sempre que sai da tela raiz (evento/login/splash) e, a cada popstate,
+   desce um nível na UI (fecha menu/sheet/busca/config, ou volta uma
+   tela) — reempilhando se ainda não chegou na raiz, pra funcionar em
+   vários toques seguidos. Na raiz, o próximo "voltar" sai do app normal. */
+function overlayAberto() {
+  return !el("menu").hidden || !el("sheet").hidden || !el("tela-busca").hidden || !el("tela-config").hidden;
+}
+function noTopo() {
+  const telaRaiz = !el("tela-eventos").hidden || !el("tela-login").hidden || !el("tela-abrir").hidden;
+  return telaRaiz && !overlayAberto();
+}
+let historicoEmpilhado = false;
+function garantirHistorico() {
+  if (!noTopo() && !historicoEmpilhado) {
+    history.pushState(null, "", location.href);
+    historicoEmpilhado = true;
+  }
+}
+function voltarUmNivel() {
+  if (!el("menu").hidden) return fecharMenu();
+  if (!el("sheet").hidden) return fecharSheet();
+  if (!el("tela-config").hidden) return fecharConfig();
+  if (!el("tela-busca").hidden) return fecharBusca();
+  if (!el("app").hidden) return mostrarTela("tela-modo");
+  if (!el("tela-modo").hidden) return mostrarTela("tela-eventos");
+}
+window.addEventListener("popstate", () => {
+  voltarUmNivel();
+  historicoEmpilhado = false;
+  garantirHistorico();
+});
 
 /* ---- boot ----------------------------------------------------------- */
 (async function boot() {
@@ -343,6 +379,7 @@ function mostrarSheet() {
   void el("sheet").offsetHeight;
   setTimeout(() => { el("sheet-fundo").classList.add("aberto"); el("sheet").classList.add("aberto"); }, 10);
   el("sheet-fundo").onclick = () => fecharSheet();
+  garantirHistorico();
 }
 function fecharSheet(semRetomar) {
   el("sheet-fundo").classList.remove("aberto");
@@ -404,6 +441,7 @@ function abrirBusca() {
   el("tela-busca").hidden = false;
   el("in-busca").value = "";
   renderBusca();
+  garantirHistorico();
 }
 function fecharBusca() {
   el("tela-busca").hidden = true;
@@ -470,6 +508,7 @@ function abrirMenu() {
   el("menu").hidden = false;
   void el("menu").offsetHeight;
   setTimeout(() => { el("menu-fundo").classList.add("aberto"); el("menu").classList.add("aberto"); }, 10);
+  garantirHistorico();
 }
 function fecharMenu() {
   el("menu-fundo").classList.remove("aberto");
@@ -487,6 +526,7 @@ const CFG_FIXOS = ["evento", "nome", "categoria"];
 async function abrirConfig() {
   pausar();
   el("tela-config").hidden = false;
+  garantirHistorico();
   try {
     const ev = await getEvento(evento.id);
     montarConfigForm(ev?.cracha_config);
