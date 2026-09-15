@@ -829,7 +829,6 @@ table.tabela tbody tr:last-child td { border-bottom: none; }
   background: #fff; overflow: hidden; position: relative;
 }
 .cracha-texto { display: flex; flex-direction: column; gap: 1mm; max-width: 100%; }
-.cracha-cartao.tem-qr .cracha-texto { padding-right: 38%; }
 .cracha-cartao > div, .cracha-texto > div { max-width: 100%; overflow-wrap: anywhere; line-height: 1.08; }
 .cracha-evento { font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: #666; margin-bottom: .5mm; }
 .cracha-nome { font-weight: 800; letter-spacing: -.02em; line-height: 1; }
