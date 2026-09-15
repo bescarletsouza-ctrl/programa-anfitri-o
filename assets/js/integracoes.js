@@ -23,6 +23,7 @@ const GATILHOS = [
   { valor: "participante.atualizado", rotulo: "Participante atualizado" },
   { valor: "participante.situacao",   rotulo: "Situação mudou (confirmado / não vai…)" },
   { valor: "convidado.aprovado",      rotulo: "Convidado aprovado" },
+  { valor: "convidado.reprovado",     rotulo: "Convidado reprovado" },
   { valor: "checkin.realizado",       rotulo: "Check-in no evento" },
   { valor: "checkin.atividade",       rotulo: "Check-in em atividade" },
 ];

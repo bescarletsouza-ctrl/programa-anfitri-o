@@ -170,6 +170,12 @@ export async function sincParticipanteConvidado(convidado) {
   if (!aprovado && existentes.length) {
     await supabase.from("participantes").delete().in("id", existentes.map((p) => p.id)).then(ok);
   }
+  if (convidado.status === "Recusado") {
+    dispararIntegracoes("convidado.reprovado", {
+      convidado_id: convidado.id,
+      participante: { nome: convidado.nome, email: convidado.email, telefone: convidado.telefone },
+    });
+  }
 }
 
 // Categoria do anfitrião mudou → atualiza os participantes já gerados por ele.
