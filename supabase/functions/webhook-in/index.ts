@@ -67,10 +67,13 @@ Deno.serve(async (req) => {
 
     const telefone = val("telefone", ["telefone", "phone", "celular", "whatsapp", "mobile", "phone_number"]).trim();
     const empresa = val("empresa", ["empresa", "company", "organization"]).trim();
-    const ingresso = val("ingresso", ["ingresso", "ticket", "ticket_name", "product", "produto", "plano", "categoria"]).trim();
-    const faturamento = val("faturamento", ["faturamento", "revenue", "billing", "faturamento_mensal"]).trim();
-    const statusRaw = val("status", ["status", "payment_status", "situacao", "state"]).trim().toLowerCase();
-    const qtd = Number(val("quantidade", ["quantidade", "quantity", "qty"])) || 1;
+    const ingresso = val("ingresso", ["ingresso", "ticket", "ticket_name", "ticket_type", "product", "produto", "plano", "categoria"]).trim();
+    const faturamento = val("faturamento", ["faturamento", "revenue", "revenue_band", "billing", "faturamento_mensal"]).trim();
+    const tipoRaw = val("tipo", ["tipo", "participant_type", "tipo_participante"]).trim();
+    // payment_status antes de status: "status" sozinho às vezes é um status
+    // genérico do registro (ex.: "ativo"), não o do pagamento.
+    const statusRaw = val("status", ["payment_status", "status", "situacao", "state"]).trim().toLowerCase();
+    const qtd = Number(val("quantidade", ["quantidade", "quantity", "ticket_quantity", "qty"])) || 1;
 
     const statusMap = (cfg.status_map || {}) as Record<string, string>;
     let situacao = statusMap[statusRaw] || (cfg.situacao_padrao as string) || "";
@@ -82,7 +85,7 @@ Deno.serve(async (req) => {
     }
 
     const reg: Record<string, unknown> = {
-      evento_id: eventoId, nome: nome || email, tipo: "Convidado", pagamento: "Externo",
+      evento_id: eventoId, nome: nome || email, tipo: tipoRaw || "Convidado", pagamento: "Externo",
       situacao, quantidade: qtd,
     };
     if (email) reg.email = email;
