@@ -6,10 +6,10 @@
 import { esc, toast } from "./ui.js";
 import {
   supabase, listEventos, listParticipantes, listCheckins, listAtividades,
-  buscarParticipantePorQR, registrarCheckin,
+  buscarParticipantePorQR, registrarCheckin, getEvento, salvarEventoPorId,
 } from "./supabase.js";
 import { eventoId, definirEvento } from "./evento.js";
-import { imprimirCracha } from "./cracha.js";
+import { imprimirCracha, CRACHA_PADRAO, TAMANHOS_CRACHA, snapTamanho, limparConfigCracha } from "./cracha.js";
 
 const el = (id) => document.getElementById(id);
 const AVATAR = `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="8.5" r="4"/><path d="M4 21a8 8 0 0 1 16 0z"/></svg>`;
@@ -44,11 +44,22 @@ async function mostrarTela(alvo) {
   el("btn-manual-2").onclick = abrirBusca;
   el("btn-cam-manual").onclick = abrirBusca;
   el("busca-voltar").onclick = fecharBusca;
+  el("fab-scanner").onclick = fecharBusca;
   el("btn-cam-retry").onclick = abrirCamera;
   el("modo-evento-btn").onclick = () => escolherModo("");
   el("modo-atividade-btn").onclick = mostrarAtividades;
   let deb;
   el("in-busca").addEventListener("input", () => { clearTimeout(deb); deb = setTimeout(renderBusca, 150); });
+
+  el("btn-menu").onclick = abrirMenu;
+  el("menu-fundo").onclick = fecharMenu;
+  el("menu-scanner").onclick = () => { fecharMenu(); fecharBusca(); fecharConfig(); };
+  el("menu-lista").onclick = () => { fecharMenu(); abrirBusca(); };
+  el("menu-trocar").onclick = () => { fecharMenu(); mostrarTela("tela-modo"); };
+  el("menu-config").onclick = () => { fecharMenu(); abrirConfig(); };
+  el("menu-sair").onclick = () => { fecharMenu(); sair(); };
+  el("config-voltar").onclick = fecharConfig;
+  el("cfg-salvar").onclick = salvarConfig;
 
   supabase.auth.onAuthStateChange((ev) => {
     if (ev === "SIGNED_OUT") { sessao = null; mostrarTela("tela-login"); }
@@ -373,13 +384,12 @@ function telaSucesso(p, atvNome) {
   setTimeout(sair, 1600);
 }
 
-/* ---- busca manual ------------------------------------------------- */
+/* ---- lista de participantes / busca manual ------------------------ */
 function abrirBusca() {
   pausar();
   el("tela-busca").hidden = false;
   el("in-busca").value = "";
-  el("busca-lista").innerHTML = "";
-  el("in-busca").focus();
+  renderBusca();
 }
 function fecharBusca() {
   el("tela-busca").hidden = true;
@@ -387,27 +397,126 @@ function fecharBusca() {
 }
 function renderBusca() {
   const t = el("in-busca").value.trim().toLowerCase();
-  if (t.length < 2) { el("busca-lista").innerHTML = ""; return; }
   const atv = atvAtual();
-  const achados = participantes
-    .filter((p) => `${p.nome} ${p.email || ""} ${p.codigo || ""} ${p.empresa || ""}`.toLowerCase().includes(t))
-    .slice(0, 30);
+  const base = t
+    ? participantes.filter((p) => `${p.nome} ${p.email || ""} ${p.codigo || ""} ${p.empresa || ""}`.toLowerCase().includes(t))
+    : [...participantes].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+  const achados = base.slice(0, t ? 30 : 300);
   el("busca-lista").innerHTML = achados.length
     ? achados.map((p) => {
         const entrada = atv ? saldoAtividade(p.id, atv.id) : entradaEvento(p);
+        const confirmado = (p.situacao || "Confirmado") === "Confirmado";
         return `<button class="ck-busca-item" data-id="${p.id}">
           <span class="ck-avatar sm">${AVATAR}</span>
           <span class="ck-busca-item-txt">
             <strong>${esc(p.nome)}</strong>
-            <span>${esc(p.ingresso || p.tipo || "")}${p.codigo ? " · " + esc(p.codigo) : ""}</span>
+            <span>${esc(p.ingresso || p.tipo || "")}</span>
+            <span class="ck-busca-sit ${confirmado ? "ok" : "alerta"}">${esc(p.situacao || "Confirmado")}</span>
           </span>
           ${entrada ? `<span class="ck-tag-ok">✓</span>` : ""}
         </button>`;
       }).join("")
-    : `<p class="ck-busca-vazio">Ninguém encontrado.</p>`;
+    : `<p class="ck-busca-vazio">${t ? "Ninguém encontrado." : "Nenhum participante neste evento."}</p>`;
   el("busca-lista").querySelectorAll("[data-id]").forEach((b) => {
     b.onclick = () => { el("tela-busca").hidden = true; abrirSheet(participantes.find((x) => x.id === b.dataset.id)); };
   });
+}
+
+/* ---- menu lateral --------------------------------------------------- */
+function abrirMenu() {
+  el("menu-usuario").textContent = sessao?.user?.email || "";
+  el("menu-fundo").hidden = false;
+  el("menu").hidden = false;
+  void el("menu").offsetHeight;
+  setTimeout(() => { el("menu-fundo").classList.add("aberto"); el("menu").classList.add("aberto"); }, 10);
+}
+function fecharMenu() {
+  el("menu-fundo").classList.remove("aberto");
+  el("menu").classList.remove("aberto");
+  setTimeout(() => { el("menu-fundo").hidden = true; el("menu").hidden = true; }, 240);
+}
+
+/* ---- impressora / etiqueta ------------------------------------------ */
+const CFG_ROTULOS = {
+  evento: "Evento", nome: "Nome", categoria: "Categoria", texto: "Texto fixo",
+  empresa: "Empresa", email: "E-mail", telefone: "Telefone", codigo: "Código",
+};
+const CFG_FIXOS = ["evento", "nome", "categoria"];
+
+async function abrirConfig() {
+  pausar();
+  el("tela-config").hidden = false;
+  try {
+    const ev = await getEvento(evento.id);
+    montarConfigForm(ev?.cracha_config);
+  } catch (e) { toast(e.message || "Falha ao carregar configuração.", "erro"); }
+}
+function fecharConfig() {
+  el("tela-config").hidden = true;
+  if (el("app").hidden === false) retomar();
+}
+
+function montarConfigForm(salvo) {
+  const cfg = JSON.parse(JSON.stringify(CRACHA_PADRAO));
+  if (salvo) {
+    cfg.largura_mm = salvo.largura_mm ?? cfg.largura_mm;
+    cfg.altura_mm = salvo.altura_mm ?? cfg.altura_mm;
+    cfg.qr = salvo.qr !== false;
+    cfg.linhas = cfg.linhas.map((l) => {
+      const s = (salvo.linhas || []).find((x) => x.campo === l.campo);
+      return s ? { ...l, ...s } : l;
+    });
+  }
+  el("cfg-largura").value = cfg.largura_mm;
+  el("cfg-altura").value = cfg.altura_mm;
+  el("cfg-qr").checked = cfg.qr !== false;
+
+  const opts = (tam) => {
+    const sel = snapTamanho(Number(tam) || 18);
+    return TAMANHOS_CRACHA.map((t) => `<option value="${t.valor}" ${sel === t.valor ? "selected" : ""}>${t.rotulo}</option>`).join("");
+  };
+  el("cfg-linhas").innerHTML = cfg.linhas.map((l) => {
+    const fixo = CFG_FIXOS.includes(l.campo);
+    return `<div class="ck-linha-cfg" data-campo="${l.campo}">
+      <label class="ck-check-row"><input type="checkbox" data-on ${l.on !== false ? "checked" : ""} ${fixo ? "disabled" : ""} /> ${esc(CFG_ROTULOS[l.campo] || l.campo)}${fixo ? " (obrigatório)" : ""}
+        ${l.campo === "texto" ? `<input class="ck-input" data-texto value="${esc(l.texto || "")}" placeholder="texto fixo" style="margin-top:6px;height:38px" />` : ""}
+      </label>
+      <select class="ck-select" data-tam>${opts(l.tam)}</select>
+    </div>`;
+  }).join("");
+}
+
+function lerConfigForm() {
+  return {
+    largura_mm: Number(el("cfg-largura").value) || 90,
+    altura_mm: Number(el("cfg-altura").value) || 55,
+    qr: el("cfg-qr").checked,
+    linhas: [...el("cfg-linhas").querySelectorAll(".ck-linha-cfg")].map((row) => {
+      const campo = row.dataset.campo;
+      const o = {
+        campo,
+        on: CFG_FIXOS.includes(campo) ? true : row.querySelector("[data-on]").checked,
+        tam: Number(row.querySelector("[data-tam]").value) || 14,
+      };
+      if (campo === "texto") o.texto = row.querySelector("[data-texto]").value.trim();
+      return o;
+    }),
+  };
+}
+
+async function salvarConfig() {
+  const btn = el("cfg-salvar");
+  const antes = btn.textContent;
+  btn.disabled = true; btn.textContent = "Salvando…";
+  try {
+    await salvarEventoPorId(evento.id, { cracha_config: lerConfigForm() });
+    limparConfigCracha();
+    toast("Configuração salva.", "ok");
+  } catch (e) {
+    toast(e.message || "Falha ao salvar.", "erro");
+  } finally {
+    btn.disabled = false; btn.textContent = antes;
+  }
 }
 
 /* ---- atualização periódica dos check-ins ------------------------- */

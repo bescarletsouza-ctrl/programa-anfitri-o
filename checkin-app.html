@@ -89,6 +89,9 @@
   <!-- Scanner -->
   <div id="app" hidden>
     <header class="ck-topo">
+      <button class="ck-icone-btn" id="btn-menu" aria-label="Menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+      </button>
       <button class="ck-icone-btn" id="btn-trocar" aria-label="Trocar evento / modo">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
       </button>
@@ -132,7 +135,57 @@
       <input class="ck-input" id="in-busca" placeholder="Nome, e-mail ou código" autocomplete="off" />
     </header>
     <div class="ck-busca-lista" id="busca-lista"></div>
+    <button class="ck-fab" id="fab-scanner">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 14v3M14 19h3"/></svg>
+      Ler QRCode
+    </button>
   </section>
+
+  <!-- Impressora e etiqueta -->
+  <section class="ck-tela ck-busca" id="tela-config" hidden>
+    <header class="ck-busca-topo">
+      <button class="ck-icone-btn" id="config-voltar" aria-label="Voltar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <strong style="font-size:1rem">Impressora e etiqueta</strong>
+    </header>
+    <div class="ck-lista-corpo">
+      <label class="ck-campo"><span>Largura (mm)</span><input class="ck-input" id="cfg-largura" type="number" min="30" max="200" /></label>
+      <label class="ck-campo"><span>Altura (mm)</span><input class="ck-input" id="cfg-altura" type="number" min="20" max="200" /></label>
+      <label class="ck-check-row"><input type="checkbox" id="cfg-qr" /> Mostrar QR Code</label>
+      <div id="cfg-linhas" style="margin-top:6px"></div>
+      <button class="ck-btn ck-btn-primario" id="cfg-salvar" style="margin-top:18px">Salvar</button>
+      <p class="pagina-sub-ck">A impressão abre a caixa de diálogo do navegador — a impressora em si você escolhe lá, na hora de imprimir. Aqui você define o tamanho da etiqueta e quais dados aparecem nela.</p>
+    </div>
+  </section>
+
+  <!-- Menu lateral -->
+  <div class="ck-menu-fundo" id="menu-fundo" hidden></div>
+  <nav class="ck-menu" id="menu" hidden aria-label="Menu">
+    <div class="ck-menu-cab">
+      <div class="ck-abrir-marca">We<b>.events</b></div>
+      <span class="ck-menu-sub" id="menu-usuario"></span>
+    </div>
+    <div class="ck-menu-corpo">
+      <button class="ck-menu-item" id="menu-scanner">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 14v3M14 19h3"/></svg>
+        Controle de acesso
+      </button>
+      <button class="ck-menu-item" id="menu-lista">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Lista de participantes
+      </button>
+      <button class="ck-menu-item" id="menu-trocar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+        Trocar evento / modo
+      </button>
+      <button class="ck-menu-item" id="menu-config">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Impressora e etiqueta
+      </button>
+    </div>
+    <button class="ck-menu-sair" id="menu-sair">Sair</button>
+  </nav>
 
   <!-- Impressão do crachá -->
   <div id="cracha" hidden></div>
