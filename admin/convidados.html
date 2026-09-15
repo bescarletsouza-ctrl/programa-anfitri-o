@@ -24,11 +24,29 @@
       <button class="btn btn-primario" id="btn-novo">+ Novo convidado</button>
     </div>
 
-    <div class="filtros" style="margin-bottom:14px">
-      <input class="input" id="busca" placeholder="Buscar por nome, e-mail ou empresa…" />
-      <select class="select" id="f-status"><option value="">Todos os status</option></select>
-      <select class="select" id="f-grupo"><option value="">Todos os grupos</option></select>
+    <div class="barra-topo" style="margin-bottom:12px">
+      <div></div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <button class="btn btn-sm btn-secundario" id="btn-toggle-filtros" aria-expanded="false">Filtros</button>
+      </div>
     </div>
+
+    <section class="filtros-painel" id="filtros-painel" hidden>
+      <div class="filtros-cab">
+        <strong>Filtros</strong>
+        <button class="btn btn-sm btn-fantasma" id="btn-limpar-filtros">Limpar tudo</button>
+      </div>
+      <div class="filtros-grupo">
+        <div class="filtros-linha">
+          <label class="campo"><span>Pesquisar</span>
+            <input class="input" id="busca" placeholder="Nome, e-mail ou empresa…" /></label>
+          <label class="campo"><span>Status</span>
+            <select class="select" id="f-status"><option value="">Todos os status</option></select></label>
+          <label class="campo"><span>Grupo</span>
+            <select class="select" id="f-grupo"><option value="">Todos os grupos</option></select></label>
+        </div>
+      </div>
+    </section>
 
     <div class="grid grid-4" id="pills" style="margin-bottom:16px"></div>
 
@@ -45,7 +63,7 @@
         <thead><tr>
           <th class="col-check"><input type="checkbox" id="check-todos" aria-label="Selecionar todos" /></th>
           <th>Convidado</th><th>Empresa</th><th>Convidado por</th>
-          <th>Telefone</th><th>Status</th><th>Situação</th><th>Data</th>
+          <th>Telefone</th><th>Status</th><th>Situação</th><th>Data</th><th></th>
         </tr></thead>
         <tbody id="linhas"></tbody>
       </table>

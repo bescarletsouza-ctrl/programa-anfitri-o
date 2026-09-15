@@ -510,10 +510,20 @@ function modalMembro(m) {
   });
 }
 
-/* ---- CTA: check-in pelo celular (link + QR) ---- */
+/* ---- CTA: check-in pelo celular (baixar o app + abrir no evento) ---- */
 function montarCtaMobile() {
   const inp = el("ck-mobile-link");
   if (!inp) return;
+
+  const apk = new URL("../downloads/we-events-checkin.apk", location.href).href;
+  el("ck-apk-link").value = apk;
+  el("ck-apk-abrir").href = apk;
+  el("ck-apk-copiar").onclick = () =>
+    navigator.clipboard.writeText(apk).then(() => toast("Link copiado.", "ok"));
+  qrDataURL(apk).then((uri) => {
+    if (uri) el("ck-apk-qr").innerHTML = `<img src="${uri}" alt="QR pra baixar o app de check-in" />`;
+  });
+
   const link = new URL(`../checkin-app.html?evento=${eventoId()}`, location.href).href;
   inp.value = link;
   el("ck-mobile-abrir").href = link;

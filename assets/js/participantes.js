@@ -920,6 +920,7 @@ function cardPart(p) {
           ${nomeResp ? `<span title="Responsável: ${esc(nomeResp)}" style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--cinza-100);color:var(--texto-suave);font-size:.62rem;font-weight:700;flex-shrink:0">${esc(iniciaisDe(nomeResp))}</span>` : ""}
         </span>
       </div>
+      ${(p.ingresso || "").trim() ? `<div style="margin-top:5px"><span class="chip-cat" style="font-size:.66rem">${esc(p.ingresso.trim())}</span></div>` : ""}
       ${p.faturamento ? `<div class="pagina-sub" style="margin:4px 0 0;font-size:.75rem">${esc(p.faturamento)}</div>` : ""}
       <div class="pagina-sub" style="margin:2px 0 0;font-size:.72rem">${esc(p.email || p.telefone || "")}</div>
       <div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">

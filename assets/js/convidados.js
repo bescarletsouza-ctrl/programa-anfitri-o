@@ -50,6 +50,17 @@ el("f-grupo").addEventListener("change", (e) => { filtros.grupo = e.target.value
 el("btn-novo").innerHTML = icone("mais") + "Novo convidado";
 el("btn-novo").onclick = modalNovo;
 
+el("btn-toggle-filtros").onclick = () => {
+  const painel = el("filtros-painel");
+  painel.hidden = !painel.hidden;
+  el("btn-toggle-filtros").setAttribute("aria-expanded", String(!painel.hidden));
+};
+el("btn-limpar-filtros").onclick = () => {
+  Object.assign(filtros, { busca: "", status: "", grupo: "" });
+  el("busca").value = ""; el("f-status").value = ""; el("f-grupo").value = "";
+  render();
+};
+
 const badgeStatus = (s) =>
   ({ Pendente: "badge-alerta", Aprovado: "badge-info", Recusado: "badge-erro", Confirmado: "badge-ok" }[s] || "badge-neutro");
 // Situação do participante gerado a partir do convite — campo separado do
@@ -59,6 +70,8 @@ const badgeSituacao = (s) =>
      "Pré-inscrito": "badge-neutro", Desativado: "badge-erro" }[s] || "badge-neutro");
 const situacaoDoParticipante = (c) =>
   (Array.isArray(c.participante) ? c.participante[0]?.situacao : c.participante?.situacao) || null;
+
+const filtrosAtivos = () => !!(filtros.busca || filtros.status || filtros.grupo);
 
 function filtrar() {
   return lista.filter((c) => {
@@ -74,6 +87,7 @@ function filtrar() {
 
 function render() {
   const filtrada = filtrar();
+  el("btn-toggle-filtros").classList.toggle("ativo", filtrosAtivos());
 
   const cont = (s) => lista.filter((c) => c.status === s).length;
   el("pills").innerHTML = STATUS_CONVIDADO.map(
@@ -103,6 +117,10 @@ function render() {
         <td><span class="badge ${badgeStatus(c.status)}">${esc(c.status)}</span></td>
         <td>${situacaoDoParticipante(c) ? `<span class="badge ${badgeSituacao(situacaoDoParticipante(c))}">${esc(situacaoDoParticipante(c))}</span>` : `<span class="cel-tenue">—</span>`}</td>
         <td>${formatarData(c.created_at)}</td>
+        <td class="linha-acoes">
+          <button class="icone-btn" data-editar title="Editar">${icone("editar")}</button>
+          <button class="icone-btn" data-excluir title="Excluir">${icone("excluir")}</button>
+        </td>
       </tr>`;
     })
     .join("");
@@ -114,6 +132,8 @@ function render() {
       tr.classList.toggle("sel", e.target.checked);
       sincronizarBarra(filtrar());
     };
+    tr.querySelector("[data-editar]").onclick = (e) => { e.stopPropagation(); modalEditar(lista.find((x) => x.id === id)); };
+    tr.querySelector("[data-excluir]").onclick = (e) => { e.stopPropagation(); excluirConvidado(lista.find((x) => x.id === id)); };
     tr.onclick = () => abrirGavetaDetalhe(id);
   });
 }
@@ -185,9 +205,52 @@ function modalNovo() {
   });
 }
 
-function campoSelecao(chave, rotulo) {
+/* ---- Editar convidado ---- */
+function modalEditar(c) {
+  if (!c) return;
+  abrirModal({
+    titulo: "Editar convidado",
+    textoConfirmar: "Salvar",
+    corpoHtml: `
+      <label class="campo"><span>Anfitrião *</span>
+        <select class="select" name="anfitriao_id" required>
+          ${anfitrioes.map((a) => `<option value="${a.id}" ${a.id === c.anfitriao_id ? "selected" : ""}>${esc(a.nome)}</option>`).join("")}</select></label>
+      <label class="campo"><span>Nome *</span><input class="input" name="nome" required value="${esc(c.nome || "")}" /></label>
+      <label class="campo"><span>E-mail</span><input class="input" name="email" type="email" value="${esc(c.email || "")}" /></label>
+      <label class="campo"><span>Telefone</span><input class="input" name="telefone" value="${esc(c.telefone || "")}" /></label>
+      <label class="campo"><span>Empresa</span><input class="input" name="empresa" value="${esc(c.empresa || "")}" /></label>
+      <label class="campo"><span>CNPJ</span><input class="input" name="cnpj" value="${esc(c.cnpj || "")}" /></label>
+      <label class="campo"><span>Site</span><input class="input" name="site" value="${esc(c.site || "")}" /></label>
+      ${campoSelecao("faturamento", "Faturamento mensal", c.faturamento)}
+      ${campoSelecao("funcionarios", "Nº de funcionários", c.funcionarios)}`,
+    onConfirmar: async (form) => {
+      const f = Object.fromEntries(new FormData(form));
+      Object.keys(f).forEach((k) => { if (f[k] === "") f[k] = null; });
+      await salvar("convidados", { id: c.id, ...f });
+      toast("Convidado atualizado.", "ok");
+      lista = await listConvidados();
+      render();
+    },
+  });
+}
+
+async function excluirConvidado(c) {
+  if (!c) return;
+  if (!confirmar(`Excluir "${c.nome}"?`)) return;
+  try {
+    await remover("convidados", c.id);
+    toast("Convidado excluído.", "ok");
+    fecharGaveta();
+    lista = await listConvidados();
+    render();
+  } catch (e) {
+    toast(e.message, "erro");
+  }
+}
+
+function campoSelecao(chave, rotulo, valorAtual) {
   const p = perguntas.find((x) => x.chave === chave);
-  const opts = (p?.opcoes || []).map((o) => `<option>${esc(o)}</option>`).join("");
+  const opts = (p?.opcoes || []).map((o) => `<option ${o === valorAtual ? "selected" : ""}>${esc(o)}</option>`).join("");
   return `<label class="campo"><span>${esc(rotulo)}</span>
     <select class="select" name="${chave}"><option value="">—</option>${opts}</select></label>`;
 }
@@ -292,18 +355,7 @@ function abrirGavetaDetalhe(id) {
     salvarConvidado({ status: "Recusado" }, "Convidado reprovado.").then(fecharGaveta);
   g.querySelector("#d-salvar").onclick = () =>
     salvarConvidado({ observacao: g.querySelector("#d-obs").value.trim() || null }, "Observação salva.").then(fecharGaveta);
-  g.querySelector("#d-excluir").onclick = async () => {
-    if (!confirmar("Excluir este convidado?")) return;
-    try {
-      await remover("convidados", c.id);
-      toast("Convidado excluído.", "ok");
-      fecharGaveta();
-      lista = await listConvidados();
-      render();
-    } catch (e) {
-      toast(e.message, "erro");
-    }
-  };
+  g.querySelector("#d-excluir").onclick = () => excluirConvidado(c);
 }
 
 function infoLinha(rotulo, valor) {
