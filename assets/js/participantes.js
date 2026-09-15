@@ -45,6 +45,7 @@ const COLUNAS_BASE = {
   situacao:   "Situação",
   statusConvite: "Status do convite",
   pagamento:  "Pagamento",
+  faturamento: "Faturamento",
   empresa:    "Empresa",
   telefone:   "Telefone",
   etapa:      "Etapa",
@@ -416,6 +417,8 @@ function celulaHtml(p, c) {
     }
     case "pagamento":
       return `<td class="celula-edit" data-campo="pagamento" title="Alterar pagamento"><span class="badge ${badgePag(p.pagamento)}">${esc(p.pagamento)}</span>${lapis()}</td>`;
+    case "faturamento":
+      return `<td>${p.faturamento ? esc(p.faturamento) : `<span class="cel-tenue">—</span>`}</td>`;
     case "empresa":
       return `<td>${p.empresa ? esc(p.empresa) : `<span class="cel-tenue">—</span>`}</td>`;
     case "telefone":
