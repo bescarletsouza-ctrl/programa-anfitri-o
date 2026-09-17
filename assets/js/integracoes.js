@@ -312,6 +312,9 @@ function modalEntrada(row) {
           ${["", "Confirmado", "Pendente", "Pré-inscrito", "Fila de espera"].map((s) =>
             `<option value="${s}" ${s === (cfg.situacao_padrao || "") ? "selected" : ""}>${s || "Automática (pelo status recebido)"}</option>`).join("")}
         </select></label>
+      <label class="campo"><span>Categoria padrão (ingresso)</span>
+        <input class="input" name="ingresso_padrao" value="${esc(cfg.ingresso_padrao || "")}" placeholder="Ex.: GOLD" />
+        <span class="cel-tenue" style="font-size:.72rem">Se preenchido, todo participante criado por essa origem recebe essa categoria, em vez do nome do produto/plano que vier no payload.</span></label>
       <label class="campo"><span>Mapa de campos (opcional, JSON)</span>
         <textarea class="input" name="mapa" rows="3" placeholder='{ "email": "buyer.email", "nome": "buyer.name" }'>${esc(cfg.mapa ? JSON.stringify(cfg.mapa, null, 0) : "")}</textarea>
         <span class="cel-tenue" style="font-size:.72rem">Sem mapa, o We.events procura nome/e-mail/telefone nas chaves comuns do corpo.</span></label>
@@ -326,6 +329,8 @@ function modalEntrada(row) {
       }
       const config = {};
       if (fd.get("situacao_padrao")) config.situacao_padrao = fd.get("situacao_padrao");
+      const ingressoPadrao = (fd.get("ingresso_padrao") || "").toString().trim();
+      if (ingressoPadrao) config.ingresso_padrao = ingressoPadrao;
       if (mapa) config.mapa = mapa;
       const reg = {
         tipo: "entrada",

@@ -102,7 +102,10 @@ Deno.serve(async (req) => {
 
     const telefone = val("telefone", ["telefone", "phone", "celular", "whatsapp", "mobile", "phone_number"]).trim();
     const empresa = val("empresa", ["empresa", "company", "organization"]).trim();
-    const ingresso = val("ingresso", ["ingresso", "ticket", "ticket_name", "ticket_type", "product", "produto", "plano", "categoria"]).trim();
+    // "Categoria padrão" da Origem tem prioridade — várias plataformas (ex.: Hubla)
+    // mandam o nome do produto/plano no lugar da categoria de ingresso.
+    const ingresso = ((cfg.ingresso_padrao as string) || "").trim()
+      || val("ingresso", ["ingresso", "ticket", "ticket_name", "ticket_type", "product", "produto", "plano", "categoria"]).trim();
     const faturamento = val("faturamento", ["faturamento", "revenue", "revenue_band", "billing", "faturamento_mensal"]).trim();
     const tipoRaw = val("tipo", ["tipo", "participant_type", "tipo_participante"]).trim();
     // payment_status antes de status: "status" sozinho às vezes é um status
