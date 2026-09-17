@@ -32,6 +32,7 @@
 .bt-nome { color: var(--bt-verde); }
 .bt-lead { font-size: 1.02rem; line-height: 1.6; color: var(--bt-texto-suave); margin: 0 0 22px; }
 .bt-lead b { color: var(--bt-texto); }
+.bt-nota { font-size: .78rem; color: var(--bt-texto-suave); margin: 14px 0 0; }
 
 /* ---- Seções genéricas ---------------------------------------------------- */
 .bt-secao { padding: 48px 20px; border-top: 1px solid var(--bt-borda); text-align: center; }
@@ -44,7 +45,6 @@
 .bt-secao > h3 { font-size: 1.15rem; }
 .bt-frase { max-width: 560px; margin: 0 auto 14px; font-size: 1.02rem; line-height: 1.6; color: var(--bt-texto-suave); }
 .bt-frase:last-of-type { margin-bottom: 20px; }
-.bt-local { font-size: .85rem; font-weight: 700; color: var(--bt-verde); margin: 18px 0 0; }
 .bt-nomes {
   max-width: 560px; margin: 0 auto 20px; font-size: .92rem; font-weight: 700;
   color: var(--bt-texto); letter-spacing: .01em;
@@ -59,16 +59,67 @@
 }
 .bt-cta:hover { transform: translateY(-2px); box-shadow: 0 16px 40px rgba(198, 255, 61, .32); }
 
-/* ---- Benefícios (lista com título + descrição) --------------------------- */
-.bt-lista {
-  list-style: none; margin: 8px auto 26px; padding: 0; max-width: 480px;
-  display: grid; gap: 18px; text-align: left;
+.bt-tags {
+  max-width: 560px; margin: 0 auto 22px; font-size: .82rem; font-weight: 800;
+  letter-spacing: .08em; text-transform: uppercase; color: var(--bt-verde);
 }
-.bt-lista li { border-left: 3px solid var(--bt-verde); padding-left: 16px; }
-.bt-lista h4 { margin: 0 0 4px; font-size: 1rem; font-weight: 800; }
-.bt-lista p { margin: 0; font-size: .9rem; line-height: 1.5; color: var(--bt-texto-suave); }
 
-.bt-em-breve { color: var(--bt-texto-suave); font-size: .9rem; margin: 0 0 20px; }
+/* ---- Vídeo (mesmo padrão do tema Nitro 10X) ------------------------------- */
+.bt-video-wrap {
+  max-width: 720px; margin: 8px auto 0; aspect-ratio: 16 / 9;
+  background: #000; border-radius: 14px; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--bt-borda);
+}
+.bt-video-wrap iframe { width: 100%; height: 100%; border: 0; }
+.bt-video-play {
+  position: relative; width: 100%; height: 100%; padding: 0; margin: 0;
+  border: 0; background: #000; cursor: pointer; display: flex;
+  align-items: center; justify-content: center;
+}
+.bt-video-play img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .65; }
+.bt-video-icone {
+  position: relative; z-index: 1; width: 64px; height: 64px; border-radius: 50%;
+  background: var(--bt-verde); display: grid; place-items: center;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .4); transition: transform .15s ease;
+}
+.bt-video-play:hover .bt-video-icone { transform: scale(1.08); }
+.bt-video-icone svg { width: 26px; height: 26px; margin-left: 4px; fill: #06110b; }
+
+/* ---- Card do expert (palestrantes) ----------------------------------------- */
+.bt-card-expert {
+  max-width: 480px; margin: 8px auto 22px; padding: 22px; text-align: left;
+  background: rgba(245, 245, 240, .04); border: 1px solid var(--bt-borda); border-radius: 16px;
+}
+.bt-card-expert h4 { margin: 0 0 6px; font-size: 1.05rem; font-weight: 800; }
+.bt-card-expert > p { margin: 0 0 18px; font-size: .9rem; line-height: 1.5; color: var(--bt-texto-suave); }
+.bt-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.bt-stats div { text-align: center; }
+.bt-stats b { display: block; font-size: 1.1rem; font-weight: 800; color: var(--bt-verde); }
+.bt-stats span { display: block; font-size: .72rem; color: var(--bt-texto-suave); margin-top: 2px; line-height: 1.3; }
+
+/* ---- Experiência / investimento --------------------------------------------- */
+.bt-check-lista {
+  list-style: none; margin: 0 auto 28px; padding: 0; max-width: 380px;
+  display: grid; gap: 10px; text-align: left; font-size: .95rem;
+}
+.bt-check-lista li { padding-left: 26px; position: relative; }
+.bt-check-lista li::before {
+  content: "✓"; position: absolute; left: 0; color: var(--bt-verde); font-weight: 800;
+}
+.bt-preco {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  margin: 0 0 26px; padding: 22px; border: 1px solid var(--bt-borda); border-radius: 16px; max-width: 360px; margin-inline: auto;
+}
+.bt-preco-rotulo { font-size: .72rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--bt-texto-suave); }
+.bt-preco-de { font-size: 1.1rem; color: var(--bt-texto-suave); text-decoration: line-through; margin-top: 2px; }
+.bt-preco-cortesia { font-size: 1.5rem; font-weight: 800; color: var(--bt-verde); margin-top: 2px; }
+.bt-preco-nota { font-size: .74rem; color: var(--bt-texto-suave); margin-top: 8px; text-align: center; }
+
+/* ---- FAQ -------------------------------------------------------------------- */
+.bt-faq-lista { max-width: 560px; margin: 8px auto 26px; text-align: left; display: grid; gap: 18px; }
+.bt-faq-item h4 { margin: 0 0 6px; font-size: .95rem; font-weight: 800; }
+.bt-faq-item p { margin: 0; font-size: .88rem; line-height: 1.5; color: var(--bt-texto-suave); }
 
 @media (min-width: 620px) {
   .bt-secao { padding: 64px 20px; }
