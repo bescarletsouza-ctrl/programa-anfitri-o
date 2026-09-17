@@ -314,7 +314,10 @@ function modalEntrada(row) {
         </select></label>
       <label class="campo"><span>Categoria padrão (ingresso)</span>
         <input class="input" name="ingresso_padrao" value="${esc(cfg.ingresso_padrao || "")}" placeholder="Ex.: GOLD" />
-        <span class="cel-tenue" style="font-size:.72rem">Se preenchido, todo participante criado por essa origem recebe essa categoria, em vez do nome do produto/plano que vier no payload.</span></label>
+        <span class="cel-tenue" style="font-size:.72rem">Se preenchido, todo participante criado por essa origem recebe essa categoria, em vez do nome do produto/plano que vier no payload. Deixe em branco se for usar categorias por produto abaixo.</span></label>
+      <label class="campo"><span>Categorias por produto (opcional, JSON)</span>
+        <textarea class="input" name="categorias_por_produto" rows="3" placeholder='{ "Ps3YneQBTDGU7xKrpPRS": "GOLD", "outroIdDeOferta": "MASTER" }'>${esc(cfg.categorias_por_produto ? JSON.stringify(cfg.categorias_por_produto, null, 0) : "")}</textarea>
+        <span class="cel-tenue" style="font-size:.72rem">Vende mais de uma categoria por essa mesma origem (ex.: Hubla)? Mapeie o ID do produto/oferta pra categoria certa — tem prioridade sobre a "Categoria padrão" acima. Na Hubla, o ID de cada oferta aparece no link de checkout: pay.hub.la/<b>ESSE-ID</b>.</span></label>
       <label class="campo"><span>Mapa de campos (opcional, JSON)</span>
         <textarea class="input" name="mapa" rows="3" placeholder='{ "email": "buyer.email", "nome": "buyer.name" }'>${esc(cfg.mapa ? JSON.stringify(cfg.mapa, null, 0) : "")}</textarea>
         <span class="cel-tenue" style="font-size:.72rem">Sem mapa, o We.events procura nome/e-mail/telefone nas chaves comuns do corpo.</span></label>
@@ -327,10 +330,17 @@ function modalEntrada(row) {
         try { mapa = JSON.parse(mapaTxt); }
         catch { toast("O mapa de campos não é um JSON válido.", "erro"); return false; }
       }
+      let categoriasPorProduto = null;
+      const categoriasTxt = (fd.get("categorias_por_produto") || "").toString().trim();
+      if (categoriasTxt) {
+        try { categoriasPorProduto = JSON.parse(categoriasTxt); }
+        catch { toast("O mapa de categorias por produto não é um JSON válido.", "erro"); return false; }
+      }
       const config = {};
       if (fd.get("situacao_padrao")) config.situacao_padrao = fd.get("situacao_padrao");
       const ingressoPadrao = (fd.get("ingresso_padrao") || "").toString().trim();
       if (ingressoPadrao) config.ingresso_padrao = ingressoPadrao;
+      if (categoriasPorProduto) config.categorias_por_produto = categoriasPorProduto;
       if (mapa) config.mapa = mapa;
       const reg = {
         tipo: "entrada",

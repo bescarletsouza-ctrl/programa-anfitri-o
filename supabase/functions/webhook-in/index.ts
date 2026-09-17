@@ -58,6 +58,7 @@ function extrairHubla(body: Record<string, unknown>): Record<string, unknown> | 
     telefone: payer.phone || user.phone || "",
     ingresso: produto.name || "",
     status: invoice.status || "",
+    produtoId: produto.id || "",
   };
 }
 
@@ -102,9 +103,13 @@ Deno.serve(async (req) => {
 
     const telefone = val("telefone", ["telefone", "phone", "celular", "whatsapp", "mobile", "phone_number"]).trim();
     const empresa = val("empresa", ["empresa", "company", "organization"]).trim();
-    // "Categoria padrão" da Origem tem prioridade — várias plataformas (ex.: Hubla)
-    // mandam o nome do produto/plano no lugar da categoria de ingresso.
-    const ingresso = ((cfg.ingresso_padrao as string) || "").trim()
+    // Categoria: 1) mapa por produto/oferta (útil quando uma origem só vende
+    // várias categorias, ex.: Hubla com um ID de oferta por categoria),
+    // 2) "Categoria padrão" da Origem, 3) detecção genérica pelo payload.
+    const categoriasPorProduto = (cfg.categorias_por_produto || {}) as Record<string, string>;
+    const produtoId = String((hubla?.produtoId as string) || "").trim();
+    const ingresso = (produtoId && categoriasPorProduto[produtoId] ? categoriasPorProduto[produtoId] : "").trim()
+      || ((cfg.ingresso_padrao as string) || "").trim()
       || val("ingresso", ["ingresso", "ticket", "ticket_name", "ticket_type", "product", "produto", "plano", "categoria"]).trim();
     const faturamento = val("faturamento", ["faturamento", "revenue", "revenue_band", "billing", "faturamento_mensal"]).trim();
     const tipoRaw = val("tipo", ["tipo", "participant_type", "tipo_participante"]).trim();
