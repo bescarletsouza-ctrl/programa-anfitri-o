@@ -28,7 +28,7 @@ const path = (o: unknown, p: string): unknown =>
 
 // primeira chave existente (busca rasa e em objetos aninhados comuns)
 function acha(body: Record<string, unknown>, chaves: string[]): string {
-  const escopos = [body, body.data, body.buyer, body.customer, body.contact, body.order, body.comprador, body.participante]
+  const escopos = [body, body.data, body.buyer, body.customer, body.contact, body.order, body.comprador, body.participante, body._hubla]
     .filter((x) => x && typeof x === "object") as Record<string, unknown>[];
   for (const esc of escopos) {
     for (const k of chaves) {
@@ -37,6 +37,28 @@ function acha(body: Record<string, unknown>, chaves: string[]): string {
     }
   }
   return "";
+}
+
+// A Hubla manda um envelope próprio (webhooks v2): dados do comprador em
+// event.invoice.payer / event.user, nome dividido em firstName+lastName, e
+// o produto/oferta em event.product. Normaliza num objeto plano e injeta
+// como mais um "escopo" pra acha() achar sem precisar de mapa manual.
+function extrairHubla(body: Record<string, unknown>): Record<string, unknown> | null {
+  const ev = body?.event as Record<string, unknown> | undefined;
+  if (!ev || typeof ev !== "object") return null;
+  const invoice = (ev.invoice || {}) as Record<string, unknown>;
+  const payer = (invoice.payer || {}) as Record<string, unknown>;
+  const user = (ev.user || {}) as Record<string, unknown>;
+  const produto = (ev.product || {}) as Record<string, unknown>;
+  const nome = [payer.firstName, payer.lastName].filter(Boolean).join(" ").trim()
+    || [user.firstName, user.lastName].filter(Boolean).join(" ").trim();
+  return {
+    email: payer.email || user.email || "",
+    nome,
+    telefone: payer.phone || user.phone || "",
+    ingresso: produto.name || "",
+    status: invoice.status || "",
+  };
 }
 
 Deno.serve(async (req) => {
@@ -56,6 +78,16 @@ Deno.serve(async (req) => {
     if (!intg) return json({ erro: "Integração de entrada não encontrada ou inativa." }, 401);
 
     const body = await req.json().catch(() => ({})) as Record<string, unknown>;
+    const hubla = extrairHubla(body);
+    if (hubla) body._hubla = hubla;
+
+    // registra a tentativa no log (sucesso ou falha) mesmo se der erro adiante
+    const logar = (status: number, ok: boolean, erro?: string, resultado?: unknown) =>
+      sb.from("webhook_entregas").insert({
+        integracao_id: intg.id, evento_id: eventoId, gatilho: "entrada",
+        status, ok, erro: erro || null, payload: { recebido: body, resultado },
+      }).then(() => {}, () => {});
+
     const cfg = (intg.config || {}) as Record<string, unknown>;
     const mapa = (cfg.mapa || {}) as Record<string, string>;
     const val = (campo: string, chaves: string[]) =>
@@ -63,7 +95,10 @@ Deno.serve(async (req) => {
 
     const email = val("email", ["email", "e-mail", "buyer_email", "email_address", "mail"]).trim().toLowerCase();
     const nome = val("nome", ["nome", "name", "full_name", "buyer_name", "first_name"]).trim();
-    if (!email && !nome) return json({ erro: "Payload sem nome nem e-mail." }, 422);
+    if (!email && !nome) {
+      await logar(422, false, "Payload sem nome nem e-mail.");
+      return json({ erro: "Payload sem nome nem e-mail." }, 422);
+    }
 
     const telefone = val("telefone", ["telefone", "phone", "celular", "whatsapp", "mobile", "phone_number"]).trim();
     const empresa = val("empresa", ["empresa", "company", "organization"]).trim();
@@ -82,7 +117,7 @@ Deno.serve(async (req) => {
       // Pré-inscrito (mesmo pago/aprovado) — a equipe confirma manualmente
       // depois. Só cancelamento/estorno já cai como Desativado direto.
       if (/refund|cancel|estorn|reembols|charged?back/.test(statusRaw)) situacao = "Desativado";
-      else if (/pending|pendente|waiting|aguard/.test(statusRaw)) situacao = "Pendente";
+      else if (/pending|pendente|waiting|aguard|unpaid/.test(statusRaw)) situacao = "Pendente";
       else situacao = "Pré-inscrito";
     }
 
@@ -116,21 +151,34 @@ Deno.serve(async (req) => {
       if (ingresso) patch.ingresso = ingresso;
       if (faturamento) patch.faturamento = faturamento;
       const { data, error } = await sb.from("participantes").update(patch).eq("id", existente.id).select("id, codigo").single();
-      if (error) return json({ erro: error.message }, 500);
+      if (error) { await logar(500, false, error.message); return json({ erro: error.message }, 500); }
       resultado = { acao: "atualizado", ...data };
     } else {
       const { data, error } = await sb.from("participantes").insert(reg).select("id, codigo").single();
-      if (error) return json({ erro: error.message }, 500);
+      if (error) { await logar(500, false, error.message); return json({ erro: error.message }, 500); }
       resultado = { acao: "criado", ...data };
     }
 
-    await sb.from("webhook_entregas").insert({
-      integracao_id: intg.id, evento_id: eventoId, gatilho: "entrada",
-      status: 200, ok: true, payload: { recebido: body, resultado },
-    });
-
+    await logar(200, true, undefined, resultado);
     return json({ ok: true, ...resultado });
   } catch (e) {
-    return json({ erro: String((e as Error)?.message || e) }, 500);
+    const msg = String((e as Error)?.message || e);
+    try {
+      const u = new URL(req.url);
+      const eventoId = u.searchParams.get("evento_id") || null;
+      const token = u.searchParams.get("token") || req.headers.get("x-webhook-token") || "";
+      if (eventoId && token) {
+        const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+        const { data: intg } = await sb.from("integracoes").select("id")
+          .eq("evento_id", eventoId).eq("token", token).eq("tipo", "entrada").maybeSingle();
+        if (intg) {
+          await sb.from("webhook_entregas").insert({
+            integracao_id: intg.id, evento_id: eventoId, gatilho: "entrada",
+            status: 500, ok: false, erro: msg,
+          });
+        }
+      }
+    } catch { /* log é best-effort */ }
+    return json({ erro: msg }, 500);
   }
 });
