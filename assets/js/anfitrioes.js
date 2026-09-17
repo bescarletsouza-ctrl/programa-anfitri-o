@@ -13,6 +13,7 @@ import {
 } from "./supabase.js";
 import { APP, TIPOS_ANFITRIAO } from "./config.js";
 import { parsearTabela, lerXlsx, baixarXLSX, baixarModeloXLSX } from "./tabela.js";
+import { baixarQR } from "./cracha.js";
 
 const _iniciando = iniciarPagina("anfitrioes");
 const el = (id) => document.getElementById(id);
@@ -589,7 +590,7 @@ async function abrirGavetaDetalhe(id) {
 
     <div class="secao">
       <h4>Links</h4>
-      ${linkBox("Link de convite", linkConvite)}
+      ${linkBox("Link de convite", linkConvite, true)}
       ${linkBox("Painel do anfitrião", linkPainel)}
     </div>
 
@@ -663,15 +664,24 @@ async function abrirGavetaDetalhe(id) {
       navigator.clipboard.writeText(b.dataset.copiar).then(() => toast("Link copiado.", "ok"));
     };
   });
+  g.querySelectorAll("[data-baixar-qr]").forEach((b) => {
+    b.onclick = async () => {
+      b.disabled = true;
+      const ok = await baixarQR(b.dataset.baixarQr, `convite-${a.slug}.gif`).catch(() => false);
+      b.disabled = false;
+      if (!ok) toast("Não foi possível gerar o QR Code.", "erro");
+    };
+  });
 }
 
-function linkBox(rotulo, url) {
+function linkBox(rotulo, url, comQr) {
   return `<div class="campo">
     <span>${esc(rotulo)}</span>
     <div style="display:flex;gap:6px">
       <input class="input" readonly value="${esc(url)}" style="font-size:.78rem" />
       <button class="icone-btn" data-copiar="${esc(url)}" title="Copiar link" aria-label="Copiar link">${icone("copiar")}</button>
       <a class="icone-btn" href="${esc(url)}" target="_blank" rel="noopener" title="Abrir em outra aba" aria-label="Abrir em outra aba" style="text-decoration:none">${icone("externo")}</a>
+      ${comQr ? `<button class="icone-btn" data-baixar-qr="${esc(url)}" title="Baixar QR Code" aria-label="Baixar QR Code">${icone("baixar")}</button>` : ""}
     </div>
   </div>`;
 }

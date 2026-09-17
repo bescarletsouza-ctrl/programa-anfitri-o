@@ -2,9 +2,10 @@
 // Painel público do anfitrião — jornada (marcos), convites e ranking.
 // Acesso por link com ?a=<slug>. Sem sidebar, sem login.
 // =============================================================================
-import { esc, slugify, formatarData } from "./ui.js";
+import { esc, slugify, formatarData, toast } from "./ui.js";
 import { APP } from "./config.js";
 import { pubPainel } from "./publico-api.js";
+import { baixarQR } from "./cracha.js";
 
 const el = (id) => document.getElementById(id);
 // Link curto (/painel-<slug>, via rewrite do Vercel) não chega com ?a= pro JS
@@ -59,6 +60,14 @@ const situacaoDoParticipante = (c) =>
         el("btn-link").textContent = "Link copiado ✓";
         setTimeout(() => (el("btn-link").textContent = "Copiar meu link de convite"), 2000);
       });
+    };
+    el("btn-qr").onclick = async () => {
+      const btn = el("btn-qr");
+      const antes = btn.textContent;
+      btn.disabled = true; btn.textContent = "Gerando…";
+      const ok = await baixarQR(link, `convite-${anfitriao.slug}.gif`).catch(() => false);
+      btn.disabled = false; btn.textContent = antes;
+      if (!ok) toast("Não foi possível gerar o QR Code agora.", "erro");
     };
 
     // a jornada avança por convidado aprovado (não só "Confirmado" — esse

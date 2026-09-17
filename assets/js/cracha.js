@@ -65,6 +65,21 @@ export async function qrDataURL(texto) {
   }
 }
 
+// gera o QR de um texto/link e dispara o download como arquivo — usado pra
+// crachá, e também pra qualquer outro QR "pra baixar" (ex.: link de convite
+// do anfitrião).
+export async function baixarQR(texto, nomeArquivo = "qrcode.gif") {
+  const uri = await qrDataURL(texto);
+  if (!uri) return false;
+  const a = document.createElement("a");
+  a.href = uri;
+  a.download = nomeArquivo;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  return true;
+}
+
 function garantirCaixa() {
   let box = document.getElementById("cracha");
   if (!box) {
