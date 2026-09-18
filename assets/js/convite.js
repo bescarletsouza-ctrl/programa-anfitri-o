@@ -77,10 +77,6 @@ el("marca").innerHTML = APP.marcaHtml;
       document.body.classList.add("tema-branding-training");
       el("bt-nome-anfitriao").textContent = anfitriao.nome;
       el("brandingtraining").hidden = false;
-      // TODO: trocar VIDEO_ID_PLACEHOLDER pelo ID real do vídeo no YouTube
-      el("bt-video-play")?.addEventListener("click", function ativar() {
-        this.outerHTML = `<iframe src="https://www.youtube.com/embed/VIDEO_ID_PLACEHOLDER?autoplay=1" title="Branding Training" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>`;
-      }, { once: true });
     }
 
     el("carregando").hidden = true;
