@@ -98,6 +98,11 @@
 .bt-stats b { display: block; font-size: 1.1rem; font-weight: 800; color: var(--bt-verde); }
 .bt-stats span { display: block; font-size: .72rem; color: var(--bt-texto-suave); margin-top: 2px; line-height: 1.3; }
 
+/* ---- Bio do especialista (mesmo padrão da bio do Nitro 10X) ----------------- */
+.bt-bio > * { max-width: 560px; margin-left: auto; margin-right: auto; }
+.bt-bio h3 { font-size: 1.4rem; font-weight: 800; margin: 0 auto 18px; text-transform: none; }
+.bt-bio p { line-height: 1.65; color: var(--bt-texto-suave); margin: 0 auto 14px; }
+
 /* ---- Experiência / investimento --------------------------------------------- */
 .bt-check-lista {
   list-style: none; margin: 0 auto 28px; padding: 0; max-width: 380px;
