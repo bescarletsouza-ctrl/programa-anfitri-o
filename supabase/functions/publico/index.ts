@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
           .eq("anfitriao_id", a.id).order("created_at", { ascending: false }),
         sb.from("marcos").select("*").eq("evento_id", a.evento_id).order("quantidade"),
         sb.from("ranking_publico").select("*").eq("evento_id", a.evento_id).order("aprovados", { ascending: false }),
-        sb.from("eventos").select("id, meta_confirmados").eq("id", a.evento_id).maybeSingle(),
+        sb.from("eventos").select("id, nome, meta_confirmados").eq("id", a.evento_id).maybeSingle(),
       ]);
       return json({ anfitriao: a, convites: convites || [], marcos: marcos || [], ranking: ranking || [], evento: evento || null });
     }

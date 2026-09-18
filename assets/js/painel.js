@@ -61,6 +61,14 @@ const situacaoDoParticipante = (c) =>
         setTimeout(() => (el("btn-link").textContent = "Copiar meu link de convite"), 2000);
       });
     };
+    // abre o WhatsApp (app ou web) sem destinatário fixo — a pessoa escolhe o
+    // contato na própria lista e encaminha, já com a mensagem pronta
+    const primeiroNome = anfitriao.nome.split(" ")[0];
+    const mensagem =
+      `Oi! Aqui é o(a) ${primeiroNome}.` +
+      `${evento?.nome ? ` Quero te convidar para o ${evento.nome}.` : " Quero te fazer um convite."}` +
+      ` Se inscreva por aqui: ${link}`;
+    el("btn-whatsapp").href = `https://wa.me/?text=${encodeURIComponent(mensagem)}`;
     el("btn-qr").onclick = async () => {
       const btn = el("btn-qr");
       const antes = btn.textContent;
