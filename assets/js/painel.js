@@ -65,9 +65,8 @@ const situacaoDoParticipante = (c) =>
     // contato na própria lista e encaminha, já com a mensagem pronta
     const primeiroNome = anfitriao.nome.split(" ")[0];
     const mensagem =
-      `Oi! Aqui é o(a) ${primeiroNome}.` +
-      `${evento?.nome ? ` Quero te convidar para o ${evento.nome}.` : " Quero te fazer um convite."}` +
-      ` Se inscreva por aqui: ${link}`;
+      `Oi! Aqui é o(a) ${primeiroNome}. Quero te fazer um convite pra um evento transformador ` +
+      `e acredito que faz muito sentido para você nesse momento. Se inscreva por aqui: ${link}`;
     el("btn-whatsapp").href = `https://wa.me/?text=${encodeURIComponent(mensagem)}`;
     el("btn-qr").onclick = async () => {
       const btn = el("btn-qr");
