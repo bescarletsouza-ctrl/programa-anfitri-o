@@ -289,6 +289,8 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .btn-perigo:hover:not(:disabled) { filter: brightness(.93); }
 .btn-fantasma { background: transparent; color: var(--texto-suave); }
 .btn-fantasma:hover:not(:disabled) { background: var(--cinza-100); color: var(--texto); }
+.btn-whatsapp { background: #25d366; color: #06110b; border-color: transparent; }
+.btn-whatsapp:hover:not(:disabled) { filter: brightness(.94); }
 
 /* ---- Campos ---- */
 .campo { display: block; margin-bottom: 14px; }

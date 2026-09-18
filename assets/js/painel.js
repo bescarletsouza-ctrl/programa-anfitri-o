@@ -2,7 +2,7 @@
 // Painel público do anfitrião — jornada (marcos), convites e ranking.
 // Acesso por link com ?a=<slug>. Sem sidebar, sem login.
 // =============================================================================
-import { esc, slugify, formatarData, toast } from "./ui.js";
+import { esc, slugify, formatarData, toast, icone } from "./ui.js";
 import { APP } from "./config.js";
 import { pubPainel } from "./publico-api.js";
 import { baixarQR } from "./cracha.js";
@@ -63,6 +63,7 @@ const situacaoDoParticipante = (c) =>
     };
     // abre o WhatsApp (app ou web) sem destinatário fixo — a pessoa escolhe o
     // contato na própria lista e encaminha, já com a mensagem pronta
+    el("btn-whatsapp").innerHTML = icone("balao") + "Enviar pelo WhatsApp";
     const primeiroNome = anfitriao.nome.split(" ")[0];
     const mensagem =
       `Oi! Aqui é o(a) ${primeiroNome}. Quero te fazer um convite pra um evento transformador ` +
