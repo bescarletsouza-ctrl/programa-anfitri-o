@@ -152,14 +152,18 @@ function lerCampo() {
   if (p.tipo === "selecao") {
     return el("passo").querySelector('input[name="opt"]:checked')?.value || "";
   }
-  return el("passo").querySelector("[data-campo]").value.trim();
+  let v = el("passo").querySelector("[data-campo]").value.trim();
+  // aceita "site.com.br" ou colar o link com https:// — completa sozinho
+  // em vez de exigir que a pessoa digite o protocolo
+  if (p.tipo === "url" && v && !/^https?:\/\//i.test(v)) v = "https://" + v;
+  return v;
 }
 
 function validar(p, v) {
   if (p.obrigatorio && !v) return "Este campo é obrigatório.";
   if (!v) return null;
   if (p.tipo === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return "E-mail inválido.";
-  if (p.tipo === "url" && !/^https?:\/\/.+\..+/.test(v)) return "Informe uma URL válida (com https://).";
+  if (p.tipo === "url" && !/^https?:\/\/.+\..+/.test(v)) return "Informe um site válido.";
   if (p.tipo === "telefone" && v.replace(/\D/g, "").length < 8) return "Telefone inválido.";
   return null;
 }
