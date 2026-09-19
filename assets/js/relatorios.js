@@ -3,7 +3,7 @@
 // por hora e lista dos últimos check-ins. Tudo client-side, sem lib de gráfico.
 // =============================================================================
 import { iniciarPagina, esc, debounce, formatarData, toast } from "./ui.js";
-import { listParticipantes, listCheckins, listAtividades } from "./supabase.js";
+import { listParticipantes, listCheckins, listAtividades, listTiposIngresso } from "./supabase.js";
 import { baixarXLSX } from "./tabela.js";
 
 const _iniciando = iniciarPagina("relatorios");
@@ -12,7 +12,22 @@ const el = (id) => document.getElementById(id);
 let participantes = [];
 let checkins = [];
 let atividades = [];
+let tipos = [];
 let buscaLog = "";
+
+// "R$ 1.500,00" / "1500" / "Gratuito" → número
+function parsePreco(txt) {
+  const s = String(txt || "").replace(/[^\d.,-]/g, "");
+  if (!s) return 0;
+  const n = parseFloat(s.replace(/\.(?=\d{3}(\D|$))/g, "").replace(",", "."));
+  return Number.isFinite(n) ? n : 0;
+}
+const brl = (n) =>
+  n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: n % 1 ? 2 : 0 });
+const precoDaCategoria = (nome) => {
+  const t = tipos.find((x) => (x.nome || "").trim().toLowerCase() === (nome || "").trim().toLowerCase());
+  return t ? parsePreco(t.preco) : 0;
+};
 
 _iniciando.then((ctx) => { if (ctx) carregar(ctx); });
 el("btn-atualizar").onclick = () => carregar();
@@ -22,8 +37,8 @@ setInterval(() => { if (!document.hidden) carregar(); }, 30000);
 
 async function carregar() {
   try {
-    [participantes, checkins, atividades] = await Promise.all([
-      listParticipantes(), listCheckins(), listAtividades().catch(() => []),
+    [participantes, checkins, atividades, tipos] = await Promise.all([
+      listParticipantes(), listCheckins(), listAtividades().catch(() => []), listTiposIngresso().catch(() => []),
     ]);
     participantes = participantes.filter((p) => p.situacao !== "Desativado");
     el("carregando").hidden = true;
@@ -88,11 +103,18 @@ function renderKpis() {
   const ultimaHora = entradas.filter((c) => agora - new Date(c.at).getTime() <= 3600000).length;
   const taxa = total ? Math.round((presentes / total) * 100) : 0;
 
+  // só mostra faturamento se algum Tipo de ingresso tiver preço configurado
+  const temPreco = tipos.some((t) => parsePreco(t.preco) > 0);
+  const valorDe = (p) => precoDaCategoria(p.ingresso) * (Number(p.quantidade) || 1);
+  const faturamentoInscrito = temPreco ? participantes.reduce((s, p) => s + valorDe(p), 0) : 0;
+  const faturamentoPresente = temPreco ? participantes.filter((p) => p.presente).reduce((s, p) => s + valorDe(p), 0) : 0;
+
   const kpi = (valor, rotulo) => `<div class="card"><div class="kpi"><span class="valor">${valor}</span><span class="rotulo">${esc(rotulo)}</span></div></div>`;
   el("kpis").innerHTML =
     kpi(total, "Participantes") +
     kpi(presentes, "Presentes agora") +
     kpi(hoje, "Check-ins hoje") +
+    (temPreco ? kpi(brl(faturamentoInscrito), "Faturamento inscrito") + kpi(brl(faturamentoPresente), "Faturamento presente") : "") +
     kpi(ultimaHora, "Na última hora") +
     kpi(taxa + "%", "Taxa de presença");
 }
