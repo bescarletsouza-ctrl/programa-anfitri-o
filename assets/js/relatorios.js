@@ -2,7 +2,7 @@
 // Relatórios de credenciamento — KPIs, presença por ingresso/tipo, check-ins
 // por hora e lista dos últimos check-ins. Tudo client-side, sem lib de gráfico.
 // =============================================================================
-import { iniciarPagina, esc, debounce, formatarData, toast } from "./ui.js";
+import { iniciarPagina, esc, debounce, formatarData, toast, normalizarFaturamento } from "./ui.js";
 import { listParticipantes, listCheckins, listAtividades, listTiposIngresso } from "./supabase.js";
 import { baixarXLSX } from "./tabela.js";
 
@@ -66,6 +66,7 @@ function render() {
   renderHoras();
   renderQuebra("rel-ingresso", (p) => p.ingresso || "Sem categoria");
   renderQuebra("rel-tipo", (p) => p.tipo || "—");
+  renderQuebra("rel-faturamento-perfil", (p) => normalizarFaturamento(p.faturamento) || "Não informado");
   renderAtividades();
   renderLog();
 }
