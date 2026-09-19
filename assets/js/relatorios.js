@@ -14,6 +14,7 @@ let checkins = [];
 let atividades = [];
 let tipos = [];
 let buscaLog = "";
+let modoFaturamentoPerfil = "inscritos";
 
 // "R$ 1.500,00" / "1500" / "Gratuito" → número
 function parsePreco(txt) {
@@ -33,6 +34,14 @@ _iniciando.then((ctx) => { if (ctx) carregar(ctx); });
 el("btn-atualizar").onclick = () => carregar();
 el("btn-exportar").onclick = exportar;
 el("busca-log").addEventListener("input", debounce((e) => { buscaLog = e.target.value.trim().toLowerCase(); renderLog(); }, 200));
+el("toggle-faturamento-perfil").querySelectorAll("button").forEach((b) => {
+  b.onclick = () => {
+    el("toggle-faturamento-perfil").querySelectorAll("button").forEach((x) => x.classList.remove("ativo"));
+    b.classList.add("ativo");
+    modoFaturamentoPerfil = b.dataset.modo;
+    renderFaturamentoPerfil();
+  };
+});
 setInterval(() => { if (!document.hidden) carregar(); }, 30000);
 
 async function carregar() {
@@ -66,7 +75,7 @@ function render() {
   renderHoras();
   renderQuebra("rel-ingresso", (p) => p.ingresso || "Sem categoria");
   renderQuebra("rel-tipo", (p) => p.tipo || "—");
-  renderQuebra("rel-faturamento-perfil", (p) => normalizarFaturamento(p.faturamento) || "Não informado");
+  renderFaturamentoPerfil();
   renderAtividades();
   renderLog();
 }
@@ -194,6 +203,35 @@ function renderQuebra(alvo, chave) {
         <span class="rel-barra-nome" title="${esc(k)}">${esc(k)}</span>
         <span class="rel-barra-trilha"><i style="width:${pct}%"></i></span>
         <span class="rel-barra-valor">${m.presentes}/${m.total}</span>
+      </div>`;
+    })
+    .join("");
+}
+
+// Igual renderQuebra, mas com toggle pra escolher entre ver o número (e a
+// barra) de inscritos ou só de presentes, em vez de sempre misturar os dois.
+function renderFaturamentoPerfil() {
+  const mapa = new Map();
+  participantes.forEach((p) => {
+    const k = normalizarFaturamento(p.faturamento) || "Não informado";
+    const m = mapa.get(k) || { total: 0, presentes: 0 };
+    m.total++;
+    if (p.presente) m.presentes++;
+    mapa.set(k, m);
+  });
+  const usarPresentes = modoFaturamentoPerfil === "presentes";
+  const valor = (m) => (usarPresentes ? m.presentes : m.total);
+  const linhas = [...mapa.entries()].sort((a, b) => valor(b[1]) - valor(a[1]));
+  if (!linhas.length) { el("rel-faturamento-perfil").innerHTML = `<p class="pagina-sub" style="margin:0">Sem dados.</p>`; return; }
+  const max = Math.max(1, ...linhas.map(([, m]) => valor(m)));
+  el("rel-faturamento-perfil").innerHTML = linhas
+    .map(([k, m]) => {
+      const n = valor(m);
+      const pct = Math.round((n / max) * 100);
+      return `<div class="rel-barra">
+        <span class="rel-barra-nome" title="${esc(k)}">${esc(k)}</span>
+        <span class="rel-barra-trilha"><i style="width:${pct}%"></i></span>
+        <span class="rel-barra-valor">${n}</span>
       </div>`;
     })
     .join("");
