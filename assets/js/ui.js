@@ -268,6 +268,14 @@ export function debounce(fn, ms = 250) {
   return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
 }
 
+// Colapsa variações de travessão ("-", "–", "—", com ou sem espaço) numa só
+// forma — sem isso, "50 mil - 150 mil/mês" e "50 mil – 150 mil/mês" (vindo
+// de uma importação, por exemplo) viram categorias diferentes nos relatórios.
+export function normalizarFaturamento(v) {
+  const s = String(v || "").trim();
+  return s ? s.replace(/\s*[-–—]\s*/g, " – ") : "";
+}
+
 export function slugify(s) {
   return String(s || "")
     .normalize("NFD").replace(/[̀-ͯ]/g, "")

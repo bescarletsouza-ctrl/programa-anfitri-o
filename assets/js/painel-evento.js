@@ -4,7 +4,7 @@
 // Faturamento = soma do preço do tipo de ingresso (texto livre) × inscritos.
 // Tudo client-side, sem lib de gráfico.
 // =============================================================================
-import { iniciarPagina, esc, formatarData } from "./ui.js";
+import { iniciarPagina, esc, formatarData, normalizarFaturamento } from "./ui.js";
 import { listParticipantes, listTiposIngresso, listCamposPersonalizados } from "./supabase.js";
 
 const _iniciando = iniciarPagina("painel-evento");
@@ -77,7 +77,7 @@ function render() {
   renderQuebra("rel-tipo", ativos, (p) => p.tipo || "—");
   renderQuebra("rel-situacao", participantes, situ, SITUACOES);
   renderFaturamento(ativos);
-  renderQuebra("rel-faturamento-perfil", ativos, (p) => p.faturamento || "Não informado");
+  renderQuebra("rel-faturamento-perfil", ativos, (p) => normalizarFaturamento(p.faturamento) || "Não informado");
   renderCamposPersonalizados(ativos);
 }
 

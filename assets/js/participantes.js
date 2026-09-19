@@ -6,7 +6,7 @@
 // =============================================================================
 import {
   iniciarPagina, esc, debounce, formatarData, abrirModal, abrirGaveta,
-  fecharGaveta, toast, confirmar, icone, abrirMenu,
+  fecharGaveta, toast, confirmar, icone, abrirMenu, normalizarFaturamento,
 } from "./ui.js";
 import {
   listParticipantes, listEtapasParticipante, listAtividades, listCheckins, listTiposIngresso, listGrupos,
@@ -1276,7 +1276,7 @@ function modalImportar() {
           telefone: (l.telefone || "").trim() || null,
           empresa: (l.empresa || "").trim() || null,
           tipo, ingresso,
-          faturamento: (l.faturamento || "").trim() || null,
+          faturamento: normalizarFaturamento(l.faturamento) || null,
           situacao: normSituacao(l.situacao) || "Pré-inscrito",
           pagamento: normPag(l.pagamento) || "Gratuito",
           quantidade: Number(l.quantidade) || 1,
