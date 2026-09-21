@@ -21,68 +21,84 @@
         <h1 class="pagina-titulo">Gestão de anfitriões</h1>
         <p class="pagina-sub">Cadastre e acompanhe quem convida.</p>
       </div>
-      <div style="display:flex;gap:8px">
+      <div class="toggle-abas" id="vistas">
+        <button data-vista="lista" class="ativo">Lista</button>
+        <button data-vista="pipeline">Pipeline</button>
+      </div>
+    </div>
+
+    <div class="barra-topo" style="margin-bottom:12px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primario" id="btn-novo">+ Novo anfitrião</button>
+        <button class="btn btn-secundario" id="btn-nova-etapa" hidden>+ Estágio</button>
         <button class="btn btn-secundario" id="btn-colunas">Colunas</button>
         <button class="btn btn-secundario" id="btn-importar">Importar lista</button>
         <button class="btn btn-secundario" id="btn-exportar">Exportar</button>
-        <button class="btn btn-primario" id="btn-novo">+ Novo anfitrião</button>
       </div>
     </div>
 
-    <div class="barra-topo">
-      <div class="toggle-abas" id="abas">
-        <button data-aba="todos" class="ativo">Todos</button>
-        <button data-aba="ativos">Vão ao evento</button>
-        <button data-aba="nao">Não vão</button>
-      </div>
-      <div style="display:flex;gap:10px;align-items:center">
-        <span class="pagina-sub" id="contador" style="margin:0"></span>
-        <button class="btn btn-sm btn-secundario" id="btn-toggle-filtros" aria-expanded="false">Filtros</button>
-      </div>
-    </div>
-
-    <section class="filtros-painel" id="filtros-painel" hidden>
-      <div class="filtros-cab">
-        <strong>Filtros</strong>
-        <button class="btn btn-sm btn-fantasma" id="btn-limpar-filtros">Limpar tudo</button>
-      </div>
-      <div class="filtros-grupo">
-        <div class="filtros-linha">
-          <label class="campo"><span>Buscar</span>
-            <input class="input" id="busca" placeholder="Nome ou e-mail…" /></label>
-          <label class="campo"><span>Tipo</span><select class="select" id="f-grupo"><option value="">Todos</option></select></label>
-          <label class="campo"><span>Categoria de ingresso</span><select class="select" id="f-categoria"><option value="">Todas</option></select></label>
-          <label class="campo"><span>Categoria liberada</span><select class="select" id="f-categoria-convidado"><option value="">Todas</option></select></label>
-          <label class="campo"><span>Responsável</span><select class="select" id="f-responsavel"><option value="">Todos</option></select></label>
-          <label class="campo"><span>Estágio</span><select class="select" id="f-estagio"><option value="">Todos</option></select></label>
-          <label class="campo"><span>Presença</span>
-            <select class="select" id="f-presenca">
-              <option value="">Todas</option>
-              <option value="sim">Confirmada</option>
-              <option value="nao">Não confirmada</option>
-            </select></label>
+    <!-- ================= LISTA ================= -->
+    <div id="vista-lista" hidden>
+      <div class="barra-topo">
+        <div class="toggle-abas" id="abas">
+          <button data-aba="todos" class="ativo">Todos</button>
+          <button data-aba="ativos">Vão ao evento</button>
+          <button data-aba="nao">Não vão</button>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <span class="pagina-sub" id="contador" style="margin:0"></span>
+          <button class="btn btn-sm btn-secundario" id="btn-toggle-filtros" aria-expanded="false">Filtros</button>
         </div>
       </div>
-    </section>
 
-    <div class="barra-acoes" id="barra-acoes" hidden>
-      <span class="barra-acoes-cont" id="sel-cont">0 selecionados</span>
-      <button class="btn btn-sm btn-secundario" data-acao="tipo">Tipo</button>
-      <button class="btn btn-sm btn-secundario" data-acao="categoria">Categoria de ingresso</button>
-      <button class="btn btn-sm btn-secundario" data-acao="responsavel">Responsável</button>
-      <button class="btn btn-sm btn-secundario" data-acao="exportar">Exportar</button>
-      <button class="btn btn-sm btn-perigo" data-acao="excluir">Excluir</button>
-      <button class="btn btn-sm btn-fantasma" data-acao="limpar">Limpar seleção</button>
+      <section class="filtros-painel" id="filtros-painel" hidden>
+        <div class="filtros-cab">
+          <strong>Filtros</strong>
+          <button class="btn btn-sm btn-fantasma" id="btn-limpar-filtros">Limpar tudo</button>
+        </div>
+        <div class="filtros-grupo">
+          <div class="filtros-linha">
+            <label class="campo"><span>Buscar</span>
+              <input class="input" id="busca" placeholder="Nome ou e-mail…" /></label>
+            <label class="campo"><span>Tipo</span><select class="select" id="f-grupo"><option value="">Todos</option></select></label>
+            <label class="campo"><span>Categoria de ingresso</span><select class="select" id="f-categoria"><option value="">Todas</option></select></label>
+            <label class="campo"><span>Categoria liberada</span><select class="select" id="f-categoria-convidado"><option value="">Todas</option></select></label>
+            <label class="campo"><span>Responsável</span><select class="select" id="f-responsavel"><option value="">Todos</option></select></label>
+            <label class="campo"><span>Estágio</span><select class="select" id="f-estagio"><option value="">Todos</option></select></label>
+            <label class="campo"><span>Presença</span>
+              <select class="select" id="f-presenca">
+                <option value="">Todas</option>
+                <option value="sim">Confirmada</option>
+                <option value="nao">Não confirmada</option>
+              </select></label>
+          </div>
+        </div>
+      </section>
+
+      <div class="barra-acoes" id="barra-acoes" hidden>
+        <span class="barra-acoes-cont" id="sel-cont">0 selecionados</span>
+        <button class="btn btn-sm btn-secundario" data-acao="tipo">Tipo</button>
+        <button class="btn btn-sm btn-secundario" data-acao="categoria">Categoria de ingresso</button>
+        <button class="btn btn-sm btn-secundario" data-acao="responsavel">Responsável</button>
+        <button class="btn btn-sm btn-secundario" data-acao="exportar">Exportar</button>
+        <button class="btn btn-sm btn-perigo" data-acao="excluir">Excluir</button>
+        <button class="btn btn-sm btn-fantasma" data-acao="limpar">Limpar seleção</button>
+      </div>
+
+      <div id="carregando" class="vazio">Carregando…</div>
+      <div class="tabela-wrap" id="wrap" hidden>
+        <table class="tabela tabela-part">
+          <thead><tr id="thead-anf"></tr></thead>
+          <tbody id="linhas"></tbody>
+        </table>
+      </div>
+      <div id="vazio" class="vazio" hidden>Nenhum anfitrião encontrado.</div>
     </div>
 
-    <div id="carregando" class="vazio">Carregando…</div>
-    <div class="tabela-wrap" id="wrap" hidden>
-      <table class="tabela tabela-part">
-        <thead><tr id="thead-anf"></tr></thead>
-        <tbody id="linhas"></tbody>
-      </table>
+    <!-- ================= PIPELINE ================= -->
+    <div id="vista-pipeline" hidden>
+      <div class="kanban" id="kanban"></div>
     </div>
-    <div id="vazio" class="vazio" hidden>Nenhum anfitrião encontrado.</div>
   </main>
 </div>
 <script type="module" src="../assets/js/anfitrioes.js"></script>

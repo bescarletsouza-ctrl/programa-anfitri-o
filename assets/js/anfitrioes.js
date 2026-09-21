@@ -21,9 +21,25 @@ const el = (id) => document.getElementById(id);
 let CTX = null;
 let estagios = [], grupos = [], membrosOrg = [], tiposIngresso = [], lista = [];
 let aba = "todos";
+let vista = "lista";
 const FILTROS_VAZIO = { busca: "", grupo: "", categoria: "", categoriaConvidado: "", responsavel: "", estagio: "", presenca: "" };
 const filtros = { ...FILTROS_VAZIO };
 const selecionados = new Set();
+
+// Pipeline (Kanban) — mesmo padrão de Participantes, com o Estágio do funil
+// já existente em Anfitriões como as colunas.
+const ORDENACOES = [
+  { valor: "", rotulo: "Ordem padrão" },
+  { valor: "nome-asc", rotulo: "Nome (A → Z)" },
+  { valor: "nome-desc", rotulo: "Nome (Z → A)" },
+  { valor: "email-asc", rotulo: "E-mail (A → Z)" },
+  { valor: "cadastro-desc", rotulo: "Cadastro (mais novo)" },
+  { valor: "cadastro-asc", rotulo: "Cadastro (mais antigo)" },
+];
+let ordemPipe = {};
+try { ordemPipe = JSON.parse(localStorage.getItem("anf_pipe_ordem") || "{}") || {}; } catch {}
+const salvarOrdemPipe = () => { try { localStorage.setItem("anf_pipe_ordem", JSON.stringify(ordemPipe)); } catch {} };
+let arrastandoEstagioId = null;
 
 // Colunas opcionais da lista (Nome e ações são fixas). Ordem + visibilidade
 // ficam salvas no navegador.
@@ -110,6 +126,15 @@ el("abas").querySelectorAll("button").forEach((b) => {
     render();
   };
 });
+el("vistas").querySelectorAll("button").forEach((b) => {
+  b.onclick = () => {
+    el("vistas").querySelectorAll("button").forEach((x) => x.classList.remove("ativo"));
+    b.classList.add("ativo");
+    vista = b.dataset.vista;
+    render();
+  };
+});
+el("btn-nova-etapa").onclick = () => modalEstagio(null);
 el("btn-novo").innerHTML = icone("mais") + "Novo anfitrião";
 el("btn-novo").onclick = modalNovo;
 el("btn-importar").innerHTML = icone("subir") + "Importar lista";
@@ -214,6 +239,15 @@ function celulaColuna(a, c) {
 }
 
 function render() {
+  const noPipeline = vista === "pipeline";
+  el("vista-lista").hidden = noPipeline;
+  el("vista-pipeline").hidden = !noPipeline;
+  el("btn-nova-etapa").hidden = !noPipeline;
+  el("btn-colunas").hidden = noPipeline;
+  noPipeline ? renderPipeline() : renderLista();
+}
+
+function renderLista() {
   renderCabecalho();
   const filtrada = filtrar();
   el("btn-toggle-filtros").classList.toggle("ativo", filtrosAtivos());
@@ -253,6 +287,238 @@ function render() {
       abrirGavetaDetalhe(id);
     };
   });
+}
+
+/* ---- Pipeline (Kanban) ---- */
+function ordenarCardsPipe(itens, chave) {
+  const modo = ordemPipe[chave] || "";
+  if (!modo) return itens;
+  const [campo, dir] = modo.split("-");
+  const mult = dir === "desc" ? -1 : 1;
+  const val = (a) => campo === "cadastro"
+    ? new Date(a.created_at).getTime()
+    : (a[campo] || "").toString().toLowerCase();
+  return [...itens].sort((a, b) => {
+    const x = val(a), y = val(b);
+    return (x < y ? -1 : x > y ? 1 : 0) * mult;
+  });
+}
+
+function iniciaisDe(nome) {
+  if (!nome) return "";
+  const partes = nome.trim().split(/\s+/);
+  return ((partes[0]?.[0] || "") + (partes.length > 1 ? partes[partes.length - 1][0] : "")).toUpperCase();
+}
+
+function cardAnf(a) {
+  const g = nomeGrupo(a.grupo_id);
+  const nomeResp = nomeMembro(a.responsavel_user_id);
+  return `<div class="card-part ${a.vai === false ? "card-desativado" : ""}" data-id="${a.id}" draggable="true">
+    <div class="card-corpo">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:start">
+        <strong style="font-size:.9rem">${esc(a.nome)}</strong>
+        <span style="display:flex;gap:6px;align-items:center;flex-shrink:0">
+          ${g ? `<span class="badge badge-laranja" style="font-size:.65rem">${esc(g)}</span>` : ""}
+          ${nomeResp ? `<span title="Responsável: ${esc(nomeResp)}" style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--cinza-100);color:var(--texto-suave);font-size:.62rem;font-weight:700;flex-shrink:0">${esc(iniciaisDe(nomeResp))}</span>` : ""}
+        </span>
+      </div>
+      ${(a.ingresso || "").trim() ? `<div style="margin-top:5px"><span class="chip-cat" style="font-size:.66rem">${esc(a.ingresso.trim())}</span></div>` : ""}
+      <div class="pagina-sub" style="margin:2px 0 0;font-size:.72rem">${esc(a.email || a.telefone || "")}</div>
+      <div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        ${a.vai === false ? `<span class="badge badge-neutro" style="font-size:.65rem">Não vai</span>` : ""}
+        ${a.presenca ? `<span class="badge badge-ok" style="font-size:.65rem">Presente</span>` : ""}
+        <span class="pagina-sub" style="margin:0;font-size:.68rem">${formatarData(a.created_at)}</span>
+      </div>
+    </div>
+    <select class="select" data-mover style="margin-top:8px;font-size:.8rem;padding:6px 8px">
+      <option value="">Sem estágio</option>
+      ${estagios.map((s) => `<option value="${s.id}" ${s.id === a.estagio_id ? "selected" : ""}>${esc(s.nome)}</option>`).join("")}
+    </select>
+  </div>`;
+}
+
+function renderPipeline() {
+  const dados = filtrar();
+  el("contador").textContent = `Exibindo ${dados.length} de ${lista.length} anfitriões`;
+
+  const semEstagio = dados.filter((a) => !a.estagio_id);
+  const colunasPipe = estagios.map((s) => ({ et: s, chave: s.id, itens: dados.filter((a) => a.estagio_id === s.id) }));
+  if (semEstagio.length) colunasPipe.unshift({ et: null, chave: "sem", itens: semEstagio });
+
+  el("kanban").innerHTML = colunasPipe
+    .map(({ et, chave, itens }) => {
+      const cor = et?.cor || "var(--cinza-400)";
+      const ind = ordemPipe[chave] ? (ordemPipe[chave].endsWith("desc") ? " ▼" : " ▲") : "";
+      const ordenados = ordenarCardsPipe(itens, chave);
+      return `<div class="coluna" data-chave="${esc(chave)}">
+        <div class="coluna-topo">
+          ${et ? `<span class="coluna-grip" draggable="true" title="Arraste para reordenar">⠿</span>` : ""}
+          <button type="button" class="coluna-titulo" data-ordenar="${esc(chave)}" title="Ordenar cards">
+            <span class="ponto" style="background:${esc(cor)}"></span>
+            ${esc(et ? et.nome : "Sem estágio")}<span class="ind-ordem">${ind}</span>
+          </button>
+          <span class="qtd">${itens.length}</span>
+          ${et ? `<span class="linha-acoes coluna-acoes">
+            <button type="button" class="icone-btn" data-editar-etapa="${et.id}" title="Editar estágio">${icone("editar")}</button>
+            <button type="button" class="icone-btn" data-excluir-etapa="${et.id}" title="Excluir estágio">${icone("excluir")}</button>
+          </span>` : ""}
+        </div>
+        <div class="coluna-corpo">
+          ${ordenados.map((a) => cardAnf(a)).join("") || `<p class="pagina-sub" style="margin:8px 0;font-size:.78rem">—</p>`}
+        </div>
+      </div>`;
+    })
+    .join("") +
+    `<button type="button" class="coluna coluna-nova" id="coluna-nova">${icone("mais")} Novo estágio</button>`;
+
+  el("kanban").querySelector("#coluna-nova").onclick = () => modalEstagio(null);
+  el("kanban").querySelectorAll("[data-ordenar]").forEach((b) => {
+    b.onclick = () => escolherOrdemPipe(b, b.dataset.ordenar);
+  });
+  el("kanban").querySelectorAll("[data-editar-etapa]").forEach((b) => {
+    b.onclick = (e) => { e.stopPropagation(); modalEstagio(estagios.find((x) => x.id === b.dataset.editarEtapa)); };
+  });
+  el("kanban").querySelectorAll("[data-excluir-etapa]").forEach((b) => {
+    b.onclick = (e) => { e.stopPropagation(); excluirEstagio(estagios.find((x) => x.id === b.dataset.excluirEtapa)); };
+  });
+
+  el("kanban").querySelectorAll(".card-part").forEach((card) => {
+    const id = card.dataset.id;
+    card.querySelector("[data-mover]").onclick = (e) => e.stopPropagation();
+    card.querySelector("[data-mover]").onchange = (e) => moverEstagio(id, e.target.value || null);
+    card.querySelector(".card-corpo").onclick = () => abrirGavetaDetalhe(id);
+    card.addEventListener("dragstart", (e) => {
+      e.dataTransfer.setData("text/plain", id);
+      e.dataTransfer.effectAllowed = "move";
+      card.classList.add("arrastando");
+    });
+    card.addEventListener("dragend", () => card.classList.remove("arrastando"));
+  });
+
+  el("kanban").querySelectorAll(".coluna-grip").forEach((g) => {
+    const col = g.closest(".coluna");
+    g.addEventListener("dragstart", (e) => {
+      arrastandoEstagioId = col.dataset.chave;
+      e.dataTransfer.effectAllowed = "move";
+      col.classList.add("etapa-arrastando");
+    });
+    g.addEventListener("dragend", () => {
+      arrastandoEstagioId = null;
+      el("kanban").querySelectorAll(".etapa-arrastando").forEach((c) => c.classList.remove("etapa-arrastando"));
+    });
+  });
+
+  el("kanban").querySelectorAll(".coluna[data-chave]").forEach((col) => {
+    col.addEventListener("dragover", (e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; col.classList.add("drop-alvo"); });
+    col.addEventListener("dragleave", (e) => { if (!col.contains(e.relatedTarget)) col.classList.remove("drop-alvo"); });
+    col.addEventListener("drop", (e) => {
+      e.preventDefault();
+      col.classList.remove("drop-alvo");
+      const chave = col.dataset.chave;
+      if (arrastandoEstagioId) {
+        reordenarEstagio(arrastandoEstagioId, chave);
+        arrastandoEstagioId = null;
+        return;
+      }
+      const id = e.dataTransfer.getData("text/plain");
+      if (id) moverEstagio(id, chave === "sem" ? null : chave);
+    });
+  });
+}
+
+async function reordenarEstagio(dragChave, alvoChave) {
+  if (dragChave === alvoChave || dragChave === "sem") return;
+  const ordenados = [...estagios].sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+  const from = ordenados.findIndex((e) => e.id === dragChave);
+  if (from < 0) return;
+  const [movido] = ordenados.splice(from, 1);
+  let to = alvoChave === "sem" ? 0 : ordenados.findIndex((e) => e.id === alvoChave);
+  if (to < 0) to = ordenados.length;
+  ordenados.splice(to, 0, movido);
+
+  const mudou = [];
+  ordenados.forEach((e, i) => { if ((e.ordem || 0) !== i) { e.ordem = i; mudou.push(e); } });
+  estagios = ordenados;
+  renderPipeline();
+  try {
+    for (const e of mudou) await salvar("estagios", { id: e.id, ordem: e.ordem });
+    preencherSelect(el("f-estagio"), estagios, "Todos os estágios", filtros.estagio);
+  } catch (err) {
+    toast(err.message, "erro");
+    estagios = await listEstagios();
+    renderPipeline();
+  }
+}
+
+async function moverEstagio(id, estagioId) {
+  const a = lista.find((x) => x.id === id);
+  if (!a) return;
+  if ((a.estagio_id || null) === (estagioId || null)) return;
+
+  const anterior = a.estagio_id;
+  a.estagio_id = estagioId; // otimista: card pula na hora
+  renderPipeline();
+  try {
+    await salvar("anfitrioes", { id, estagio_id: estagioId });
+  } catch (err) {
+    a.estagio_id = anterior;
+    renderPipeline();
+    toast(err.message, "erro");
+  }
+}
+
+async function escolherOrdemPipe(anchor, chave) {
+  const itens = ORDENACOES.map((o) => ({ ...o, atual: (ordemPipe[chave] || "") === o.valor }));
+  const escolha = await abrirMenu(anchor, itens);
+  if (escolha === null) return;
+  if (escolha) ordemPipe[chave] = escolha;
+  else delete ordemPipe[chave];
+  salvarOrdemPipe();
+  renderPipeline();
+}
+
+function modalEstagio(et) {
+  abrirModal({
+    titulo: et ? "Editar estágio" : "Novo estágio",
+    textoConfirmar: et ? "Salvar" : "Criar",
+    corpoHtml: `
+      <label class="campo"><span>Nome *</span><input class="input" name="nome" required value="${esc(et?.nome || "")}" placeholder="Ex.: Novo, Em contato, Confirmado" /></label>
+      <label class="campo"><span>Ordem</span><input class="input" name="ordem" type="number" value="${et?.ordem ?? estagios.length}" /></label>
+      <label class="campo"><span>Cor</span><input class="input" name="cor" type="color" value="${esc(et?.cor || "#9aa0a6")}" style="height:40px;padding:4px" /></label>
+      ${et ? `<button type="button" class="btn btn-perigo btn-sm" id="etapa-excluir" style="margin-top:6px">Excluir estágio</button>` : ""}`,
+    aoMontar: (root) => {
+      root.querySelector("#etapa-excluir")?.addEventListener("click", () => {
+        root.closest(".modal-fundo")?.remove();
+        excluirEstagio(et);
+      });
+    },
+    onConfirmar: async (form) => {
+      const f = Object.fromEntries(new FormData(form));
+      const reg = { nome: f.nome.trim(), ordem: Number(f.ordem) || 0, cor: f.cor || null };
+      if (et) reg.id = et.id;
+      await salvar("estagios", reg);
+      toast("Estágio salvo.", "ok");
+      estagios = await listEstagios();
+      preencherSelect(el("f-estagio"), estagios, "Todos os estágios", filtros.estagio);
+      render();
+    },
+  });
+}
+
+async function excluirEstagio(et) {
+  if (!et) return;
+  const n = lista.filter((a) => a.estagio_id === et.id).length;
+  if (!confirmar(`Excluir o estágio "${et.nome}"?${n ? ` ${n} anfitrião(ões) ficam sem estágio.` : ""}`)) return;
+  try {
+    await remover("estagios", et.id);
+    delete ordemPipe[et.id];
+    salvarOrdemPipe();
+    toast("Estágio excluído.", "ok");
+    estagios = await listEstagios();
+    if (filtros.estagio === et.id) filtros.estagio = "";
+    preencherSelect(el("f-estagio"), estagios, "Todos os estágios", filtros.estagio);
+    render();
+  } catch (e) { toast(e.message, "erro"); }
 }
 
 function modalColunas() {
