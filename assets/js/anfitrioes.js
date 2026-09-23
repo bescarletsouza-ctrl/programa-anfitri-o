@@ -22,7 +22,10 @@ let CTX = null;
 let estagios = [], grupos = [], membrosOrg = [], tiposIngresso = [], lista = [];
 let aba = "todos";
 let vista = "lista";
-const FILTROS_VAZIO = { busca: "", grupo: "", categoria: "", categoriaConvidado: "", responsavel: "", estagio: "", presenca: "" };
+const FILTROS_VAZIO = {
+  busca: "", grupo: "", categoria: "", categoriaConvidado: "", responsavel: "", estagio: "", presenca: "",
+  dataDe: "", dataAte: "",
+};
 const filtros = { ...FILTROS_VAZIO };
 const selecionados = new Set();
 
@@ -100,6 +103,7 @@ el("busca").addEventListener("input", debounce((e) => { filtros.busca = e.target
 const CAMPO_DO_FILTRO = {
   "f-grupo": "grupo", "f-categoria": "categoria", "f-categoria-convidado": "categoriaConvidado",
   "f-responsavel": "responsavel", "f-estagio": "estagio", "f-presenca": "presenca",
+  "f-data-de": "dataDe", "f-data-ate": "dataAte",
 };
 Object.keys(CAMPO_DO_FILTRO).forEach((id) => {
   el(id).addEventListener("change", (e) => {
@@ -149,6 +153,8 @@ el("barra-acoes").querySelectorAll("[data-acao]").forEach((b) => {
 
 /* ---- render ---- */
 function filtrar() {
+  const diaDe = filtros.dataDe ? new Date(filtros.dataDe + "T00:00:00") : null;
+  const diaAte = filtros.dataAte ? new Date(filtros.dataAte + "T23:59:59") : null;
   return lista.filter((a) => {
     if (aba === "ativos" && a.vai === false) return false;
     if (aba === "nao" && a.vai !== false) return false;
@@ -161,6 +167,8 @@ function filtrar() {
     if (filtros.estagio && a.estagio_id !== filtros.estagio) return false;
     if (filtros.presenca === "sim" && !a.presenca) return false;
     if (filtros.presenca === "nao" && a.presenca) return false;
+    if (diaDe && new Date(a.created_at) < diaDe) return false;
+    if (diaAte && new Date(a.created_at) > diaAte) return false;
     if (filtros.busca) {
       const alvo = (a.nome + " " + (a.email || "")).toLowerCase();
       if (!alvo.includes(filtros.busca)) return false;
@@ -221,20 +229,95 @@ function renderCabecalho() {
   };
 }
 
-function celulaColuna(a, c) {
+const lapis = () => `<span class="cel-lapis">${icone("editar")}</span>`;
+
+function celulaHtml(a, c) {
   switch (c) {
-    case "tipo": { const g = nomeGrupo(a.grupo_id); return g ? `<span class="badge badge-laranja">${esc(g)}</span>` : "—"; }
-    case "email": return esc(a.email || "—");
-    case "telefone": return esc(a.telefone || "—");
-    case "categoria": return esc(a.ingresso || "—");
-    case "categoriaConvidado": return esc(a.categoria_convidado || "—");
-    case "responsavel": return esc(nomeMembro(a.responsavel_user_id) || "—");
-    case "estagio": return `<span class="badge badge-neutro">${esc(nomeEstagio(a.estagio_id))}</span>`;
-    case "presenca": return a.presenca ? '<span class="badge badge-ok">Sim</span>' : '<span class="badge badge-neutro">Não</span>';
-    case "enviados": return a.enviados || 0;
-    case "aprovados": return a.aprovados || 0;
-    case "cadastro": return esc(formatarData(a.created_at));
-    default: return "—";
+    case "tipo": {
+      const g = nomeGrupo(a.grupo_id);
+      return `<td class="celula-edit" data-campo="tipo" title="Alterar tipo">${g ? `<span class="badge badge-laranja">${esc(g)}</span>` : `<span class="cel-tenue">—</span>`}${lapis()}</td>`;
+    }
+    case "email": return `<td>${esc(a.email || "—")}</td>`;
+    case "telefone": return `<td>${esc(a.telefone || "—")}</td>`;
+    case "categoria":
+      return `<td class="celula-edit" data-campo="categoria" title="Alterar categoria de ingresso">${a.ingresso ? esc(a.ingresso) : `<span class="cel-tenue">—</span>`}${lapis()}</td>`;
+    case "categoriaConvidado":
+      return `<td class="celula-edit" data-campo="categoriaConvidado" title="Alterar categoria liberada">${a.categoria_convidado ? esc(a.categoria_convidado) : `<span class="cel-tenue">—</span>`}${lapis()}</td>`;
+    case "responsavel": {
+      const nome = nomeMembro(a.responsavel_user_id);
+      return `<td class="celula-edit" data-campo="responsavel" title="Alterar responsável">${nome ? esc(nome) : `<span class="cel-tenue">—</span>`}${lapis()}</td>`;
+    }
+    case "estagio":
+      return `<td class="celula-edit" data-campo="estagio" title="Alterar estágio"><span class="badge badge-neutro">${esc(nomeEstagio(a.estagio_id))}</span>${lapis()}</td>`;
+    case "presenca":
+      return `<td class="celula-edit" data-campo="presenca" title="Alterar presença">${a.presenca ? '<span class="badge badge-ok">Sim</span>' : '<span class="badge badge-neutro">Não</span>'}${lapis()}</td>`;
+    case "enviados": return `<td>${a.enviados || 0}</td>`;
+    case "aprovados": return `<td>${a.aprovados || 0}</td>`;
+    case "cadastro": return `<td>${esc(formatarData(a.created_at))}</td>`;
+    default: return "<td>—</td>";
+  }
+}
+
+async function editarCelula(id, campo, td) {
+  const a = lista.find((x) => x.id === id);
+  if (!a) return;
+  let itens, atualValor;
+  if (campo === "tipo") {
+    itens = grupos.map((g) => ({ valor: g.id, rotulo: g.nome }));
+    atualValor = a.grupo_id || "";
+  } else if (campo === "categoria") {
+    itens = [{ valor: "", rotulo: "— sem categoria —" }, ...tiposIngresso.map((t) => ({ valor: t.nome, rotulo: t.nome }))];
+    atualValor = (a.ingresso || "").trim();
+  } else if (campo === "categoriaConvidado") {
+    itens = [{ valor: "", rotulo: "— sem categoria —" }, ...categoriasUsadas().map((c) => ({ valor: c, rotulo: c }))];
+    atualValor = (a.categoria_convidado || "").trim();
+  } else if (campo === "responsavel") {
+    itens = [{ valor: "", rotulo: "— sem responsável —" }, ...membrosOrg.map((m) => ({ valor: m.user_id, rotulo: m.nome || m.email }))];
+    atualValor = a.responsavel_user_id || "";
+  } else if (campo === "estagio") {
+    itens = [{ valor: "", rotulo: "Sem estágio" }, ...estagios.map((s) => ({ valor: s.id, rotulo: s.nome }))];
+    atualValor = a.estagio_id || "";
+  } else if (campo === "presenca") {
+    itens = [{ valor: "sim", rotulo: "Sim" }, { valor: "nao", rotulo: "Não" }];
+    atualValor = a.presenca ? "sim" : "nao";
+  }
+  itens.forEach((it) => (it.atual = it.valor === atualValor));
+  const escolha = await abrirMenu(td, itens);
+  if (escolha === null || escolha === atualValor) return;
+  td.classList.add("salvando");
+  try {
+    if (campo === "tipo") {
+      const atualizado = await salvar("anfitrioes", {
+        id, grupo_id: escolha || null, responsavel_user_id: responsavelAutomatico(escolha || null, a.ingresso),
+      });
+      Object.assign(a, atualizado);
+      await sincAnfitriaoParticipante(atualizado).catch((e) => console.warn(e));
+    } else if (campo === "categoria") {
+      const atualizado = await salvar("anfitrioes", {
+        id, ingresso: escolha || null, responsavel_user_id: responsavelAutomatico(a.grupo_id, escolha || null),
+      });
+      Object.assign(a, atualizado);
+      await sincAnfitriaoParticipante(atualizado).catch((e) => console.warn(e));
+    } else if (campo === "categoriaConvidado") {
+      const atualizado = await salvar("anfitrioes", { id, categoria_convidado: escolha || null });
+      Object.assign(a, atualizado);
+      await reSincCategoriaAnfitriao(id, escolha || null).catch(() => {});
+    } else if (campo === "responsavel") {
+      const atualizado = await salvar("anfitrioes", { id, responsavel_user_id: escolha || null });
+      Object.assign(a, atualizado);
+      await reSincResponsavelAnfitriao(id, escolha || null).catch(() => {});
+    } else if (campo === "estagio") {
+      const atualizado = await salvar("anfitrioes", { id, estagio_id: escolha || null });
+      Object.assign(a, atualizado);
+    } else if (campo === "presenca") {
+      const atualizado = await salvar("anfitrioes", { id, presenca: escolha === "sim" });
+      Object.assign(a, atualizado);
+    }
+    toast("Atualizado.", "ok");
+    render();
+  } catch (e) {
+    toast(e.message, "erro");
+    td.classList.remove("salvando");
   }
 }
 
@@ -264,7 +347,7 @@ function renderLista() {
       return `<tr data-id="${a.id}">
         <td class="col-check"><input type="checkbox" data-check ${selecionados.has(a.id) ? "checked" : ""} /></td>
         <td><strong>${esc(a.nome)}</strong><div class="pagina-sub" style="margin:0;font-size:.75rem">${esc(a.tipo || "")}</div></td>
-        ${colunas.map((c) => `<td>${celulaColuna(a, c)}</td>`).join("")}
+        ${colunas.map((c) => celulaHtml(a, c)).join("")}
         <td class="linha-acoes">
           <button class="icone-btn" data-editar title="Editar">${icone("editar")}</button>
           <button class="icone-btn" data-excluir title="Excluir">${icone("excluir")}</button>
@@ -280,6 +363,9 @@ function renderLista() {
       e.target.checked ? selecionados.add(id) : selecionados.delete(id);
       sincronizarBarra(filtrar());
     };
+    tr.querySelectorAll(".celula-edit").forEach((td) => {
+      td.onclick = (e) => { e.stopPropagation(); editarCelula(id, td.dataset.campo, td); };
+    });
     tr.onclick = (e) => {
       if (e.target.closest("[data-excluir]")) return excluir(id);
       if (e.target.closest("[data-editar]")) return abrirGavetaDetalhe(id);
@@ -994,17 +1080,38 @@ async function acaoEmMassa(acao) {
     return;
   }
 
-  // tipo / categoria / responsável → menu ancorado no botão
+  if (acao === "presente" || acao === "ausente") {
+    try {
+      await atualizarEmLote("anfitrioes", ids, { presenca: acao === "presente" });
+      selecionados.clear();
+      toast(`Presença atualizada para ${ids.length} anfitrião(ões).`, "ok");
+      lista = await listAnfitrioes();
+      render();
+    } catch (e) { toast(e.message, "erro"); }
+    return;
+  }
+
+  // tipo / categoria / responsável / estágio / vai ao evento → menu ancorado no botão
   const btn = el("barra-acoes").querySelector(`[data-acao="${acao}"]`);
   let itens;
   if (acao === "tipo") itens = grupos.map((g) => ({ valor: g.id, rotulo: g.nome }));
   else if (acao === "categoria") itens = [{ valor: "", rotulo: "— sem categoria —" }, ...tiposIngresso.map((t) => ({ valor: t.nome, rotulo: t.nome }))];
+  else if (acao === "estagio") itens = [{ valor: "", rotulo: "Sem estágio" }, ...estagios.map((s) => ({ valor: s.id, rotulo: s.nome }))];
+  else if (acao === "vai") itens = [{ valor: "sim", rotulo: "Sim" }, { valor: "nao", rotulo: "Não" }];
   else itens = [{ valor: "", rotulo: "Sem responsável" }, ...membrosOrg.map((m) => ({ valor: m.user_id, rotulo: m.nome || m.email }))];
   const escolha = await abrirMenu(btn, itens);
   if (escolha === null) return;
   try {
     if (acao === "responsavel") {
       await atualizarEmLote("anfitrioes", ids, { responsavel_user_id: escolha || null });
+    } else if (acao === "estagio") {
+      await atualizarEmLote("anfitrioes", ids, { estagio_id: escolha || null });
+    } else if (acao === "vai") {
+      await atualizarEmLote("anfitrioes", ids, { vai: escolha === "sim" });
+      lista = await listAnfitrioes();
+      for (const a of lista.filter((x) => selecionados.has(x.id))) {
+        await sincAnfitriaoParticipante(a).catch((e) => console.warn(e));
+      }
     } else {
       // tipo/categoria: o responsável (que depende dos dois juntos) é
       // recalculado por linha, igual em Participantes

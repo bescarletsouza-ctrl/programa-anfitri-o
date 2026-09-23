@@ -685,7 +685,10 @@ function ordenarCards(itens, chave) {
 }
 
 function renderPipeline() {
-  const dados = filtrarLista(true); // pipeline mostra os "Não vai" (Desativados) também
+  // quem tem vínculo com anfitrioes (anfitriao_id) tem a jornada dele
+  // acompanhada só no pipeline de Anfitriões — aqui fica de fora do kanban,
+  // mas continua aparecendo normalmente na Lista.
+  const dados = filtrarLista(true).filter((p) => !p.anfitriao_id); // pipeline mostra os "Não vai" (Desativados) também
   el("contador").textContent = `${dados.length} de ${participantes.length} participantes`;
   el("btn-toggle-filtros").classList.toggle("ativo", filtrosAtivos());
 
