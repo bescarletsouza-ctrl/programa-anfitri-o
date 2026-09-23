@@ -102,9 +102,12 @@ function renderFunilConvidados() {
   const total = c.length;
   const pend = cont("Pendente"), apr = cont("Aprovado") + cont("Confirmado"), conf = cont("Confirmado");
   let html = "";
+  // Pendentes/Aprovados são categorias que se excluem (ninguém está nas
+  // duas), então cada uma compara com o Total recebido, não uma com a
+  // outra — só Confirmados é de fato um subconjunto de Aprovados.
   html += linhaFunil("Total recebido", total, null);
   html += linhaFunil("Pendentes", pend, total || null);
-  html += linhaFunil("Aprovados", apr, pend || null);
+  html += linhaFunil("Aprovados", apr, total || null);
   html += linhaFunil("Confirmados", conf, apr || null);
   html += `<div class="funil-linha" style="margin-top:6px">
       <div class="nome">Recusados</div>
