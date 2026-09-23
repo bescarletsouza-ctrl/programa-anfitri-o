@@ -17,6 +17,7 @@ const el = (id) => document.getElementById(id);
 let grupos = [], anfitrioes = [], lista = [], perguntas = [];
 const filtros = { busca: "", status: "", grupo: "" };
 const selecionados = new Set();
+let aba = "todos";
 
 // aplica a decisão do convidado (status) + sincroniza a lista de Participantes
 async function decidir(c, status) {
@@ -60,6 +61,14 @@ el("btn-limpar-filtros").onclick = () => {
   el("busca").value = ""; el("f-status").value = ""; el("f-grupo").value = "";
   render();
 };
+el("abas").querySelectorAll("button").forEach((b) => {
+  b.onclick = () => {
+    el("abas").querySelectorAll("button").forEach((x) => x.classList.remove("ativo"));
+    b.classList.add("ativo");
+    aba = b.dataset.aba;
+    render();
+  };
+});
 
 const badgeStatus = (s) =>
   ({ Pendente: "badge-alerta", Aprovado: "badge-info", Recusado: "badge-erro", Confirmado: "badge-ok" }[s] || "badge-neutro");
@@ -75,6 +84,8 @@ const filtrosAtivos = () => !!(filtros.busca || filtros.status || filtros.grupo)
 
 function filtrar() {
   return lista.filter((c) => {
+    if (aba === "pendentes" && c.status !== "Pendente") return false;
+    if (aba === "analisados" && c.status === "Pendente") return false;
     if (filtros.status && c.status !== filtros.status) return false;
     if (filtros.grupo && c.anfitriao?.grupo_id !== filtros.grupo) return false;
     if (filtros.busca) {

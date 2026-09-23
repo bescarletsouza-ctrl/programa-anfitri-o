@@ -99,9 +99,11 @@ function renderFunilAnfitrioes() {
 function renderFunilConvidados() {
   const c = convNoGrupo();
   const cont = (s) => c.filter((x) => x.status === s).length;
+  const total = c.length;
   const pend = cont("Pendente"), apr = cont("Aprovado") + cont("Confirmado"), conf = cont("Confirmado");
   let html = "";
-  html += linhaFunil("Pendentes", pend, null);
+  html += linhaFunil("Total recebido", total, null);
+  html += linhaFunil("Pendentes", pend, total || null);
   html += linhaFunil("Aprovados", apr, pend || null);
   html += linhaFunil("Confirmados", conf, apr || null);
   html += `<div class="funil-linha" style="margin-top:6px">
