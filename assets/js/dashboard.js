@@ -15,6 +15,7 @@ let CTX = null;
 let dados = null;
 let filtroGrupo = "";
 let faixaModo = "Confirmado";
+let topAnfModo = "Confirmado";
 
 el("data-hoje").textContent =
   dataPorExtenso().replace(/^\w/, (c) => c.toUpperCase());
@@ -39,6 +40,15 @@ async function iniciar() {
         b.classList.add("ativo");
         faixaModo = b.dataset.fx;
         renderFaixas();
+      };
+    });
+
+    el("top-anf-toggle").querySelectorAll("button").forEach((b) => {
+      b.onclick = () => {
+        el("top-anf-toggle").querySelectorAll("button").forEach((x) => x.classList.remove("ativo"));
+        b.classList.add("ativo");
+        topAnfModo = b.dataset.topanf;
+        renderTopAnfitrioes();
       };
     });
 
@@ -179,13 +189,15 @@ function renderVisaoGrupos() {
 }
 
 function renderTopAnfitrioes() {
+  const campo = topAnfModo === "Aprovado" ? "aprovados" : "confirmados";
+  const rotulo = topAnfModo === "Aprovado" ? "aprovados" : "confirmados";
   const top = anfNoGrupo()
-    .filter((a) => (a.confirmados || 0) > 0)
-    .sort((a, b) => (b.confirmados || 0) - (a.confirmados || 0))
+    .filter((a) => (a[campo] || 0) > 0)
+    .sort((a, b) => (b[campo] || 0) - (a[campo] || 0))
     .slice(0, 10);
   el("top-anfitrioes").innerHTML = top.length
-    ? top.map((a, i) => rankLinha(i + 1, a.nome, `${a.confirmados} confirmados`)).join("")
-    : `<p class="pagina-sub" style="margin:0">Ninguém com confirmados ainda.</p>`;
+    ? top.map((a, i) => rankLinha(i + 1, a.nome, `${a[campo]} ${rotulo}`)).join("")
+    : `<p class="pagina-sub" style="margin:0">Ninguém com ${rotulo} ainda.</p>`;
 }
 
 function renderTopResponsaveis() {
