@@ -248,6 +248,19 @@ async function excluirConvidado(c) {
   }
 }
 
+// Campos "de sistema" do formulário — ficam em colunas próprias de
+// "convidados" (não em respostas), mas o rótulo exibido tem que ser o da
+// pergunta de verdade cadastrada pro evento, não um texto fixo — cada evento
+// pode usar esse campo pra perguntar algo diferente (ex.: "cnpj" virar
+// "Você é sócio, funcionário ou fundador?" em vez de "CNPJ").
+const CAMPOS_SISTEMA = [
+  { chave: "empresa", coluna: "empresa" },
+  { chave: "cnpj", coluna: "cnpj" },
+  { chave: "faturamento", coluna: "faturamento" },
+  { chave: "funcionarios", coluna: "funcionarios" },
+  { chave: "site", coluna: "site" },
+];
+
 function campoSelecao(chave, rotulo, valorAtual) {
   const p = perguntas.find((x) => x.chave === chave);
   const opts = (p?.opcoes || []).map((o) => `<option ${o === valorAtual ? "selected" : ""}>${esc(o)}</option>`).join("");
@@ -260,6 +273,11 @@ function abrirGavetaDetalhe(id) {
   const c = lista.find((x) => x.id === id);
   if (!c) return;
   const extras = perguntas.filter((p) => !p.sistema && c.respostas && c.respostas[p.chave] != null);
+  // só mostra os campos de sistema que este evento realmente usa no
+  // formulário, com o rótulo da pergunta de verdade (não um texto fixo)
+  const camposEmpresa = CAMPOS_SISTEMA
+    .map((cs) => ({ ...cs, pergunta: perguntas.find((p) => p.chave === cs.chave) }))
+    .filter((cs) => cs.pergunta);
 
   abrirGaveta(
     `${esc(c.nome || "Convidado")}`,
@@ -302,14 +320,13 @@ function abrirGavetaDetalhe(id) {
       <p style="margin:4px 0" class="pagina-sub">Convidado por ${esc(c.anfitriao?.nome || "—")}</p>
     </div>
 
-    <div class="secao">
-      <h4>Empresa</h4>
-      ${infoLinha("Empresa", c.empresa)}
-      ${infoLinha("CNPJ", c.cnpj)}
-      ${infoLinha("Faturamento", c.faturamento)}
-      ${infoLinha("Funcionários", c.funcionarios)}
-      ${infoLinha("Site", c.site)}
-    </div>
+    ${
+      camposEmpresa.length
+        ? `<div class="secao"><h4>Empresa</h4>${camposEmpresa
+            .map((cs) => infoLinha(cs.pergunta.rotulo, c[cs.coluna]))
+            .join("")}</div>`
+        : ""
+    }
 
     ${
       extras.length
