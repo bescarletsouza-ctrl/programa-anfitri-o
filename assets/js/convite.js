@@ -80,6 +80,9 @@ el("marca").innerHTML = APP.marcaHtml;
       // anfitrião com categoria liberada "VIP" (Configurações do anfitrião) →
       // troca os entregáveis e o preço "de" da dobra de experiência/investimento
       if ((anfitriao.categoria_convidado || "").trim().toUpperCase() === "VIP") {
+        el("bt-experiencia-titulo").textContent = "A experiência VIP";
+        el("bt-experiencia-sub").textContent = "Dois dias para sair da intenção e colocar a marca em construção — com uma experiência ainda mais próxima.";
+        el("bt-experiencia-intro").textContent = "O ingresso VIP inclui:";
         el("bt-experiencia-lista").innerHTML = [
           "Acesso aos 2 dias presenciais de Training", "Apostila", "Canvas de aplicação",
           "Coffee break", "Almoço", "Certificado", "Primeiras fileiras",
