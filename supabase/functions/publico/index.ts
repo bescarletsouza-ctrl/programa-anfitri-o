@@ -28,7 +28,7 @@ const svc = () =>
 
 async function anfitriaoPorSlug(sb: ReturnType<typeof svc>, slug: string) {
   const { data } = await sb.from("anfitrioes")
-    .select("id, nome, slug, evento_id, grupo_id, vai, grupo:grupos(nome)")
+    .select("id, nome, slug, evento_id, grupo_id, vai, categoria_convidado, grupo:grupos(nome)")
     .eq("slug", slug).maybeSingle();
   return data;
 }

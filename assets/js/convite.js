@@ -77,6 +77,17 @@ el("marca").innerHTML = APP.marcaHtml;
       document.body.classList.add("tema-branding-training");
       el("bt-nome-anfitriao").textContent = anfitriao.nome;
       el("brandingtraining").hidden = false;
+      // anfitrião com categoria liberada "VIP" (Configurações do anfitrião) →
+      // troca os entregáveis e o preço "de" da dobra de experiência/investimento
+      if ((anfitriao.categoria_convidado || "").trim().toUpperCase() === "VIP") {
+        el("bt-experiencia-lista").innerHTML = [
+          "Acesso aos 2 dias presenciais de Training", "Apostila", "Canvas de aplicação",
+          "Coffee break", "Almoço", "Certificado", "Primeiras fileiras",
+          "Almoço com os palestrantes", "PDF do livro O Highlighter",
+          "E-book de arquétipos", "Acesso à plataforma de aulas gravadas",
+        ].map((item) => `<li>${esc(item)}</li>`).join("");
+        el("bt-preco-de").textContent = "R$ 4.997";
+      }
     }
 
     el("carregando").hidden = true;
