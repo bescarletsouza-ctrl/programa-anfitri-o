@@ -32,11 +32,12 @@ const rotuloGatilho = (v) => GATILHOS.find((g) => g.valor === v)?.rotulo || v;
 // Conectores disponíveis (provedor → como cadastrar)
 const CONECTORES = {
   activecampaign: {
-    nome: "ActiveCampaign", desc: "Sincroniza o contato e inscreve numa lista — use o gatilho \"inscrito na lista\" de uma automação lá pra disparar o e-mail.",
+    nome: "ActiveCampaign", desc: "Sincroniza o contato e, se configurado, inscreve numa lista e/ou entra direto numa automação — sem depender de nenhum gatilho configurado lá.",
     campos: [
       { k: "base_url", rotulo: "URL da conta", ex: "https://suaconta.api-us1.com", req: true },
       { k: "api_key",  rotulo: "API Key", tipo: "password", req: true },
-      { k: "lista_id", rotulo: "ID da lista", ex: "98 (Configurações → Listas → editar a lista → o número vem na URL)" },
+      { k: "automation_id", rotulo: "ID da automação (recomendado)", ex: "474 (na URL ao editar a automação: .../app/automations/474/… ) — entra direto na automação, funciona com qualquer gatilho configurado lá (ou nenhum)." },
+      { k: "lista_id", rotulo: "ID da lista (opcional)", ex: "98 (Configurações → Listas → editar a lista → o número vem na URL) — só inscreve na lista; só dispara automação se ela usar o gatilho \"inscrito na lista\"." },
     ],
   },
   zapi: {

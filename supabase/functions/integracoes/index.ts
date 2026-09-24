@@ -103,6 +103,22 @@ async function entregarActiveCampaign(cfg: Record<string, string>, dados: Record
       return { ok: false, status: listRes.status, erro: listErr.slice(0, 500) };
     }
   }
+
+  // Entra direto na automação por ID — não depende do gatilho configurado lá
+  // (lista, tag, etc.). Mais confiável que só inscrever na lista, porque não
+  // quebra se a automação usar outro tipo de disparo.
+  if (cfg.automation_id && contactId) {
+    const autoRes = await fetch(`${base}/api/3/contactAutomations`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ contactAutomation: { contact: Number(contactId), automation: Number(cfg.automation_id) } }),
+    });
+    if (!autoRes.ok) {
+      const autoErr = await autoRes.text().catch(() => "");
+      return { ok: false, status: autoRes.status, erro: autoErr.slice(0, 500) };
+    }
+  }
+
   return { ok: true, status: syncRes.status };
 }
 
