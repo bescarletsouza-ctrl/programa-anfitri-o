@@ -644,8 +644,12 @@ export const removerMembroOrg = (membroId) => chamarPlataforma({ acao: "remover_
 
 // Envia um payload de teste de uma integração específica. Aqui os erros sobem.
 export async function testarIntegracao(integracaoId) {
+  const dados = {
+    participante_id: "teste", convidado_id: "teste",
+    participante: { nome: "Teste We.events", email: "teste@we.events", telefone: "5511999999999" },
+  };
   const { data, error } = await supabase.functions.invoke("integracoes", {
-    body: { evento_id: eventoId(), integracao_id: integracaoId, teste: true },
+    body: { evento_id: eventoId(), integracao_id: integracaoId, teste: true, dados },
   });
   if (error) {
     throw new Error(await mensagemErroFuncao(error, "Função não encontrada. Faça o deploy de supabase/functions/integracoes."));
