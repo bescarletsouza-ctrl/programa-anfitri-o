@@ -125,7 +125,11 @@ function renderFunilConvidados() {
       <div class="qtd">${cont("Recusado")}</div></div>`;
   el("funil-convidados").innerHTML = html;
 
-  const meta = dados.evento?.meta_confirmados || 0;
+  // Meta vem do Planejamento (grupo "Convidados") — mesmo número usado lá.
+  // Cai pro campo antigo de Configurações só se o Planejamento não tiver
+  // meta definida ainda.
+  const metaPlanejamento = Number(dados.evento?.metas_planejamento?.convidados?.confirmados) || 0;
+  const meta = metaPlanejamento || dados.evento?.meta_confirmados || 0;
   if (meta > 0) {
     const pct = Math.min(100, Math.round((conf / meta) * 100));
     el("meta-box").innerHTML = `
@@ -136,7 +140,7 @@ function renderFunilConvidados() {
         <div class="qtd">${pct}%</div>
       </div>`;
   } else {
-    el("meta-box").innerHTML = `<p class="pagina-sub" style="margin:0">Defina a meta em Configurações.</p>`;
+    el("meta-box").innerHTML = `<p class="pagina-sub" style="margin:0">Defina a meta em Planejamento.</p>`;
   }
 }
 
