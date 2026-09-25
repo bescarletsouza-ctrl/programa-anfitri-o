@@ -4,6 +4,11 @@
 // O admin manda só os IDs; a função busca os e-mails no banco (service role),
 // personaliza {nome}/{codigo}/{email}/{evento} e envia em lotes de 100.
 //
+// Auth: exige o JWT do usuário logado e reaproveita a RLS da tabela "eventos"
+// pra confirmar que ele tem acesso àquele evento (mesmo padrão de
+// integracoes/index.ts) — a chave anon/publishable sozinha não prova nada,
+// porque é pública por design (fica no config.js do site).
+//
 // Deploy:
 //   supabase functions deploy enviar-email
 // Secrets (Studio → Edge Functions → enviar-email → Secrets, ou CLI):
@@ -38,25 +43,31 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ erro: "Método não suportado." }, 405);
 
   try {
-    // valida a chamada: precisa vir com a chave anon/publishable do projeto
-    const anon = Deno.env.get("SUPABASE_ANON_KEY") || "";
-    const auth = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
-    const apikey = req.headers.get("apikey") || "";
-    if (anon && auth !== anon && apikey !== anon) return json({ erro: "Não autorizado." }, 401);
-
-    const { evento_id, participante_ids, assunto, corpo, de } = await req.json();
+    const { evento_id, participante_ids, assunto, corpo } = await req.json();
     if (!evento_id || !Array.isArray(participante_ids) || !participante_ids.length || !assunto || !corpo)
       return json({ erro: "Dados incompletos." }, 400);
 
+    // Autorização real: exige um usuário logado com acesso a este evento.
+    // Reaproveita a RLS da tabela "eventos" em vez de só checar a chave
+    // anon, que é pública por design e não prova que quem chamou é da
+    // organização dona do evento.
+    const jwt = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+    if (!jwt) return json({ erro: "Não autorizado." }, 401);
+    const supaUrl = Deno.env.get("SUPABASE_URL")!;
+    const asUser = createClient(supaUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: `Bearer ${jwt}` } },
+    });
+    const { data: evVisivel } = await asUser.from("eventos").select("id").eq("id", evento_id).maybeSingle();
+    if (!evVisivel) return json({ erro: "Não autorizado." }, 401);
+
     const RESEND = Deno.env.get("RESEND_API_KEY");
-    const FROM = (de && String(de).trim()) || Deno.env.get("EMAIL_FROM");
+    // remetente é sempre o secret configurado — não vem do chamador (era um
+    // jeito de qualquer pessoa escolher o nome/e-mail exibido no envio)
+    const FROM = Deno.env.get("EMAIL_FROM");
     if (!RESEND || !FROM)
       return json({ erro: "Configure RESEND_API_KEY e EMAIL_FROM nos secrets da função." }, 500);
 
-    const sb = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    );
+    const sb = createClient(supaUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
     const { data: parts, error } = await sb
       .from("participantes")

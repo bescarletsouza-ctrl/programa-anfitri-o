@@ -1,9 +1,13 @@
 // =============================================================================
-// Acompanhamento público da inscrição — por link (?c=<id>) ou por e-mail.
+// Acompanhamento público da inscrição — só por link (?c=<id>).
+// A busca por e-mail foi retirada: ela devolvia status de inscrição pra
+// qualquer e-mail digitado, sem provar que quem perguntou é o dono (LGPD).
+// O convidado já recebe o link ?c=<id> na confirmação e na aprovação/recusa
+// (via webhook/integração), então não há regressão de funcionalidade.
 // =============================================================================
 import { esc, formatarData } from "./ui.js";
 import { APP } from "./config.js";
-import { pubStatus, pubStatusEmail } from "./publico-api.js";
+import { pubStatus } from "./publico-api.js";
 
 const el = (id) => document.getElementById(id);
 const idConvidado = new URLSearchParams(location.search).get("c");
@@ -29,84 +33,43 @@ const MAPA = {
 };
 
 (async function iniciar() {
-  if (idConvidado) {
-    el("carregando").hidden = false;
-    try {
-      const r = await pubStatus(idConvidado);
-      if (!r?.convidado) return semResultado("Não encontramos essa inscrição.");
-      eventosCarregados = r.evento ? { [r.convidado.evento_id]: r.evento } : {};
-      mostrarResultado([r.convidado], null);
-    } catch (e) {
-      console.error(e);
-      mostrarBusca();
-    }
-    el("carregando").hidden = true;
-  } else {
-    mostrarBusca();
+  if (!idConvidado) { mostrarOrientacao(); return; }
+  el("carregando").hidden = false;
+  try {
+    const r = await pubStatus(idConvidado);
+    if (!r?.convidado) return semResultado();
+    eventosCarregados = r.evento ? { [r.convidado.evento_id]: r.evento } : {};
+    mostrarResultado(r.convidado);
+  } catch (e) {
+    console.error(e);
+    mostrarOrientacao();
   }
+  el("carregando").hidden = true;
 })();
 
-function mostrarBusca() {
+function mostrarOrientacao() {
   el("cartao-resultado").hidden = true;
   el("cartao-busca").hidden = false;
 }
 
-el("form-busca").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const email = el("email").value.trim();
-  el("busca-erro").textContent = "";
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    el("busca-erro").textContent = "Informe um e-mail válido.";
-    return;
-  }
-  const btn = el("btn-buscar");
-  btn.disabled = true;
-  btn.textContent = "Buscando…";
-  try {
-    const r = await pubStatusEmail(email);
-    const lista = r?.convidados || [];
-    if (!lista.length) return semResultado("Não encontramos nenhuma inscrição com esse e-mail.");
-    eventosCarregados = r.eventos || {};
-    mostrarResultado(lista, email);
-  } catch (err) {
-    console.error(err);
-    el("busca-erro").textContent = "Não foi possível consultar agora. Tente de novo.";
-  } finally {
-    btn.disabled = false;
-    btn.textContent = "Ver status";
-  }
-});
-
-el("btn-voltar").onclick = () => {
-  history.replaceState(null, "", location.pathname);
-  el("email").value = "";
-  mostrarBusca();
-};
-
-function semResultado(msg) {
+function semResultado() {
+  el("busca-msg").textContent = "Não encontramos essa inscrição. Use o link que você recebeu por e-mail.";
   el("cartao-busca").hidden = false;
   el("cartao-resultado").hidden = true;
-  el("busca-erro").textContent = msg;
 }
 
-function mostrarResultado(lista, email) {
+function mostrarResultado(c) {
   el("cartao-busca").hidden = true;
   el("cartao-resultado").hidden = false;
-  const linhas = lista.map((c) => {
-    const { m, texto } = textoStatus(c);
-    return `<div style="padding:16px 0;border-bottom:1px solid var(--cinza-100)">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-        <strong style="font-size:1.05rem">${esc(c.nome || "Inscrição")}</strong>
-        <span class="badge ${m.cls}" style="font-size:.78rem">${m.rotulo}</span>
-      </div>
-      <p style="margin:8px 0 0;color:var(--texto-suave);line-height:1.5">${esc(texto)}</p>
-      <p class="pagina-sub" style="margin:8px 0 0;font-size:.75rem">
-        Convite de ${esc(c.anfitriao?.nome || "—")} · enviado em ${formatarData(c.created_at)}
-      </p>
-    </div>`;
-  });
-  el("resultado").innerHTML =
-    (email ? `<p class="pagina-sub" style="margin:0 0 14px">Inscrições de <b>${esc(email)}</b></p>` : "") +
-    linhas.join("");
-  el("resultado").lastElementChild?.style.setProperty("border-bottom", "none");
+  const { m, texto } = textoStatus(c);
+  el("resultado").innerHTML = `<div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+      <strong style="font-size:1.05rem">${esc(c.nome || "Inscrição")}</strong>
+      <span class="badge ${m.cls}" style="font-size:.78rem">${m.rotulo}</span>
+    </div>
+    <p style="margin:8px 0 0;color:var(--texto-suave);line-height:1.5">${esc(texto)}</p>
+    <p class="pagina-sub" style="margin:8px 0 0;font-size:.75rem">
+      Convite de ${esc(c.anfitriao?.nome || "—")} · enviado em ${formatarData(c.created_at)}
+    </p>
+  </div>`;
 }

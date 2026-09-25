@@ -1,0 +1,7 @@
+# Nada aqui afeta o deploy do site em si (HTML/JS/CSS estático) — só evita
+# publicar arquivos internos (migrações, Edge Functions, documentação) pela
+# mesma URL do site. Confirmado em auditoria: sem isso, qualquer visitante
+# conseguia ler /supabase/migrations/*.sql, /supabase/config.toml e até o
+# código-fonte das Edge Functions.
+supabase/
+README.md

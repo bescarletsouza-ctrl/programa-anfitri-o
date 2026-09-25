@@ -2,9 +2,10 @@
 # project_id é o ref do seu projeto (Studio → Settings → General).
 project_id = "xiuhqkvkiexmbgwyvunr"
 
-# A Edge Function de e-mail é chamada pelo admin com a chave publishable
-# (não é um JWT), então a verificação de JWT fica desligada — a função valida
-# a chave e restringe os destinatários aos participantes do evento.
+# Chamada pelo admin autenticado; exige o JWT do usuário e confere (via RLS
+# de "eventos") que ele tem acesso ao evento — mesmo padrão de "integracoes".
+# verify_jwt fica desligado no gateway porque a função faz essa checagem ela
+# mesma (permite responder com uma mensagem de erro clara em vez do 401 genérico).
 [functions.enviar-email]
 verify_jwt = false
 

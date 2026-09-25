@@ -28,4 +28,3 @@ export const pubPainel = (slug) => chamar({ acao: "painel", slug });
 
 // status.html
 export const pubStatus = (c) => chamar({ acao: "status", c });
-export const pubStatusEmail = (email) => chamar({ acao: "status_email", email });

@@ -22,21 +22,12 @@
     <div class="pub-card" id="cartao-busca" hidden>
       <div class="pub-hero">
         <h1>Acompanhe sua <b>inscrição</b></h1>
-        <p>Informe o e-mail que você usou na aplicação.</p>
+        <p id="busca-msg">Use o link que você recebeu por e-mail na hora da inscrição para ver o status da sua aplicação aqui.</p>
       </div>
-      <form id="form-busca" novalidate>
-        <label class="pergunta-rotulo">Seu e-mail</label>
-        <input class="pub-input" type="email" id="email" placeholder="voce@email.com" required />
-        <div class="passo-erro" id="busca-erro"></div>
-        <div class="passo-acoes">
-          <button type="submit" class="btn btn-primario" id="btn-buscar">Ver status</button>
-        </div>
-      </form>
     </div>
 
     <div class="pub-card" id="cartao-resultado" hidden>
       <div id="resultado"></div>
-      <button class="btn btn-secundario" id="btn-voltar" style="width:100%;justify-content:center;margin-top:16px">Consultar outro e-mail</button>
     </div>
     <p class="pub-credito">desenvolvido por <b>we.events</b></p>
   </div>

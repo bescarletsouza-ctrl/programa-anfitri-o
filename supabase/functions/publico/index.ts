@@ -100,20 +100,11 @@ Deno.serve(async (req) => {
       return json({ convidado: c, evento: evento || null });
     }
 
-    if (acao === "status_email") {
-      const email = String(body.email || "").trim();
-      if (!email) return json({ erro: "Informe o e-mail." }, 400);
-      const { data: cs } = await sb.from("convidados")
-        .select("id, nome, status, created_at, evento_id, anfitriao:anfitrioes(nome)")
-        .ilike("email", email).order("created_at", { ascending: false });
-      const ids = [...new Set((cs || []).map((c) => c.evento_id))];
-      const eventos: Record<string, unknown> = {};
-      if (ids.length) {
-        const { data: evs } = await sb.from("eventos").select(TEXTOS_EVENTO.join(",")).in("id", ids);
-        (evs || []).forEach((e: Record<string, unknown>) => { eventos[e.id as string] = e; });
-      }
-      return json({ convidados: cs || [], eventos });
-    }
+    // "status_email" (buscar inscrição digitando o e-mail, sem link) foi
+    // removida: devolvia status de inscrição de QUALQUER e-mail digitado, sem
+    // provar que quem perguntou é o dono, em qualquer evento de qualquer
+    // organização — vazamento de dado pessoal. O convidado já recebe o link
+    // ?c=<id> na confirmação e na aprovação/recusa (webhook/integração).
 
     return json({ erro: "Ação desconhecida." }, 400);
   } catch (e) {
