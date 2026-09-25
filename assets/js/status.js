@@ -53,7 +53,7 @@ function mostrarOrientacao() {
 }
 
 function semResultado() {
-  el("busca-msg").textContent = "Não encontramos essa inscrição. Use o link que você recebeu por e-mail.";
+  el("busca-msg").textContent = "Não encontramos essa inscrição. A atualização da sua inscrição será enviada no e-mail cadastrado.";
   el("cartao-busca").hidden = false;
   el("cartao-resultado").hidden = true;
 }
