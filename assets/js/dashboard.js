@@ -79,37 +79,46 @@ function render() {
   renderRecentes();
 }
 
-// Evolução diária de candidaturas (convidados) recebidas vs o ritmo diário
-// necessário pra bater a meta de convidados (Planejamento) até a data do
-// evento — recalcula sozinho a cada dia: (meta − recebido) ÷ dias restantes.
-// Não respeita o filtro de grupo: a meta em Planejamento é do evento inteiro.
+// Evolução diária de candidaturas: recebidas (todo mundo que se candidatou
+// naquele dia) vs aprovadas (quem, daquele mesmo dia, está hoje com status
+// Aprovado/Confirmado) — mais a meta diária necessária pra bater a meta de
+// confirmados (mesma do Planejamento/meta-box do Funil de convidados) até a
+// data do evento. Recalcula sozinha a cada dia: (meta − já aprovado) ÷ dias
+// restantes. Não respeita o filtro de grupo: a meta é do evento inteiro.
 const DIAS_JANELA_APLICACOES = 14;
 
 function renderAplicacoesDiarias() {
   const todos = dados.convidados;
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
+  const eAprovado = (c) => c.status === "Aprovado" || c.status === "Confirmado";
 
   const chaveDia = (d) => d.toISOString().slice(0, 10);
-  const contagemPorDia = new Map();
+  const recebidasPorDia = new Map();
+  const aprovadasPorDia = new Map();
   todos.forEach((c) => {
     const d = new Date(c.created_at);
     d.setHours(0, 0, 0, 0);
     const k = chaveDia(d);
-    contagemPorDia.set(k, (contagemPorDia.get(k) || 0) + 1);
+    recebidasPorDia.set(k, (recebidasPorDia.get(k) || 0) + 1);
+    if (eAprovado(c)) aprovadasPorDia.set(k, (aprovadasPorDia.get(k) || 0) + 1);
   });
 
   const dias = [];
   for (let i = DIAS_JANELA_APLICACOES - 1; i >= 0; i--) {
     const d = new Date(hoje);
     d.setDate(d.getDate() - i);
-    dias.push({ data: d, qtd: contagemPorDia.get(chaveDia(d)) || 0, hoje: i === 0 });
+    const k = chaveDia(d);
+    dias.push({ data: d, recebidas: recebidasPorDia.get(k) || 0, aprovadas: aprovadasPorDia.get(k) || 0, hoje: i === 0 });
   }
 
-  const metaTotal = dados.evento?.metas_planejamento?.convidados?.inscritos || 0;
-  const recebido = todos.length;
+  const recebidoTotal = todos.length;
+  const aprovadoTotal = todos.filter(eAprovado).length;
+  // mesma meta (e mesmo fallback) já usados no meta-box do Funil de convidados
+  const metaPlanejamento = Number(dados.evento?.metas_planejamento?.convidados?.confirmados) || 0;
+  const metaTotal = metaPlanejamento || dados.evento?.meta_confirmados || 0;
   const dataEventoStr = dados.evento?.data_evento;
-  const faltam = Math.max(0, metaTotal - recebido);
+  const faltam = Math.max(0, metaTotal - aprovadoTotal);
   let ritmo = null, diasRestantes = null;
   if (metaTotal > 0 && dataEventoStr) {
     const dataEvento = new Date(dataEventoStr + "T00:00:00");
@@ -118,8 +127,11 @@ function renderAplicacoesDiarias() {
   }
 
   const ALTURA = 140;
-  const maxValor = Math.max(1, ...dias.map((d) => d.qtd), ritmo || 0);
-  dias.forEach((d) => { d.alturaPx = Math.max(2, Math.round((d.qtd / maxValor) * ALTURA)); });
+  const maxValor = Math.max(1, ...dias.map((d) => d.recebidas), ritmo || 0);
+  dias.forEach((d) => {
+    d.recebidasPx = Math.max(2, Math.round((d.recebidas / maxValor) * ALTURA));
+    d.aprovadasPx = Math.round((d.aprovadas / maxValor) * ALTURA);
+  });
   const linhaRitmoPx = ritmo != null ? Math.min(ALTURA, Math.round((ritmo / maxValor) * ALTURA)) : null;
 
   const fmtCurto = (d) => new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit" }).format(d);
@@ -128,16 +140,22 @@ function renderAplicacoesDiarias() {
   // margem de 22px reservada no topo pro rótulo do ritmo não cortar quando a
   // linha tracejada cai bem no topo do gráfico (ritmo > qualquer dia da janela)
   el("aplic-grafico").innerHTML = `
+    <div style="display:flex;gap:14px;margin-bottom:12px;font-size:.72rem;color:var(--texto-suave)">
+      <span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--cinza-300);margin-right:5px;vertical-align:middle"></span>Recebidas</span>
+      <span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--cor-laranja-forte);margin-right:5px;vertical-align:middle"></span>Aprovadas</span>
+    </div>
     <div style="position:relative;height:${ALTURA + 22}px;margin-bottom:6px">
       <div style="position:absolute;left:0;right:0;bottom:0;height:${ALTURA}px">
         ${linhaRitmoPx != null ? `
           <div style="position:absolute;left:0;right:0;bottom:${linhaRitmoPx}px;border-top:2px dashed var(--cor-laranja-forte)">
-            <span style="position:absolute;right:0;top:-17px;font-size:.68rem;color:var(--cor-laranja-forte);font-weight:700;white-space:nowrap">Ritmo necessário: ${ritmo}/dia</span>
+            <span style="position:absolute;right:0;top:-17px;font-size:.68rem;color:var(--cor-laranja-forte);font-weight:700;white-space:nowrap;background:var(--superficie);padding-left:6px;border-radius:3px">Ritmo necessário: ${ritmo} aprovações/dia</span>
           </div>` : ""}
-        <div style="display:flex;align-items:flex-end;gap:5px;height:100%">
+        <div style="display:flex;gap:5px;height:100%">
           ${dias.map((d) => `
-            <div style="flex:1;display:flex;justify-content:center;height:100%;align-items:flex-end" title="${fmtLongo(d.data)}: ${d.qtd} aplicação${d.qtd === 1 ? "" : "s"}">
-              <div style="width:100%;max-width:26px;border-radius:4px 4px 0 0;background:${d.hoje ? "var(--cor-laranja-forte)" : "var(--cinza-300)"};height:${d.alturaPx}px"></div>
+            <div style="flex:1;position:relative;height:100%;border-radius:4px 4px 0 0;${d.hoje ? "background:var(--cor-laranja-suave)" : ""}" title="${fmtLongo(d.data)}: ${d.recebidas} recebida${d.recebidas === 1 ? "" : "s"}, ${d.aprovadas} aprovada${d.aprovadas === 1 ? "" : "s"}">
+              ${d.recebidas > 0 ? `<span style="position:absolute;bottom:${d.recebidasPx + 4}px;left:50%;transform:translateX(-50%);font-size:.6rem;color:var(--texto-tenue);white-space:nowrap">${d.recebidas}</span>` : ""}
+              <div style="position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:26px;max-width:80%;border-radius:4px 4px 0 0;background:var(--cinza-300);height:${d.recebidasPx}px"></div>
+              <div style="position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:26px;max-width:80%;border-radius:4px 4px 0 0;background:var(--cor-laranja-forte);height:${d.aprovadasPx}px"></div>
             </div>`).join("")}
         </div>
       </div>
@@ -147,12 +165,12 @@ function renderAplicacoesDiarias() {
     </div>`;
 
   el("aplic-legenda").textContent = !metaTotal
-    ? `${recebido} aplicação${recebido === 1 ? "" : "ões"} recebida${recebido === 1 ? "" : "s"} no total · defina a meta de convidados em Planejamento para ver o ritmo necessário.`
+    ? `${recebidoTotal} recebidas · ${aprovadoTotal} aprovadas no total · defina a meta de confirmados em Planejamento para ver o ritmo necessário.`
     : !dataEventoStr
-    ? `${recebido} de ${metaTotal} aplicações recebidas · defina a data do evento em Configurações para ver o ritmo necessário.`
+    ? `${recebidoTotal} recebidas · ${aprovadoTotal} de ${metaTotal} aprovadas · defina a data do evento em Configurações para ver o ritmo necessário.`
     : faltam === 0
-    ? `Meta batida! ${recebido} de ${metaTotal} aplicações recebidas.`
-    : `${recebido} de ${metaTotal} aplicações recebidas · faltam ${faltam} em ${diasRestantes} dia${diasRestantes === 1 ? "" : "s"}.`;
+    ? `Meta batida! ${aprovadoTotal} de ${metaTotal} aprovadas (${recebidoTotal} recebidas no total).`
+    : `${recebidoTotal} recebidas · ${aprovadoTotal} de ${metaTotal} aprovadas · faltam ${faltam} em ${diasRestantes} dia${diasRestantes === 1 ? "" : "s"}.`;
 }
 
 function linhaFunil(nome, qtd, anterior) {
