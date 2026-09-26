@@ -72,10 +72,87 @@ function render() {
   renderFunilAnfitrioes();
   renderFunilConvidados();
   renderFaixas();
+  renderAplicacoesDiarias();
   renderVisaoGrupos();
   renderTopAnfitrioes();
   renderTopResponsaveis();
   renderRecentes();
+}
+
+// Evolução diária de candidaturas (convidados) recebidas vs o ritmo diário
+// necessário pra bater a meta de convidados (Planejamento) até a data do
+// evento — recalcula sozinho a cada dia: (meta − recebido) ÷ dias restantes.
+// Não respeita o filtro de grupo: a meta em Planejamento é do evento inteiro.
+const DIAS_JANELA_APLICACOES = 14;
+
+function renderAplicacoesDiarias() {
+  const todos = dados.convidados;
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+
+  const chaveDia = (d) => d.toISOString().slice(0, 10);
+  const contagemPorDia = new Map();
+  todos.forEach((c) => {
+    const d = new Date(c.created_at);
+    d.setHours(0, 0, 0, 0);
+    const k = chaveDia(d);
+    contagemPorDia.set(k, (contagemPorDia.get(k) || 0) + 1);
+  });
+
+  const dias = [];
+  for (let i = DIAS_JANELA_APLICACOES - 1; i >= 0; i--) {
+    const d = new Date(hoje);
+    d.setDate(d.getDate() - i);
+    dias.push({ data: d, qtd: contagemPorDia.get(chaveDia(d)) || 0, hoje: i === 0 });
+  }
+
+  const metaTotal = dados.evento?.metas_planejamento?.convidados?.inscritos || 0;
+  const recebido = todos.length;
+  const dataEventoStr = dados.evento?.data_evento;
+  const faltam = Math.max(0, metaTotal - recebido);
+  let ritmo = null, diasRestantes = null;
+  if (metaTotal > 0 && dataEventoStr) {
+    const dataEvento = new Date(dataEventoStr + "T00:00:00");
+    diasRestantes = Math.max(0, Math.round((dataEvento - hoje) / 86400000));
+    ritmo = diasRestantes > 0 ? Math.ceil(faltam / diasRestantes) : faltam;
+  }
+
+  const ALTURA = 140;
+  const maxValor = Math.max(1, ...dias.map((d) => d.qtd), ritmo || 0);
+  dias.forEach((d) => { d.alturaPx = Math.max(2, Math.round((d.qtd / maxValor) * ALTURA)); });
+  const linhaRitmoPx = ritmo != null ? Math.min(ALTURA, Math.round((ritmo / maxValor) * ALTURA)) : null;
+
+  const fmtCurto = (d) => new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit" }).format(d);
+  const fmtLongo = (d) => new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" }).format(d);
+
+  // margem de 22px reservada no topo pro rótulo do ritmo não cortar quando a
+  // linha tracejada cai bem no topo do gráfico (ritmo > qualquer dia da janela)
+  el("aplic-grafico").innerHTML = `
+    <div style="position:relative;height:${ALTURA + 22}px;margin-bottom:6px">
+      <div style="position:absolute;left:0;right:0;bottom:0;height:${ALTURA}px">
+        ${linhaRitmoPx != null ? `
+          <div style="position:absolute;left:0;right:0;bottom:${linhaRitmoPx}px;border-top:2px dashed var(--cor-laranja-forte)">
+            <span style="position:absolute;right:0;top:-17px;font-size:.68rem;color:var(--cor-laranja-forte);font-weight:700;white-space:nowrap">Ritmo necessário: ${ritmo}/dia</span>
+          </div>` : ""}
+        <div style="display:flex;align-items:flex-end;gap:5px;height:100%">
+          ${dias.map((d) => `
+            <div style="flex:1;display:flex;justify-content:center;height:100%;align-items:flex-end" title="${fmtLongo(d.data)}: ${d.qtd} aplicação${d.qtd === 1 ? "" : "s"}">
+              <div style="width:100%;max-width:26px;border-radius:4px 4px 0 0;background:${d.hoje ? "var(--cor-laranja-forte)" : "var(--cinza-300)"};height:${d.alturaPx}px"></div>
+            </div>`).join("")}
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:5px">
+      ${dias.map((d) => `<span style="flex:1;text-align:center;font-size:.62rem;color:var(--texto-tenue)">${fmtCurto(d.data)}</span>`).join("")}
+    </div>`;
+
+  el("aplic-legenda").textContent = !metaTotal
+    ? `${recebido} aplicação${recebido === 1 ? "" : "ões"} recebida${recebido === 1 ? "" : "s"} no total · defina a meta de convidados em Planejamento para ver o ritmo necessário.`
+    : !dataEventoStr
+    ? `${recebido} de ${metaTotal} aplicações recebidas · defina a data do evento em Configurações para ver o ritmo necessário.`
+    : faltam === 0
+    ? `Meta batida! ${recebido} de ${metaTotal} aplicações recebidas.`
+    : `${recebido} de ${metaTotal} aplicações recebidas · faltam ${faltam} em ${diasRestantes} dia${diasRestantes === 1 ? "" : "s"}.`;
 }
 
 function linhaFunil(nome, qtd, anterior) {
