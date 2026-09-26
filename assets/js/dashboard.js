@@ -147,7 +147,7 @@ function renderAplicacoesDiarias() {
     <div style="position:relative;height:${ALTURA + 22}px;margin-bottom:6px">
       <div style="position:absolute;left:0;right:0;bottom:0;height:${ALTURA}px">
         ${linhaRitmoPx != null ? `
-          <div style="position:absolute;left:0;right:0;bottom:${linhaRitmoPx}px;border-top:2px dashed var(--cor-laranja-forte)">
+          <div style="position:absolute;left:0;right:0;bottom:${linhaRitmoPx}px;border-top:2px dashed var(--cor-laranja-forte);z-index:2">
             <span style="position:absolute;right:0;top:-17px;font-size:.68rem;color:var(--cor-laranja-forte);font-weight:700;white-space:nowrap;background:var(--superficie);padding-left:6px;border-radius:3px">Ritmo necessário: ${ritmo} aprovações/dia</span>
           </div>` : ""}
         <div style="display:flex;gap:5px;height:100%">
