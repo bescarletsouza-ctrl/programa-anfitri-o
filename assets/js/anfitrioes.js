@@ -10,6 +10,7 @@ import {
   listConvidadosDoAnfitriao, salvar, remover, inserirLote, atualizarEmLote, removerEmLote,
   reSincCategoriaAnfitriao, reSincResponsavelAnfitriao,
   sincAnfitriaoParticipante, desvincularAoExcluirAnfitriao,
+  listSituacaoDosAnfitrioes, definirSituacaoDoAnfitriao,
 } from "./supabase.js";
 import { APP, TIPOS_ANFITRIAO } from "./config.js";
 import { parsearTabela, lerXlsx, baixarXLSX, baixarModeloXLSX } from "./tabela.js";
@@ -20,11 +21,17 @@ const el = (id) => document.getElementById(id);
 
 let CTX = null;
 let estagios = [], grupos = [], membrosOrg = [], tiposIngresso = [], lista = [];
+// situação do anfitrião = a do participante ligado a ele: { [anfitriao_id]: situacao }
+let situacoes = {};
+const SITUACOES = ["Confirmado", "Pendente", "Fila de espera", "Pré-inscrito", "Desativado"];
+const badgeSituacao = (s) =>
+  ({ Confirmado: "badge-ok", Pendente: "badge-alerta", "Fila de espera": "badge-info",
+     "Pré-inscrito": "badge-neutro", Desativado: "badge-erro" }[s] || "badge-neutro");
 let aba = "todos";
 let vista = "lista";
 const FILTROS_VAZIO = {
   busca: "", grupo: "", categoria: "", categoriaConvidado: "", responsavel: "", estagio: "", presenca: "",
-  dataDe: "", dataAte: "",
+  situacao: "", dataDe: "", dataAte: "",
 };
 const filtros = { ...FILTROS_VAZIO };
 const selecionados = new Set();
@@ -54,12 +61,13 @@ const COLUNAS = {
   categoriaConvidado: "Categoria liberada",
   responsavel: "Responsável",
   estagio:   "Estágio",
+  situacao:  "Situação",
   presenca:  "Presença",
   enviados:  "Enviados",
   aprovados: "Aprovados",
   cadastro:  "Cadastro",
 };
-const COLUNAS_PADRAO = ["tipo", "email", "telefone", "presenca", "enviados", "aprovados"];
+const COLUNAS_PADRAO = ["tipo", "email", "telefone", "situacao", "presenca", "enviados", "aprovados"];
 let colunas = [...COLUNAS_PADRAO];
 try {
   const s = JSON.parse(localStorage.getItem("anf_colunas") || "null");
@@ -71,12 +79,15 @@ _iniciando.then((ctx) => { if (ctx) { CTX = ctx; carregar(ctx); } });
 
 async function carregar() {
   try {
-    [estagios, grupos, membrosOrg, tiposIngresso, lista] = await Promise.all([
+    [estagios, grupos, membrosOrg, tiposIngresso, lista, situacoes] = await Promise.all([
       listEstagios(), listGrupos(),
       CTX?.org?.id ? listarEquipe(CTX.org.id).catch(() => []) : Promise.resolve([]),
       listTiposIngresso().catch(() => []),
       listAnfitrioes(),
+      listSituacaoDosAnfitrioes().catch(() => ({})),
     ]);
+    el("f-situacao").innerHTML = `<option value="">Todas as situações</option>` +
+      SITUACOES.map((s) => `<option>${esc(s)}</option>`).join("");
     preencherSelect(el("f-grupo"), grupos, "Todos os tipos");
     preencherSelect(el("f-estagio"), estagios, "Todos os estágios");
     el("f-categoria").innerHTML = `<option value="">Todas as categorias</option>` +
@@ -93,6 +104,13 @@ async function carregar() {
   }
 }
 
+async function recarregarLista() {
+  [lista, situacoes] = await Promise.all([
+    listAnfitrioes(),
+    listSituacaoDosAnfitrioes().catch(() => situacoes),
+  ]);
+}
+
 function preencherSelect(sel, arr, placeholder, valorAtual) {
   sel.innerHTML = `<option value="">${esc(placeholder)}</option>` +
     arr.map((x) => `<option value="${x.id}" ${x.id === valorAtual ? "selected" : ""}>${esc(x.nome)}</option>`).join("");
@@ -103,7 +121,7 @@ el("busca").addEventListener("input", debounce((e) => { filtros.busca = e.target
 const CAMPO_DO_FILTRO = {
   "f-grupo": "grupo", "f-categoria": "categoria", "f-categoria-convidado": "categoriaConvidado",
   "f-responsavel": "responsavel", "f-estagio": "estagio", "f-presenca": "presenca",
-  "f-data-de": "dataDe", "f-data-ate": "dataAte",
+  "f-situacao": "situacao", "f-data-de": "dataDe", "f-data-ate": "dataAte",
 };
 Object.keys(CAMPO_DO_FILTRO).forEach((id) => {
   el(id).addEventListener("change", (e) => {
@@ -167,6 +185,7 @@ function filtrar() {
     if (filtros.estagio && a.estagio_id !== filtros.estagio) return false;
     if (filtros.presenca === "sim" && !a.presenca) return false;
     if (filtros.presenca === "nao" && a.presenca) return false;
+    if (filtros.situacao && situacoes[a.id] !== filtros.situacao) return false;
     if (diaDe && new Date(a.created_at) < diaDe) return false;
     if (diaAte && new Date(a.created_at) > diaAte) return false;
     if (filtros.busca) {
@@ -179,6 +198,18 @@ function filtrar() {
 
 function nomeGrupo(id) { return grupos.find((g) => g.id === id)?.nome; }
 function nomeEstagio(id) { return estagios.find((s) => s.id === id)?.nome || "—"; }
+
+// Ao entrar num estágio com "situação alvo", muda a situação do anfitrião
+// (participante ligado) — igual às etapas de Participantes. Devolve a nova
+// situação, ou null se não mudou nada (estágio sem alvo, já estava nela, ou
+// anfitrião sem participante).
+async function aplicarSituacaoDoEstagio(a, estagioId) {
+  const alvo = estagios.find((s) => s.id === estagioId)?.situacao_alvo;
+  if (!alvo || !a.participante_id || situacoes[a.id] === alvo) return null;
+  if (!(await definirSituacaoDoAnfitriao(a, alvo))) return null;
+  situacoes[a.id] = alvo;
+  return alvo;
+}
 function respDoGrupo(grupoId) { return grupos.find((g) => g.id === grupoId)?.responsavel_user_id || null; }
 
 // Igual à Participantes: a categoria de ingresso manda primeiro (tem
@@ -249,6 +280,11 @@ function celulaHtml(a, c) {
     }
     case "estagio":
       return `<td class="celula-edit" data-campo="estagio" title="Alterar estágio"><span class="badge badge-neutro">${esc(nomeEstagio(a.estagio_id))}</span>${lapis()}</td>`;
+    case "situacao": {
+      const s = situacoes[a.id];
+      if (!s) return `<td><span class="cel-tenue" title="Só quem vai ao evento tem situação">—</span></td>`;
+      return `<td class="celula-edit" data-campo="situacao" title="Alterar situação"><span class="badge ${badgeSituacao(s)}">${esc(s)}</span>${lapis()}</td>`;
+    }
     case "presenca":
       return `<td class="celula-edit" data-campo="presenca" title="Alterar presença">${a.presenca ? '<span class="badge badge-ok">Sim</span>' : '<span class="badge badge-neutro">Não</span>'}${lapis()}</td>`;
     case "enviados": return `<td>${a.enviados || 0}</td>`;
@@ -277,6 +313,9 @@ async function editarCelula(id, campo, td) {
   } else if (campo === "estagio") {
     itens = [{ valor: "", rotulo: "Sem estágio" }, ...estagios.map((s) => ({ valor: s.id, rotulo: s.nome }))];
     atualValor = a.estagio_id || "";
+  } else if (campo === "situacao") {
+    itens = SITUACOES.map((s) => ({ valor: s, rotulo: s }));
+    atualValor = situacoes[a.id] || "";
   } else if (campo === "presenca") {
     itens = [{ valor: "sim", rotulo: "Sim" }, { valor: "nao", rotulo: "Não" }];
     atualValor = a.presenca ? "sim" : "nao";
@@ -309,6 +348,11 @@ async function editarCelula(id, campo, td) {
     } else if (campo === "estagio") {
       const atualizado = await salvar("anfitrioes", { id, estagio_id: escolha || null });
       Object.assign(a, atualizado);
+      const novaSit = await aplicarSituacaoDoEstagio(a, escolha || null);
+      if (novaSit) toast(`${a.nome}: situação → ${novaSit}.`, "ok");
+    } else if (campo === "situacao") {
+      await definirSituacaoDoAnfitriao(a, escolha);
+      situacoes[id] = escolha;
     } else if (campo === "presenca") {
       const atualizado = await salvar("anfitrioes", { id, presenca: escolha === "sim" });
       Object.assign(a, atualizado);
@@ -412,6 +456,7 @@ function cardAnf(a) {
       <div class="pagina-sub" style="margin:2px 0 0;font-size:.72rem">${esc(a.email || a.telefone || "")}</div>
       <div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
         ${a.vai === false ? `<span class="badge badge-neutro" style="font-size:.65rem">Não vai</span>` : ""}
+        ${situacoes[a.id] ? `<span class="badge ${badgeSituacao(situacoes[a.id])}" style="font-size:.65rem">${esc(situacoes[a.id])}</span>` : ""}
         ${a.presenca ? `<span class="badge badge-ok" style="font-size:.65rem">Presente</span>` : ""}
         <span class="pagina-sub" style="margin:0;font-size:.68rem">${formatarData(a.created_at)}</span>
       </div>
@@ -449,6 +494,7 @@ function renderPipeline() {
             <button type="button" class="icone-btn" data-excluir-etapa="${et.id}" title="Excluir estágio">${icone("excluir")}</button>
           </span>` : ""}
         </div>
+        ${et?.situacao_alvo ? `<div class="coluna-vinculo" title="Ao mover para cá, a situação vira ${esc(et.situacao_alvo)}">→ situação: <b>${esc(et.situacao_alvo)}</b></div>` : ""}
         <div class="coluna-corpo">
           ${ordenados.map((a) => cardAnf(a)).join("") || `<p class="pagina-sub" style="margin:8px 0;font-size:.78rem">—</p>`}
         </div>
@@ -546,6 +592,8 @@ async function moverEstagio(id, estagioId) {
   renderPipeline();
   try {
     await salvar("anfitrioes", { id, estagio_id: estagioId });
+    const novaSit = await aplicarSituacaoDoEstagio(a, estagioId);
+    if (novaSit) { toast(`${a.nome}: situação → ${novaSit}.`, "ok"); renderPipeline(); }
   } catch (err) {
     a.estagio_id = anterior;
     renderPipeline();
@@ -571,6 +619,11 @@ function modalEstagio(et) {
       <label class="campo"><span>Nome *</span><input class="input" name="nome" required value="${esc(et?.nome || "")}" placeholder="Ex.: Novo, Em contato, Confirmado" /></label>
       <label class="campo"><span>Ordem</span><input class="input" name="ordem" type="number" value="${et?.ordem ?? estagios.length}" /></label>
       <label class="campo"><span>Cor</span><input class="input" name="cor" type="color" value="${esc(et?.cor || "#9aa0a6")}" style="height:40px;padding:4px" /></label>
+      <label class="campo"><span>Ao mover um card para este estágio, mudar a situação para</span>
+        <select class="select" name="situacao_alvo">
+          <option value="">Não mudar</option>
+          ${SITUACOES.map((s) => `<option ${s === (et?.situacao_alvo || "") ? "selected" : ""}>${s}</option>`).join("")}
+        </select></label>
       ${et ? `<button type="button" class="btn btn-perigo btn-sm" id="etapa-excluir" style="margin-top:6px">Excluir estágio</button>` : ""}`,
     aoMontar: (root) => {
       root.querySelector("#etapa-excluir")?.addEventListener("click", () => {
@@ -580,10 +633,19 @@ function modalEstagio(et) {
     },
     onConfirmar: async (form) => {
       const f = Object.fromEntries(new FormData(form));
-      const reg = { nome: f.nome.trim(), ordem: Number(f.ordem) || 0, cor: f.cor || null };
+      const reg = { nome: f.nome.trim(), ordem: Number(f.ordem) || 0, cor: f.cor || null, situacao_alvo: f.situacao_alvo || null };
       if (et) reg.id = et.id;
-      await salvar("estagios", reg);
-      toast("Estágio salvo.", "ok");
+      try {
+        await salvar("estagios", reg);
+        toast("Estágio salvo.", "ok");
+      } catch (e) {
+        // coluna nova ainda não existe: salva sem ela e avisa pra rodar a migração
+        if (/situacao_alvo|schema cache|could not find/i.test(e.message || "")) {
+          delete reg.situacao_alvo;
+          await salvar("estagios", reg);
+          toast("Estágio salvo (rode a migração 0033 para vincular a situação).", "erro");
+        } else throw e;
+      }
       estagios = await listEstagios();
       preencherSelect(el("f-estagio"), estagios, "Todos os estágios", filtros.estagio);
       render();
@@ -750,7 +812,7 @@ function modalNovo() {
       }
       await sincAnfitriaoParticipante(novo).catch((e) => console.warn(e));
       toast("Anfitrião criado.", "ok");
-      lista = await listAnfitrioes();
+      await recarregarLista();
       render();
       abrirGavetaDetalhe(novo.id);
     },
@@ -854,7 +916,7 @@ function modalImportar() {
       );
       if (criouAux) grupos = await listGrupos();
       preencherSelect(el("f-grupo"), grupos, "Todos os tipos", filtros.grupo);
-      lista = await listAnfitrioes();
+      await recarregarLista();
       render();
     },
   });
@@ -872,6 +934,7 @@ async function exportar(dados) {
     { chave: "telefone", rotulo: "Telefone" },
     { rotulo: "Responsável", valor: (a) => nomeMembro(a.responsavel_user_id) },
     { rotulo: "Estágio", valor: (a) => nomeEstagio(a.estagio_id) },
+    { rotulo: "Situação", valor: (a) => situacoes[a.id] || "" },
     { chave: "categoria_convidado", rotulo: "Categoria liberada" },
     { rotulo: "Vai ao evento", valor: (a) => (a.vai !== false ? "Sim" : "Não") },
     { rotulo: "Presença", valor: (a) => (a.presenca ? "Sim" : "Não") },
@@ -932,6 +995,9 @@ async function abrirGavetaDetalhe(id) {
       <label class="campo"><span>Estágio do funil</span>
         <select class="select" id="d-estagio"><option value="">—</option>
           ${estagios.map((s) => `<option value="${s.id}" ${s.id === a.estagio_id ? "selected" : ""}>${esc(s.nome)}</option>`).join("")}</select></label>
+      ${situacoes[a.id] ? `<label class="campo"><span>Situação</span>
+        <select class="select" id="d-situacao">
+          ${SITUACOES.map((s) => `<option ${s === situacoes[a.id] ? "selected" : ""}>${s}</option>`).join("")}</select></label>` : ""}
       <label class="campo" style="display:flex;gap:8px;align-items:center">
         <input type="checkbox" id="d-vai" ${a.vai !== false ? "checked" : ""} /> <span style="margin:0">Vai ao evento</span></label>
       <label class="campo" style="display:flex;gap:8px;align-items:center">
@@ -1002,8 +1068,19 @@ async function abrirGavetaDetalhe(id) {
         await reSincResponsavelAnfitriao(a.id, atualizado.responsavel_user_id).catch(() => {});
       }
       await sincAnfitriaoParticipante(atualizado).catch((e) => console.warn(e));
+      // situação escolhida à mão manda; senão, mudar de estágio aplica o alvo dele
+      const sitEscolhida = g.querySelector("#d-situacao")?.value;
+      const sitAntes = situacoes[a.id];
+      const mudouEstagio = (a.estagio_id || null) !== (atualizado.estagio_id || null);
+      await recarregarLista();
+      const fresco = lista.find((x) => x.id === a.id) || atualizado;
+      if (sitEscolhida && sitEscolhida !== sitAntes) {
+        await definirSituacaoDoAnfitriao(fresco, sitEscolhida).catch((e) => console.warn(e));
+        situacoes[a.id] = sitEscolhida;
+      } else if (mudouEstagio) {
+        await aplicarSituacaoDoEstagio(fresco, atualizado.estagio_id || null).catch((e) => console.warn(e));
+      }
       toast("Anfitrião atualizado.", "ok");
-      lista = await listAnfitrioes();
       render();
       fecharGaveta();
     } catch (e) {
@@ -1046,7 +1123,7 @@ async function excluir(id) {
     await remover("anfitrioes", id);
     toast("Anfitrião excluído.", "ok");
     fecharGaveta();
-    lista = await listAnfitrioes();
+    await recarregarLista();
     render();
   } catch (e) {
     toast(e.message, "erro");
@@ -1074,7 +1151,7 @@ async function acaoEmMassa(acao) {
       await removerEmLote("anfitrioes", ids);
       selecionados.clear();
       toast(`${ids.length} anfitrião(ões) excluído(s).`, "ok");
-      lista = await listAnfitrioes();
+      await recarregarLista();
       render();
     } catch (e) { toast(e.message, "erro"); }
     return;
@@ -1085,7 +1162,7 @@ async function acaoEmMassa(acao) {
       await atualizarEmLote("anfitrioes", ids, { presenca: acao === "presente" });
       selecionados.clear();
       toast(`Presença atualizada para ${ids.length} anfitrião(ões).`, "ok");
-      lista = await listAnfitrioes();
+      await recarregarLista();
       render();
     } catch (e) { toast(e.message, "erro"); }
     return;
@@ -1106,9 +1183,12 @@ async function acaoEmMassa(acao) {
       await atualizarEmLote("anfitrioes", ids, { responsavel_user_id: escolha || null });
     } else if (acao === "estagio") {
       await atualizarEmLote("anfitrioes", ids, { estagio_id: escolha || null });
+      for (const a of lista.filter((x) => selecionados.has(x.id))) {
+        await aplicarSituacaoDoEstagio(a, escolha || null).catch((e) => console.warn(e));
+      }
     } else if (acao === "vai") {
       await atualizarEmLote("anfitrioes", ids, { vai: escolha === "sim" });
-      lista = await listAnfitrioes();
+      await recarregarLista();
       for (const a of lista.filter((x) => selecionados.has(x.id))) {
         await sincAnfitriaoParticipante(a).catch((e) => console.warn(e));
       }
@@ -1117,7 +1197,7 @@ async function acaoEmMassa(acao) {
       // recalculado por linha, igual em Participantes
       const patch = acao === "tipo" ? { grupo_id: escolha || null } : { ingresso: escolha || null };
       await atualizarEmLote("anfitrioes", ids, patch);
-      lista = await listAnfitrioes();
+      await recarregarLista();
       for (const a of lista.filter((x) => selecionados.has(x.id))) {
         const atualizado = await salvar("anfitrioes", {
           id: a.id, responsavel_user_id: responsavelAutomatico(a.grupo_id, a.ingresso),
@@ -1127,7 +1207,7 @@ async function acaoEmMassa(acao) {
     }
     selecionados.clear();
     toast(`${ids.length} anfitrião(ões) atualizado(s).`, "ok");
-    lista = await listAnfitrioes();
+    await recarregarLista();
     render();
   } catch (e) { toast(e.message, "erro"); }
 }

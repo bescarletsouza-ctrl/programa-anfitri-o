@@ -100,6 +100,14 @@ export const listCamposPersonalizados = (eid) =>
 export const listAnfitrioes = (eid) =>
   supabase.from("anfitrioes_com_stats").select("*").eq("evento_id", ev(eid)).order("nome").then(ok);
 
+// Situação de cada anfitrião = a do participante ligado a ele (só existe
+// pra quem vai ao evento). Retorna { [anfitriao_id]: situacao }.
+export const listSituacaoDosAnfitrioes = (eid) =>
+  supabase.from("participantes").select("anfitriao_id, situacao")
+    .eq("evento_id", ev(eid)).not("anfitriao_id", "is", null)
+    .then(ok)
+    .then((rows) => Object.fromEntries(rows.map((r) => [r.anfitriao_id, r.situacao || "Confirmado"])));
+
 export const listConvidados = (eid) =>
   supabase
     .from("convidados")
@@ -350,6 +358,20 @@ export async function desvincularAoExcluirAnfitriao(anfitriao) {
   if (!pid) return;
   const p = await supabase.from("participantes").select("id, origem_anfitriao").eq("id", pid).maybeSingle().then((r) => r.data);
   if (p?.origem_anfitriao) await supabase.from("participantes").delete().eq("id", pid);
+}
+
+// Muda a situação do participante ligado ao anfitrião (usado ao mover de
+// estágio ou editar a situação na Gestão de anfitriões) e avisa as
+// integrações, igual à mudança de situação em Participantes. Retorna false
+// se o anfitrião não tem participante (não vai ao evento).
+export async function definirSituacaoDoAnfitriao(anfitriao, situacao) {
+  if (!anfitriao?.participante_id || !situacao) return false;
+  const p = await salvar("participantes", { id: anfitriao.participante_id, situacao });
+  dispararIntegracoes("participante.situacao", {
+    participante_id: p.id, situacao,
+    participante: { nome: p.nome, email: p.email, telefone: p.telefone, ingresso: p.ingresso, codigo: p.codigo },
+  });
+  return true;
 }
 
 // Antes de excluir um PARTICIPANTE: se o anfitrião ligado foi criado
