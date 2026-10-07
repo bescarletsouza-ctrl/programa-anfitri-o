@@ -13,7 +13,7 @@
 // (usa SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / SUPABASE_ANON_KEY, já
 //  presentes no ambiente da função — nenhum secret extra é obrigatório.)
 // =============================================================================
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.117.2";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",

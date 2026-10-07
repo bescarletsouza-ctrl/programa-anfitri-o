@@ -15,7 +15,7 @@
 //   supabase secrets set RESEND_API_KEY=re_xxx EMAIL_FROM="Evento <no-reply@seu-dominio.com>"
 // O domínio do EMAIL_FROM precisa estar verificado no Resend.
 // =============================================================================
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.117.2";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",

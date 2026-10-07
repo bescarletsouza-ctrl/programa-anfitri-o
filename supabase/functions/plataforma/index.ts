@@ -11,7 +11,7 @@
 // Secrets (opcionais — se faltarem, o link de convite volta na resposta para
 // copiar à mão):  RESEND_API_KEY, EMAIL_FROM
 // =============================================================================
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.117.2";
 
 const OWNER_EMAIL = "bescarletsouza@gmail.com";
 

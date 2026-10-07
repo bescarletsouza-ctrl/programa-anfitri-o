@@ -3,7 +3,7 @@
 // Tudo no admin é escopado pelo evento atual (evento.js). As páginas públicas
 // passam o evento_id do anfitrião explicitamente.
 // =============================================================================
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.117.2";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js";
 import { eventoId } from "./evento.js";
 
