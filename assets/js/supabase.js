@@ -360,6 +360,21 @@ export async function desvincularAoExcluirAnfitriao(anfitriao) {
   if (p?.origem_anfitriao) await supabase.from("participantes").delete().eq("id", pid);
 }
 
+// Evento "ativo" = não desativado e com data ainda não passada (ou sem data).
+// Mesma regra da função transferir_participantes no banco.
+export function eventoAtivo(e) {
+  if (!e || e.ativo === false) return false;
+  if (!e.data_evento) return true;
+  const hoje = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+  return e.data_evento >= hoje;
+}
+
+// Move participantes pra outro evento ativo mantendo a origem (evento e
+// código originais). Devolve { transferidos, ignorados_anfitriao,
+// ignorados_mesmo_evento }. Migração 0034.
+export const transferirParticipantes = (ids, eventoDestinoId) =>
+  supabase.rpc("transferir_participantes", { p_ids: ids, p_evento_destino: eventoDestinoId }).then(ok);
+
 // Muda a situação do participante ligado ao anfitrião (usado ao mover de
 // estágio ou editar a situação na Gestão de anfitriões) e avisa as
 // integrações, igual à mudança de situação em Participantes. Retorna false

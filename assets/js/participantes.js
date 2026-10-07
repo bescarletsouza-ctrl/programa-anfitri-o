@@ -13,9 +13,10 @@ import {
   listCamposPersonalizados,
   salvar, remover, inserirLote, atualizarEmLote, removerEmLote, registrarCheckin, listarEquipe,
   sincParticipanteAnfitriao, desvincularAoExcluirParticipante, dispararIntegracoes, definirStatusConvidado,
+  listEventos, eventoAtivo, transferirParticipantes,
 } from "./supabase.js";
 import { STATUS_CONVIDADO } from "./config.js";
-import { eventoNome } from "./evento.js";
+import { eventoNome, eventoId } from "./evento.js";
 import { imprimirCracha } from "./cracha.js";
 import { parsearTabela, lerXlsx, baixarXLSX, baixarModeloXLSX, normalizarCab } from "./tabela.js";
 import { abrirEnvioEmail } from "./email.js";
@@ -51,6 +52,7 @@ const COLUNAS_BASE = {
   etapa:      "Etapa",
   presenca:   "Presença",
   cadastro:   "Cadastro",
+  origem:     "Origem (transferência)",
 };
 let COLUNAS = { ...COLUNAS_BASE };
 const COLUNAS_PADRAO = ["codigo", "tipo", "categoria", "responsavel", "situacao", "statusConvite", "pagamento", "etapa", "presenca", "cadastro"];
@@ -431,6 +433,10 @@ function celulaHtml(p, c) {
         : `<span class="cel-tenue">—</span>`}</td>`;
     case "cadastro":
       return `<td>${formatarData(p.created_at)}</td>`;
+    case "origem":
+      return p.evento_origem_id || p.evento_origem_nome
+        ? `<td title="Transferido em ${esc(formatarData(p.transferido_em))}">${esc(p.evento_origem_nome || "—")}${p.codigo_origem ? ` <span class="chip-codigo">${esc(p.codigo_origem)}</span>` : ""}</td>`
+        : `<td><span class="cel-tenue">—</span></td>`;
     default:
       return "<td></td>";
   }
@@ -596,6 +602,11 @@ async function acaoEmMassa(acao) {
 
   if (acao === "email") {
     abrirEmailPara(participantes.filter((p) => selecionados.has(p.id)));
+    return;
+  }
+
+  if (acao === "transferir") {
+    modalTransferir(participantes.filter((p) => selecionados.has(p.id)));
     return;
   }
 
@@ -1060,6 +1071,61 @@ async function recarregar() {
   render();
 }
 
+/* ---- Transferir para outro evento ---- */
+async function modalTransferir(lista) {
+  if (!lista.length) return;
+  const ehAnfitriao = (p) => !!p.anfitriao_id;
+  const transferiveis = lista.filter((p) => !ehAnfitriao(p));
+  if (!transferiveis.length) {
+    toast("Anfitriões não são transferidos por aqui — eles ficam na Gestão de anfitriões.", "erro");
+    return;
+  }
+
+  let destinos;
+  try {
+    destinos = (await listEventos()).filter((e) => e.id !== eventoId() && eventoAtivo(e));
+  } catch (e) { toast(e.message, "erro"); return; }
+  if (!destinos.length) {
+    toast("Não há outro evento ativo para receber a transferência.", "erro");
+    return;
+  }
+
+  const n = transferiveis.length;
+  const ignorados = lista.length - n;
+  abrirModal({
+    titulo: n === 1 ? `Transferir ${transferiveis[0].nome}` : `Transferir ${n} participantes`,
+    textoConfirmar: "Transferir",
+    corpoHtml: `
+      <label class="campo"><span>Evento de destino *</span>
+        <select class="select" name="destino" required>
+          ${destinos.map((e) => `<option value="${esc(e.id)}">${esc(e.nome)}${e.data_evento ? ` · ${esc(e.data_evento.split("-").reverse().join("/"))}` : ""}</option>`).join("")}
+        </select>
+        <span class="cel-tenue" style="font-size:.72rem">Só eventos ativos (não encerrados) aparecem aqui.</span></label>
+      <div class="aviso" style="margin:0">
+        O participante <b>sai</b> de “${esc(eventoNome())}” e entra no evento escolhido, levando
+        todos os dados (tipo, ingresso, pagamento, campos personalizados…). O <b>código dele é mantido</b>
+        e a origem (evento e código originais) fica registrada. A etapa volta pra primeira do novo evento
+        e a presença é zerada.${ignorados ? `<br><br>${ignorados} anfitrião(ões) da seleção não serão transferidos.` : ""}
+      </div>`,
+    onConfirmar: async (form) => {
+      const destino = new FormData(form).get("destino");
+      try {
+        const r = await transferirParticipantes(transferiveis.map((p) => p.id), destino);
+        const nome = destinos.find((e) => e.id === destino)?.nome || "o outro evento";
+        toast(`${r.transferidos} participante(s) transferido(s) para ${nome}.`, "ok");
+        selecionados.clear();
+        fecharGaveta();
+        await recarregar();
+      } catch (e) {
+        if (/transferir_participantes|schema cache|does not exist/i.test(e.message || "")) {
+          toast("Rode a migração 0034_transferir_participante.sql no Supabase para ativar a transferência.", "erro");
+        } else toast(e.message, "erro");
+        return false;
+      }
+    },
+  });
+}
+
 /* ---- Gaveta ---- */
 function abrirGavetaDetalhe(id) {
   const p = participantes.find((x) => x.id === id);
@@ -1100,6 +1166,14 @@ function abrirGavetaDetalhe(id) {
            </div></div>`
         : ""
     }
+    ${
+      p.evento_origem_id || p.evento_origem_nome
+        ? `<div class="secao"><div class="aviso" style="margin:0">
+             <b>Transferido</b> de “${esc(p.evento_origem_nome || "outro evento")}”${p.codigo_origem ? ` · código original <span class="chip-codigo">${esc(p.codigo_origem)}</span>` : ""}
+             <span class="cel-tenue">em ${esc(formatarData(p.transferido_em, true))}</span>
+           </div></div>`
+        : ""
+    }
     <div class="secao">
       <button class="btn btn-primario" id="g-editar">Editar dados</button>
     </div>
@@ -1129,6 +1203,11 @@ function abrirGavetaDetalhe(id) {
       <textarea class="input" id="g-obs" rows="3">${esc(p.observacao || "")}</textarea>
       <button class="btn btn-secundario" id="g-salvar-obs" style="margin-top:8px">Salvar observação</button>
     </div>
+    ${p.anfitriao_id ? "" : `<div class="secao">
+      <h4>Transferir de evento</h4>
+      <p class="pagina-sub" style="margin:0 0 8px">Move para outro evento ativo mantendo o código e a origem.</p>
+      <button class="btn btn-secundario" id="g-transferir">Transferir para outro evento</button>
+    </div>`}
     <div class="secao zona-perigo">
       <p>Remover da lista de participantes.${p.anfitriao_id ? " (O registro na gestão de anfitriões não é apagado.)" : ""}</p>
       <button class="btn btn-perigo" id="g-excluir">Excluir participante</button>
@@ -1188,6 +1267,7 @@ function abrirGavetaDetalhe(id) {
       fecharGaveta();
     } catch (err) { toast(err.message, "erro"); }
   };
+  g.querySelector("#g-transferir")?.addEventListener("click", () => modalTransferir([p]));
   g.querySelector("#g-excluir").onclick = () => excluir(p.id);
 }
 
@@ -1321,6 +1401,8 @@ async function exportar(dados) {
     { rotulo: "Presente", valor: (p) => (p.presente ? "Sim" : "Não") },
     { rotulo: "Check-in", valor: (p) => formatarData(p.checkin_at, true) },
     { rotulo: "Data de cadastro", valor: (p) => formatarData(p.created_at) },
+    { chave: "evento_origem_nome", rotulo: "Evento de origem" },
+    { chave: "codigo_origem", rotulo: "Código de origem" },
     ...camposPersonalizados.filter((c) => c.ativo).map((c) => ({
       rotulo: c.nome,
       valor: (p) => { const v = p.campos_extra?.[c.chave]; return Array.isArray(v) ? v.join(", ") : (v || ""); },
