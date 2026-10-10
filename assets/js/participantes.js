@@ -26,6 +26,16 @@ const el = (id) => document.getElementById(id);
 
 const TIPOS_PADRAO = ["Convidado", "Anfitrião", "Acompanhante", "Comprador", "Membro", "Outro"];
 let TIPOS = [...TIPOS_PADRAO];
+
+// Tipos que o evento oferece: os cadastrados (grupos). Mas evento que só tem o
+// "Anfitrião" (criado sozinho pela Gestão de anfitriões) ainda não configurou
+// tipos próprios — nesse caso os padrões continuam disponíveis, senão o campo
+// Tipo ficaria com uma única opção.
+function tiposDisponiveis(grupos) {
+  const nomes = grupos.map((g) => g.nome);
+  const temProprios = nomes.some((n) => (n || "").trim().toLowerCase() !== "anfitrião");
+  return temProprios ? nomes : [...new Set([...TIPOS_PADRAO, ...nomes])];
+}
 const PAGAMENTOS = ["Gratuito", "Pago", "Convidado", "Cancelado", "Reembolsado"];
 const SITUACOES = ["Confirmado", "Pendente", "Fila de espera", "Pré-inscrito", "Desativado"];
 const FAIXAS = [
@@ -189,7 +199,7 @@ async function carregar() {
       listCamposPersonalizados().catch(() => []),
     ]);
     mesclarColunasCampos();
-    TIPOS = grupos.length ? grupos.map((g) => g.nome) : [...TIPOS_PADRAO];
+    TIPOS = tiposDisponiveis(grupos);
     opcoes(el("f-tipo"), TIPOS, "Todos os tipos");
     opcoes(el("f-pagamento"), PAGAMENTOS, "Todos os pagamentos");
     opcoes(el("f-situacao"), SITUACOES, "Todas (menos desativados)");
@@ -1066,7 +1076,7 @@ async function recarregar() {
   grupos = await listGrupos().catch(() => grupos);
   camposPersonalizados = await listCamposPersonalizados().catch(() => camposPersonalizados);
   mesclarColunasCampos();
-  TIPOS = grupos.length ? grupos.map((g) => g.nome) : [...TIPOS_PADRAO];
+  TIPOS = tiposDisponiveis(grupos);
   participantes = await listParticipantes();
   render();
 }
