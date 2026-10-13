@@ -17,7 +17,7 @@ import {
 } from "./supabase.js";
 import { STATUS_CONVIDADO } from "./config.js";
 import { eventoNome, eventoId } from "./evento.js";
-import { imprimirCracha } from "./cracha.js";
+import { imprimirCracha, imprimirCrachas } from "./cracha.js";
 import { parsearTabela, lerXlsx, baixarXLSX, baixarModeloXLSX, normalizarCab } from "./tabela.js";
 import { abrirEnvioEmail } from "./email.js";
 
@@ -612,6 +612,14 @@ async function acaoEmMassa(acao) {
 
   if (acao === "email") {
     abrirEmailPara(participantes.filter((p) => selecionados.has(p.id)));
+    return;
+  }
+
+  if (acao === "cracha") {
+    const alvos = participantes.filter((p) => selecionados.has(p.id));
+    if (alvos.length > 50 && !confirmar(`Imprimir ${alvos.length} crachás de uma vez? Vai gerar ${alvos.length} etiquetas.`)) return;
+    toast(`Preparando ${alvos.length} crachá(s)…`);
+    await imprimirCrachas(alvos, eventoNome());
     return;
   }
 

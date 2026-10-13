@@ -142,14 +142,24 @@ async function carregarConfig() {
 }
 export function limparConfigCracha() { eventoCache = null; }
 
-export async function imprimirCracha(participante, nomeEvento = "") {
+export const imprimirCracha = (participante, nomeEvento = "") =>
+  imprimirCrachas([participante], nomeEvento);
+
+// Vários crachás numa única impressão: cada um numa página do tamanho da
+// etiqueta (largura × altura configuradas), uma atrás da outra — a impressora
+// de etiquetas tira uma etiqueta por página.
+export async function imprimirCrachas(participantes, nomeEvento = "") {
+  const lista = (participantes || []).filter(Boolean);
+  if (!lista.length) return;
   const ev = await carregarConfig();
   const config = ev?.cracha_config || CRACHA_PADRAO;
   const nome = nomeEvento || ev?.nome || "";
   const box = garantirCaixa();
   const larg = Number(config.largura_mm) || 90;
   const alt = Number(config.altura_mm) || 55;
-  const uri = config.qr !== false ? await qrDataURL(participante.codigo || participante.id || "") : null;
+  const uris = config.qr !== false
+    ? await Promise.all(lista.map((p) => qrDataURL(p.codigo || p.id || "")))
+    : lista.map(() => null);
 
   document.getElementById("cracha-page-style")?.remove();
   const st = document.createElement("style");
@@ -157,28 +167,32 @@ export async function imprimirCracha(participante, nomeEvento = "") {
   st.textContent = `
     @media print {
       @page { size: ${larg}mm ${alt}mm; margin: 0; }
-      html, body { width: ${larg}mm; height: ${alt}mm; margin: 0 !important; padding: 0 !important; background: #fff !important; }
+      html, body { width: ${larg}mm; height: auto; margin: 0 !important; padding: 0 !important; background: #fff !important; }
       body > *:not(#cracha) { display: none !important; }
       #cracha { position: static !important; inset: auto !important; display: block !important; margin: 0 !important; padding: 0 !important; }
       #cracha .cracha-cartao {
         width: ${larg}mm !important; height: ${alt}mm !important; min-height: 0 !important;
         margin: 0 !important; border: none !important; border-radius: 0 !important;
-        overflow: hidden !important; page-break-inside: avoid; page-break-after: avoid;
+        overflow: hidden !important; page-break-inside: avoid; break-inside: avoid;
+        page-break-after: always; break-after: page;
       }
+      #cracha .cracha-cartao:last-child { page-break-after: auto; break-after: auto; }
     }`;
   document.head.appendChild(st);
 
-  box.innerHTML = montarCrachaHtml(participante, nome, config, uri);
+  box.innerHTML = lista.map((p, i) => montarCrachaHtml(p, nome, config, uris[i])).join("");
   box.hidden = false;
 
-  // garante que a imagem do QR já decodificou antes de abrir a impressão
-  const img = box.querySelector(".cracha-qr img");
-  if (img && !img.complete) {
-    await new Promise((res) => { img.onload = img.onerror = res; setTimeout(res, 700); });
-  }
-  try { await img?.decode?.(); } catch {}
+  // garante que as imagens dos QR já decodificaram antes de abrir a impressão
+  const imgs = [...box.querySelectorAll(".cracha-qr img")];
+  await Promise.all(imgs.map(async (img) => {
+    if (!img.complete) {
+      await new Promise((res) => { img.onload = img.onerror = res; setTimeout(res, 700); });
+    }
+    try { await img.decode?.(); } catch {}
+  }));
 
-  const limpar = () => { box.hidden = true; window.removeEventListener("afterprint", limpar); };
+  const limpar = () => { box.hidden = true; box.innerHTML = ""; window.removeEventListener("afterprint", limpar); };
   window.addEventListener("afterprint", limpar);
   window.print();
   setTimeout(limpar, 1000);
