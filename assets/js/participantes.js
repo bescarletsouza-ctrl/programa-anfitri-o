@@ -1135,9 +1135,13 @@ async function modalTransferir(lista) {
         fecharGaveta();
         await recarregar();
       } catch (e) {
-        if (/transferir_participantes|schema cache|does not exist/i.test(e.message || "")) {
+        const msg = e.message || "";
+        // só diz "rode a migração" quando a função realmente não existe; qualquer
+        // outro erro (coluna faltando, evento inativo…) aparece com a mensagem real
+        if (/Could not find the function|function .*transferir_participantes.* does not exist|PGRST202/i.test(msg)) {
           toast("Rode a migração 0034_transferir_participante.sql no Supabase para ativar a transferência.", "erro");
-        } else toast(e.message, "erro");
+        } else toast(msg || "Não foi possível transferir.", "erro");
+        console.error("transferir_participantes:", e);
         return false;
       }
     },
