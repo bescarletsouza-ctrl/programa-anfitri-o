@@ -677,11 +677,20 @@ function modalEstagio(et) {
           <input class="input" name="sla_critico_horas" type="number" min="0" step="any" value="${esc(et?.sla_critico_horas ?? "")}" placeholder="Ex.: 48" /></label>
       </div>
       <span class="cel-tenue" style="font-size:.72rem">O card fica <b>amarelo</b> ao passar do prazo e <b>vermelho</b> ao passar do limite crítico (vazio = o dobro do prazo). Conta horas corridas desde que entrou no estágio. Deixe em branco se o estágio não tem prazo.</span>
+      ${et && divergentesDoEstagio(et).length ? `<div class="aviso" style="margin:8px 0 0">
+        <b>${divergentesDoEstagio(et).length}</b> anfitrião(ões) que já estão neste estágio estão com outra situação que não <b>${esc(et.situacao_alvo)}</b>
+        (a regra só vale pra quem entra no estágio depois de configurada).
+        <button type="button" class="btn btn-secundario btn-sm" id="etapa-aplicar-sit" style="margin-top:8px">Aplicar “${esc(et.situacao_alvo)}” a eles agora</button>
+      </div>` : ""}
       ${et ? `<button type="button" class="btn btn-perigo btn-sm" id="etapa-excluir" style="margin-top:6px">Excluir estágio</button>` : ""}`,
     aoMontar: (root) => {
       root.querySelector("#etapa-excluir")?.addEventListener("click", () => {
         root.closest(".modal-fundo")?.remove();
         excluirEstagio(et);
+      });
+      root.querySelector("#etapa-aplicar-sit")?.addEventListener("click", () => {
+        root.closest(".modal-fundo")?.remove();
+        aplicarSituacaoNoEstagio(et);
       });
     },
     onConfirmar: async (form) => {
@@ -716,6 +725,28 @@ function modalEstagio(et) {
       render();
     },
   });
+}
+
+// quem já está no estágio mas com situação diferente da que o estágio define
+// (desativados ficam de fora: não ressuscita cancelamento)
+function divergentesDoEstagio(et) {
+  if (!et?.situacao_alvo) return [];
+  return lista.filter((a) => a.estagio_id === et.id && a.participante_id && a.vai !== false
+    && situacoes[a.id] && situacoes[a.id] !== et.situacao_alvo && situacoes[a.id] !== "Desativado");
+}
+
+// Aplica de uma vez a situação do estágio a quem já estava nele. Não dispara as
+// integrações (são vários de uma vez e não é uma movimentação).
+async function aplicarSituacaoNoEstagio(et) {
+  const alvos = divergentesDoEstagio(et);
+  if (!alvos.length) { toast("Todos já estão com essa situação.", "ok"); return; }
+  if (!confirmar(`Mudar a situação de ${alvos.length} anfitrião(ões) do estágio "${et.nome}" para ${et.situacao_alvo}? As integrações não serão disparadas.`)) return;
+  try {
+    await atualizarEmLote("participantes", alvos.map((a) => a.participante_id), { situacao: et.situacao_alvo });
+    toast(`${alvos.length} anfitrião(ões) agora em ${et.situacao_alvo}.`, "ok");
+    await recarregarLista();
+    render();
+  } catch (e) { toast(e.message, "erro"); }
 }
 
 async function excluirEstagio(et) {

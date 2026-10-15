@@ -109,6 +109,19 @@ const textoMov = (id) => {
   const m = movs[id];
   return m ? `${m.de ? "Movido para" : "Entrou em"} ${m.para} em ${formatarData(m.em, true)}${m.est ? " (estimado)" : ""}` : "";
 };
+// Situação que a etapa define ao entrar nela (etapa.situacao_alvo), se for
+// diferente da atual do participante. Toda forma de mudar de etapa usa isto.
+const situacaoAlvoDaEtapa = (etapaId, p) => {
+  const alvo = etapas.find((e) => e.id === etapaId)?.situacao_alvo;
+  return alvo && alvo !== situacaoDe(p) ? alvo : null;
+};
+// avisa as integrações (n8n, ActiveCampaign…) que a situação mudou
+const avisarSituacao = (p, situacao) =>
+  dispararIntegracoes("participante.situacao", {
+    participante_id: p.id, situacao,
+    participante: { nome: p.nome, email: p.email, telefone: p.telefone, ingresso: p.ingresso, codigo: p.codigo },
+  });
+
 // prazo da etapa atual: conta desde que o card ENTROU na etapa (última
 // movimentação/entrada registrada) — não desde o cadastro. Sem registro de
 // entrada → nivel "sem-data". Desativado ("não vai") e sem etapa não contam.
@@ -583,9 +596,11 @@ async function editarCelula(id, campo, td) {
   try {
     if (campo === "etapa") {
       const etapaAntes = p.etapa_id;
-      const salvo = await salvar("participantes", { id, etapa_id: escolha || null });
+      const novaSit = situacaoAlvoDaEtapa(escolha || null, p);
+      const salvo = await salvar("participantes", { id, etapa_id: escolha || null, ...(novaSit ? { situacao: novaSit } : {}) });
       Object.assign(p, salvo);
       registrarMovLocal(id, etapaAntes, escolha || null);
+      if (novaSit) avisarSituacao(p, novaSit);
     } else if (campo === "tipo") {
       const salvo = await salvar("participantes", {
         id, tipo: escolha, responsavel_user_id: responsavelAutomatico(escolha, p.ingresso),
@@ -699,7 +714,14 @@ async function acaoEmMassa(acao) {
   if (escolha === null) return;
   try {
     if (acao === "etapa") {
+      // quem muda de etapa recebe a situação que a etapa define (se tiver), como ao arrastar o card
+      const alvo = etapas.find((e) => e.id === escolha)?.situacao_alvo;
+      const mudarSit = alvo ? participantes.filter((p) => selecionados.has(p.id) && situacaoDe(p) !== alvo) : [];
       await atualizarEmLote("participantes", ids, { etapa_id: escolha || null });
+      if (mudarSit.length) {
+        await atualizarEmLote("participantes", mudarSit.map((p) => p.id), { situacao: alvo });
+        mudarSit.forEach((p) => avisarSituacao(p, alvo));
+      }
     } else if (acao === "pagamento" || acao === "situacao") {
       await atualizarEmLote("participantes", ids, { [acao]: escolha });
     } else {
@@ -895,10 +917,7 @@ async function moverEtapa(id, etapaId) {
     renderPipeline();
     if (novaSit) {
       toast(`${p.nome}: situação → ${novaSit}.`, "ok");
-      dispararIntegracoes("participante.situacao", {
-        participante_id: id, situacao: novaSit,
-        participante: { nome: p.nome, email: p.email, telefone: p.telefone, ingresso: p.ingresso, codigo: p.codigo },
-      });
+      avisarSituacao(p, novaSit);
     }
   } catch (err) {
     Object.assign(p, anterior);
@@ -938,11 +957,20 @@ function modalEtapa(et) {
           <input class="input" name="sla_critico_horas" type="number" min="0" step="any" value="${esc(et?.sla_critico_horas ?? "")}" placeholder="Ex.: 48" /></label>
       </div>
       <span class="cel-tenue" style="font-size:.72rem">O card fica <b>amarelo</b> ao passar do prazo e <b>vermelho</b> ao passar do limite crítico (vazio = o dobro do prazo). Conta horas corridas desde que entrou na etapa. Deixe em branco se a etapa não tem prazo.</span>
+      ${et && divergentesDaEtapa(et).length ? `<div class="aviso" style="margin:8px 0 0">
+        <b>${divergentesDaEtapa(et).length}</b> participante(s) que já estão nesta etapa estão com outra situação que não <b>${esc(et.situacao_alvo)}</b>
+        (a regra só vale pra quem entra na etapa depois de configurada).
+        <button type="button" class="btn btn-secundario btn-sm" id="etapa-aplicar-sit" style="margin-top:8px">Aplicar “${esc(et.situacao_alvo)}” a eles agora</button>
+      </div>` : ""}
       ${et ? `<button type="button" class="btn btn-perigo btn-sm" id="etapa-excluir" style="margin-top:6px">Excluir etapa</button>` : ""}`,
     aoMontar: (root) => {
       root.querySelector("#etapa-excluir")?.addEventListener("click", () => {
         root.closest(".modal-fundo")?.remove();
         excluirEtapa(et);
+      });
+      root.querySelector("#etapa-aplicar-sit")?.addEventListener("click", () => {
+        root.closest(".modal-fundo")?.remove();
+        aplicarSituacaoNaEtapa(et);
       });
     },
     onConfirmar: async (form) => {
@@ -976,6 +1004,26 @@ function modalEtapa(et) {
       render();
     },
   });
+}
+
+// quem já está na etapa mas com situação diferente da que a etapa define
+// (desativados — "não vai" — ficam de fora: não ressuscita cancelamento)
+function divergentesDaEtapa(et) {
+  if (!et?.situacao_alvo) return [];
+  return participantes.filter((p) => p.etapa_id === et.id && situacaoDe(p) !== et.situacao_alvo && situacaoDe(p) !== "Desativado");
+}
+
+// Aplica de uma vez a situação da etapa a quem já estava nela. Não dispara as
+// integrações (são vários de uma vez e não é uma movimentação).
+async function aplicarSituacaoNaEtapa(et) {
+  const lista = divergentesDaEtapa(et);
+  if (!lista.length) { toast("Todos já estão com essa situação.", "ok"); return; }
+  if (!confirmar(`Mudar a situação de ${lista.length} participante(s) da etapa "${et.nome}" para ${et.situacao_alvo}? As integrações não serão disparadas.`)) return;
+  try {
+    await atualizarEmLote("participantes", lista.map((p) => p.id), { situacao: et.situacao_alvo });
+    toast(`${lista.length} participante(s) agora em ${et.situacao_alvo}.`, "ok");
+    await recarregar();
+  } catch (e) { toast(e.message, "erro"); }
 }
 
 async function excluirEtapa(et) {
@@ -1135,7 +1183,12 @@ function abrirForm(p) {
         campos_extra: camposExtraDoForm(new FormData(form), p?.campos_extra),
       };
       if (p) reg.id = p.id;
+      // editou a etapa no formulário sem mexer na situação → vale a regra da etapa
+      const novaSitEtapa = p && reg.etapa_id !== (p.etapa_id || null) && reg.situacao === situacaoDe(p)
+        ? situacaoAlvoDaEtapa(reg.etapa_id, p) : null;
+      if (novaSitEtapa) reg.situacao = novaSitEtapa;
       const salvo = await salvar("participantes", reg);
+      if (novaSitEtapa) avisarSituacao(salvo, novaSitEtapa);
       await sincParticipanteAnfitriao(salvo).catch((e) => console.warn(e));
       dispararIntegracoes(p ? "participante.atualizado" : "participante.criado", {
         participante_id: salvo.id,
@@ -1352,8 +1405,11 @@ function abrirGavetaDetalhe(id) {
   };
   g.querySelector("#g-etapa").onchange = async (e) => {
     try {
-      await salvar("participantes", { id: p.id, etapa_id: e.target.value || null });
-      toast("Etapa atualizada.", "ok");
+      const etapaId = e.target.value || null;
+      const novaSit = situacaoAlvoDaEtapa(etapaId, p);
+      await salvar("participantes", { id: p.id, etapa_id: etapaId, ...(novaSit ? { situacao: novaSit } : {}) });
+      if (novaSit) avisarSituacao(p, novaSit);
+      toast(novaSit ? `Etapa atualizada · situação → ${novaSit}.` : "Etapa atualizada.", "ok");
       await recarregar();
     } catch (err) { toast(err.message, "erro"); }
   };
