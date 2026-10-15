@@ -107,13 +107,14 @@ function registrarMovLocal(id, etapaAnterior, etapaNova) {
 }
 const textoMov = (id) => {
   const m = movs[id];
-  return m ? `Movido para ${m.para} em ${formatarData(m.em, true)}` : "";
+  return m ? `${m.de ? "Movido para" : "Entrou em"} ${m.para} em ${formatarData(m.em, true)}` : "";
 };
-// prazo da etapa atual: desde a última movimentação (ou o cadastro, se nunca foi
-// movido). Desativado ("não vai") e sem etapa não contam.
+// prazo da etapa atual: conta desde que o card ENTROU na etapa (última
+// movimentação/entrada registrada) — não desde o cadastro. Sem registro de
+// entrada → nivel "sem-data". Desativado ("não vai") e sem etapa não contam.
 function prazoDe(p) {
   if (!p.etapa_id || situacaoDe(p) === "Desativado") return null;
-  return avaliarPrazo(etapas.find((e) => e.id === p.etapa_id), movs[p.id]?.em || p.created_at);
+  return avaliarPrazo(etapas.find((e) => e.id === p.etapa_id), movs[p.id]?.em);
 }
 let vista = "lista";
 let pagina = 1;
@@ -462,7 +463,7 @@ function celulaHtml(p, c) {
     case "telefone":
       return `<td>${p.telefone ? esc(p.telefone) : `<span class="cel-tenue">—</span>`}</td>`;
     case "etapa":
-      return `<td class="celula-edit" data-campo="etapa" title="Alterar etapa"><span>${esc(nomeEtapa(p.etapa_id))}</span>${movs[p.id] ? `<span class="cel-sub">desde ${esc(formatarData(movs[p.id].em, true))}</span>` : ""}${(() => { const r = prazoDe(p); return r && r.nivel !== "ok" ? `<span class="sla-tag ${r.nivel}" title="Amarelo após ${esc(fmtDuracao(r.prazo))}, vermelho após ${esc(fmtDuracao(r.critico))}">⏱ ${esc(fmtDuracao(r.horas))}</span>` : ""; })()}${lapis()}</td>`;
+      return `<td class="celula-edit" data-campo="etapa" title="Alterar etapa"><span>${esc(nomeEtapa(p.etapa_id))}</span>${movs[p.id] ? `<span class="cel-sub">desde ${esc(formatarData(movs[p.id].em, true))}</span>` : ""}${(() => { const r = prazoDe(p); return r && (r.nivel === "amarelo" || r.nivel === "vermelho") ? `<span class="sla-tag ${r.nivel}" title="Amarelo após ${esc(fmtDuracao(r.prazo))}, vermelho após ${esc(fmtDuracao(r.critico))}">⏱ ${esc(fmtDuracao(r.horas))}</span>` : ""; })()}${lapis()}</td>`;
     case "presenca":
       return `<td>${p.presente
         ? `<span class="badge badge-ok" title="Check-in às ${esc(horaCurta(p.checkin_at))}">Presente</span>`
@@ -846,6 +847,7 @@ function cabecalhoPrazo(et, itens) {
     <span>⏱ prazo <b>${fmtDuracao(Number(et.sla_horas))}</b> · crítico <b>${fmtDuracao(crit)}</b></span>
     ${c.amarelo ? `<span class="sla-tag amarelo">${c.amarelo} em atenção</span>` : ""}
     ${c.vermelho ? `<span class="sla-tag vermelho">${c.vermelho} atrasado${c.vermelho === 1 ? "" : "s"}</span>` : ""}
+    ${c["sem-data"] ? `<span class="sla-tag sem-data" title="Sem registro de quando entraram na etapa — o prazo começa a contar na próxima movimentação">${c["sem-data"]} sem data</span>` : ""}
   </div>`;
 }
 
@@ -1005,7 +1007,7 @@ function cardPart(p) {
   const desativado = situacaoDe(p) === "Desativado";
   const nomeResp = nomeMembro(p.responsavel_user_id);
   const prazo = prazoDe(p);
-  return `<div class="card-part ${desativado ? "card-desativado" : ""} ${prazo && prazo.nivel !== "ok" ? "sla-" + prazo.nivel : ""}" data-id="${p.id}" draggable="true">
+  return `<div class="card-part ${desativado ? "card-desativado" : ""} ${prazo && (prazo.nivel === "amarelo" || prazo.nivel === "vermelho") ? "sla-" + prazo.nivel : ""}" data-id="${p.id}" draggable="true">
     <div class="card-corpo">
       <div style="display:flex;justify-content:space-between;gap:8px;align-items:start">
         <strong style="font-size:.9rem">${esc(p.nome)}</strong>
@@ -1493,7 +1495,7 @@ async function exportar(dados) {
     { chave: "quantidade", rotulo: "Quantidade" },
     { rotulo: "Etapa", valor: (p) => nomeEtapa(p.etapa_id) },
     { rotulo: "Na etapa desde", valor: (p) => (movs[p.id]?.em ? formatarData(movs[p.id].em, true) : "") },
-    { rotulo: "Tempo na etapa (h)", valor: (p) => { const r = prazoDe(p); return r ? Math.round(r.horas * 10) / 10 : ""; } },
+    { rotulo: "Tempo na etapa (h)", valor: (p) => { const r = prazoDe(p); return r && r.horas != null ? Math.round(r.horas * 10) / 10 : ""; } },
     { rotulo: "Prazo da etapa", valor: (p) => { const r = prazoDe(p); return r ? ROTULO_NIVEL[r.nivel] : ""; } },
     { rotulo: "Presente", valor: (p) => (p.presente ? "Sim" : "Não") },
     { rotulo: "Check-in", valor: (p) => formatarData(p.checkin_at, true) },

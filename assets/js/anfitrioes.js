@@ -33,12 +33,13 @@ function registrarMovLocal(id, estagioAnterior, estagioNovo) {
   if ((estagioAnterior || null) === (estagioNovo || null)) return;
   movs[id] = { de: nomeEstagioMov(estagioAnterior), para: nomeEstagioMov(estagioNovo), em: new Date().toISOString() };
 }
-const textoMov = (id) => (movs[id] ? `Movido para ${movs[id].para} em ${formatarData(movs[id].em, true)}` : "");
-// prazo do estágio atual: desde a última movimentação (ou o cadastro, se nunca foi
-// movido). Quem "não vai" e quem está sem estágio não contam.
+const textoMov = (id) => (movs[id] ? `${movs[id].de ? "Movido para" : "Entrou em"} ${movs[id].para} em ${formatarData(movs[id].em, true)}` : "");
+// prazo do estágio atual: conta desde que o card ENTROU no estágio (última
+// movimentação/entrada registrada) — não desde o cadastro. Sem registro de
+// entrada → nivel "sem-data". Quem "não vai" e quem está sem estágio não contam.
 function prazoDe(a) {
   if (!a.estagio_id || a.vai === false) return null;
-  return avaliarPrazo(estagios.find((s) => s.id === a.estagio_id), movs[a.id]?.em || a.created_at);
+  return avaliarPrazo(estagios.find((s) => s.id === a.estagio_id), movs[a.id]?.em);
 }
 const SITUACOES = ["Confirmado", "Pendente", "Fila de espera", "Pré-inscrito", "Desativado"];
 const badgeSituacao = (s) =>
@@ -302,7 +303,7 @@ function celulaHtml(a, c) {
       return `<td class="celula-edit" data-campo="responsavel" title="Alterar responsável">${nome ? esc(nome) : `<span class="cel-tenue">—</span>`}${lapis()}</td>`;
     }
     case "estagio":
-      return `<td class="celula-edit" data-campo="estagio" title="Alterar estágio"><span class="badge badge-neutro">${esc(nomeEstagio(a.estagio_id))}</span>${movs[a.id] ? `<span class="cel-sub">desde ${esc(formatarData(movs[a.id].em, true))}</span>` : ""}${(() => { const r = prazoDe(a); return r && r.nivel !== "ok" ? `<span class="sla-tag ${r.nivel}" title="Amarelo após ${esc(fmtDuracao(r.prazo))}, vermelho após ${esc(fmtDuracao(r.critico))}">⏱ ${esc(fmtDuracao(r.horas))}</span>` : ""; })()}${lapis()}</td>`;
+      return `<td class="celula-edit" data-campo="estagio" title="Alterar estágio"><span class="badge badge-neutro">${esc(nomeEstagio(a.estagio_id))}</span>${movs[a.id] ? `<span class="cel-sub">desde ${esc(formatarData(movs[a.id].em, true))}</span>` : ""}${(() => { const r = prazoDe(a); return r && (r.nivel === "amarelo" || r.nivel === "vermelho") ? `<span class="sla-tag ${r.nivel}" title="Amarelo após ${esc(fmtDuracao(r.prazo))}, vermelho após ${esc(fmtDuracao(r.critico))}">⏱ ${esc(fmtDuracao(r.horas))}</span>` : ""; })()}${lapis()}</td>`;
     case "situacao": {
       const s = situacoes[a.id];
       if (!s) return `<td><span class="cel-tenue" title="Só quem vai ao evento tem situação">—</span></td>`;
@@ -469,7 +470,7 @@ function cardAnf(a) {
   const g = nomeGrupo(a.grupo_id);
   const nomeResp = nomeMembro(a.responsavel_user_id);
   const prazo = prazoDe(a);
-  return `<div class="card-part ${a.vai === false ? "card-desativado" : ""} ${prazo && prazo.nivel !== "ok" ? "sla-" + prazo.nivel : ""}" data-id="${a.id}" draggable="true">
+  return `<div class="card-part ${a.vai === false ? "card-desativado" : ""} ${prazo && (prazo.nivel === "amarelo" || prazo.nivel === "vermelho") ? "sla-" + prazo.nivel : ""}" data-id="${a.id}" draggable="true">
     <div class="card-corpo">
       <div style="display:flex;justify-content:space-between;gap:8px;align-items:start">
         <strong style="font-size:.9rem">${esc(a.nome)}</strong>
@@ -595,6 +596,7 @@ function cabecalhoPrazo(et, itens) {
     <span>⏱ prazo <b>${fmtDuracao(Number(et.sla_horas))}</b> · crítico <b>${fmtDuracao(crit)}</b></span>
     ${c.amarelo ? `<span class="sla-tag amarelo">${c.amarelo} em atenção</span>` : ""}
     ${c.vermelho ? `<span class="sla-tag vermelho">${c.vermelho} atrasado${c.vermelho === 1 ? "" : "s"}</span>` : ""}
+    ${c["sem-data"] ? `<span class="sla-tag sem-data" title="Sem registro de quando entraram no estágio — o prazo começa a contar na próxima movimentação">${c["sem-data"]} sem data</span>` : ""}
   </div>`;
 }
 
@@ -997,7 +999,7 @@ async function exportar(dados) {
     { rotulo: "Estágio", valor: (a) => nomeEstagio(a.estagio_id) },
     { rotulo: "Situação", valor: (a) => situacoes[a.id] || "" },
     { rotulo: "No estágio desde", valor: (a) => (movs[a.id]?.em ? formatarData(movs[a.id].em, true) : "") },
-    { rotulo: "Tempo no estágio (h)", valor: (a) => { const r = prazoDe(a); return r ? Math.round(r.horas * 10) / 10 : ""; } },
+    { rotulo: "Tempo no estágio (h)", valor: (a) => { const r = prazoDe(a); return r && r.horas != null ? Math.round(r.horas * 10) / 10 : ""; } },
     { rotulo: "Prazo do estágio", valor: (a) => { const r = prazoDe(a); return r ? ROTULO_NIVEL[r.nivel] : ""; } },
     { chave: "categoria_convidado", rotulo: "Categoria liberada" },
     { rotulo: "Vai ao evento", valor: (a) => (a.vai !== false ? "Sim" : "Não") },
