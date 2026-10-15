@@ -16,6 +16,7 @@ import {
 import { APP, TIPOS_ANFITRIAO } from "./config.js";
 import { parsearTabela, lerXlsx, baixarXLSX, baixarModeloXLSX } from "./tabela.js";
 import { baixarQR } from "./cracha.js";
+import { avaliarPrazo, fmtDuracao, ROTULO_NIVEL, textoPrazo, resumirPrazos } from "./prazo.js";
 
 const _iniciando = iniciarPagina("anfitrioes");
 const el = (id) => document.getElementById(id);
@@ -33,6 +34,12 @@ function registrarMovLocal(id, estagioAnterior, estagioNovo) {
   movs[id] = { de: nomeEstagioMov(estagioAnterior), para: nomeEstagioMov(estagioNovo), em: new Date().toISOString() };
 }
 const textoMov = (id) => (movs[id] ? `Movido para ${movs[id].para} em ${formatarData(movs[id].em, true)}` : "");
+// prazo do estágio atual: desde a última movimentação (ou o cadastro, se nunca foi
+// movido). Quem "não vai" e quem está sem estágio não contam.
+function prazoDe(a) {
+  if (!a.estagio_id || a.vai === false) return null;
+  return avaliarPrazo(estagios.find((s) => s.id === a.estagio_id), movs[a.id]?.em || a.created_at);
+}
 const SITUACOES = ["Confirmado", "Pendente", "Fila de espera", "Pré-inscrito", "Desativado"];
 const badgeSituacao = (s) =>
   ({ Confirmado: "badge-ok", Pendente: "badge-alerta", "Fila de espera": "badge-info",
@@ -41,7 +48,7 @@ let aba = "todos";
 let vista = "lista";
 const FILTROS_VAZIO = {
   busca: "", grupo: "", categoria: "", categoriaConvidado: "", responsavel: "", estagio: "", presenca: "",
-  situacao: "", dataDe: "", dataAte: "",
+  situacao: "", prazo: "", dataDe: "", dataAte: "",
 };
 const filtros = { ...FILTROS_VAZIO };
 const selecionados = new Set();
@@ -133,7 +140,7 @@ el("busca").addEventListener("input", debounce((e) => { filtros.busca = e.target
 const CAMPO_DO_FILTRO = {
   "f-grupo": "grupo", "f-categoria": "categoria", "f-categoria-convidado": "categoriaConvidado",
   "f-responsavel": "responsavel", "f-estagio": "estagio", "f-presenca": "presenca",
-  "f-situacao": "situacao", "f-data-de": "dataDe", "f-data-ate": "dataAte",
+  "f-situacao": "situacao", "f-prazo": "prazo", "f-data-de": "dataDe", "f-data-ate": "dataAte",
 };
 Object.keys(CAMPO_DO_FILTRO).forEach((id) => {
   el(id).addEventListener("change", (e) => {
@@ -198,6 +205,10 @@ function filtrar() {
     if (filtros.presenca === "sim" && !a.presenca) return false;
     if (filtros.presenca === "nao" && a.presenca) return false;
     if (filtros.situacao && situacoes[a.id] !== filtros.situacao) return false;
+    if (filtros.prazo) {
+      const nivel = prazoDe(a)?.nivel;
+      if (filtros.prazo === "atrasados" ? nivel !== "amarelo" && nivel !== "vermelho" : nivel !== filtros.prazo) return false;
+    }
     if (diaDe && new Date(a.created_at) < diaDe) return false;
     if (diaAte && new Date(a.created_at) > diaAte) return false;
     if (filtros.busca) {
@@ -291,7 +302,7 @@ function celulaHtml(a, c) {
       return `<td class="celula-edit" data-campo="responsavel" title="Alterar responsável">${nome ? esc(nome) : `<span class="cel-tenue">—</span>`}${lapis()}</td>`;
     }
     case "estagio":
-      return `<td class="celula-edit" data-campo="estagio" title="Alterar estágio"><span class="badge badge-neutro">${esc(nomeEstagio(a.estagio_id))}</span>${movs[a.id] ? `<span class="cel-sub">desde ${esc(formatarData(movs[a.id].em, true))}</span>` : ""}${lapis()}</td>`;
+      return `<td class="celula-edit" data-campo="estagio" title="Alterar estágio"><span class="badge badge-neutro">${esc(nomeEstagio(a.estagio_id))}</span>${movs[a.id] ? `<span class="cel-sub">desde ${esc(formatarData(movs[a.id].em, true))}</span>` : ""}${(() => { const r = prazoDe(a); return r && r.nivel !== "ok" ? `<span class="sla-tag ${r.nivel}" title="Amarelo após ${esc(fmtDuracao(r.prazo))}, vermelho após ${esc(fmtDuracao(r.critico))}">⏱ ${esc(fmtDuracao(r.horas))}</span>` : ""; })()}${lapis()}</td>`;
     case "situacao": {
       const s = situacoes[a.id];
       if (!s) return `<td><span class="cel-tenue" title="Só quem vai ao evento tem situação">—</span></td>`;
@@ -457,7 +468,8 @@ function iniciaisDe(nome) {
 function cardAnf(a) {
   const g = nomeGrupo(a.grupo_id);
   const nomeResp = nomeMembro(a.responsavel_user_id);
-  return `<div class="card-part ${a.vai === false ? "card-desativado" : ""}" data-id="${a.id}" draggable="true">
+  const prazo = prazoDe(a);
+  return `<div class="card-part ${a.vai === false ? "card-desativado" : ""} ${prazo && prazo.nivel !== "ok" ? "sla-" + prazo.nivel : ""}" data-id="${a.id}" draggable="true">
     <div class="card-corpo">
       <div style="display:flex;justify-content:space-between;gap:8px;align-items:start">
         <strong style="font-size:.9rem">${esc(a.nome)}</strong>
@@ -475,6 +487,7 @@ function cardAnf(a) {
         <span class="pagina-sub" style="margin:0;font-size:.68rem">${formatarData(a.created_at)}</span>
       </div>
       ${movs[a.id] ? `<div class="pagina-sub" style="margin:6px 0 0;font-size:.68rem" title="${esc(`${movs[a.id].de} → ${movs[a.id].para}`)}">↪ ${esc(textoMov(a.id))}</div>` : ""}
+      ${prazo ? `<div style="margin-top:6px"><span class="sla-tag ${prazo.nivel}" title="${esc(`${ROTULO_NIVEL[prazo.nivel]} — amarelo após ${fmtDuracao(prazo.prazo)}, vermelho após ${fmtDuracao(prazo.critico)}`)}">${esc(textoPrazo(prazo))}</span></div>` : ""}
     </div>
     <select class="select" data-mover style="margin-top:8px;font-size:.8rem;padding:6px 8px">
       <option value="">Sem estágio</option>
@@ -510,6 +523,7 @@ function renderPipeline() {
           </span>` : ""}
         </div>
         ${et?.situacao_alvo ? `<div class="coluna-vinculo" title="Ao mover para cá, a situação vira ${esc(et.situacao_alvo)}">→ situação: <b>${esc(et.situacao_alvo)}</b></div>` : ""}
+        ${et?.sla_horas ? cabecalhoPrazo(et, itens) : ""}
         <div class="coluna-corpo">
           ${ordenados.map((a) => cardAnf(a)).join("") || `<p class="pagina-sub" style="margin:8px 0;font-size:.78rem">—</p>`}
         </div>
@@ -571,6 +585,17 @@ function renderPipeline() {
       if (id) moverEstagio(id, chave === "sem" ? null : chave);
     });
   });
+}
+
+// linha do cabeçalho da coluna: prazo configurado + quantos cards estão em atenção/atrasados
+function cabecalhoPrazo(et, itens) {
+  const c = resumirPrazos(itens.map(prazoDe));
+  const crit = Number(et.sla_critico_horas) > Number(et.sla_horas) ? Number(et.sla_critico_horas) : Number(et.sla_horas) * 2;
+  return `<div class="coluna-vinculo coluna-prazo" title="Amarelo depois de ${fmtDuracao(Number(et.sla_horas))}, vermelho depois de ${fmtDuracao(crit)} no estágio">
+    <span>⏱ prazo <b>${fmtDuracao(Number(et.sla_horas))}</b> · crítico <b>${fmtDuracao(crit)}</b></span>
+    ${c.amarelo ? `<span class="sla-tag amarelo">${c.amarelo} em atenção</span>` : ""}
+    ${c.vermelho ? `<span class="sla-tag vermelho">${c.vermelho} atrasado${c.vermelho === 1 ? "" : "s"}</span>` : ""}
+  </div>`;
 }
 
 async function reordenarEstagio(dragChave, alvoChave) {
@@ -641,6 +666,13 @@ function modalEstagio(et) {
           <option value="">Não mudar</option>
           ${SITUACOES.map((s) => `<option ${s === (et?.situacao_alvo || "") ? "selected" : ""}>${s}</option>`).join("")}
         </select></label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <label class="campo"><span>Prazo neste estágio (horas)</span>
+          <input class="input" name="sla_horas" type="number" min="0" step="any" value="${esc(et?.sla_horas ?? "")}" placeholder="Ex.: 24" /></label>
+        <label class="campo"><span>Vira vermelho após (horas)</span>
+          <input class="input" name="sla_critico_horas" type="number" min="0" step="any" value="${esc(et?.sla_critico_horas ?? "")}" placeholder="Ex.: 48" /></label>
+      </div>
+      <span class="cel-tenue" style="font-size:.72rem">O card fica <b>amarelo</b> ao passar do prazo e <b>vermelho</b> ao passar do limite crítico (vazio = o dobro do prazo). Conta horas corridas desde que entrou no estágio. Deixe em branco se o estágio não tem prazo.</span>
       ${et ? `<button type="button" class="btn btn-perigo btn-sm" id="etapa-excluir" style="margin-top:6px">Excluir estágio</button>` : ""}`,
     aoMontar: (root) => {
       root.querySelector("#etapa-excluir")?.addEventListener("click", () => {
@@ -650,14 +682,26 @@ function modalEstagio(et) {
     },
     onConfirmar: async (form) => {
       const f = Object.fromEntries(new FormData(form));
-      const reg = { nome: f.nome.trim(), ordem: Number(f.ordem) || 0, cor: f.cor || null, situacao_alvo: f.situacao_alvo || null };
+      const horas = (v) => (Number(v) > 0 ? Number(v) : null);
+      const reg = {
+        nome: f.nome.trim(), ordem: Number(f.ordem) || 0, cor: f.cor || null, situacao_alvo: f.situacao_alvo || null,
+        sla_horas: horas(f.sla_horas), sla_critico_horas: horas(f.sla_critico_horas),
+      };
+      if (reg.sla_horas && reg.sla_critico_horas && reg.sla_critico_horas <= reg.sla_horas) {
+        toast("O limite vermelho precisa ser maior que o prazo (ou deixe vazio).", "erro");
+        return false;
+      }
       if (et) reg.id = et.id;
       try {
         await salvar("estagios", reg);
         toast("Estágio salvo.", "ok");
       } catch (e) {
         // coluna nova ainda não existe: salva sem ela e avisa pra rodar a migração
-        if (/situacao_alvo|schema cache|could not find/i.test(e.message || "")) {
+        if (/sla_horas|sla_critico/i.test(e.message || "")) {
+          delete reg.sla_horas; delete reg.sla_critico_horas;
+          await salvar("estagios", reg);
+          toast("Estágio salvo (rode a migração 0038 para ativar o prazo).", "erro");
+        } else if (/situacao_alvo|schema cache|could not find/i.test(e.message || "")) {
           delete reg.situacao_alvo;
           await salvar("estagios", reg);
           toast("Estágio salvo (rode a migração 0033 para vincular a situação).", "erro");
@@ -952,6 +996,9 @@ async function exportar(dados) {
     { rotulo: "Responsável", valor: (a) => nomeMembro(a.responsavel_user_id) },
     { rotulo: "Estágio", valor: (a) => nomeEstagio(a.estagio_id) },
     { rotulo: "Situação", valor: (a) => situacoes[a.id] || "" },
+    { rotulo: "No estágio desde", valor: (a) => (movs[a.id]?.em ? formatarData(movs[a.id].em, true) : "") },
+    { rotulo: "Tempo no estágio (h)", valor: (a) => { const r = prazoDe(a); return r ? Math.round(r.horas * 10) / 10 : ""; } },
+    { rotulo: "Prazo do estágio", valor: (a) => { const r = prazoDe(a); return r ? ROTULO_NIVEL[r.nivel] : ""; } },
     { chave: "categoria_convidado", rotulo: "Categoria liberada" },
     { rotulo: "Vai ao evento", valor: (a) => (a.vai !== false ? "Sim" : "Não") },
     { rotulo: "Presença", valor: (a) => (a.presenca ? "Sim" : "Não") },

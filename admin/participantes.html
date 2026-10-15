@@ -86,6 +86,14 @@
           <div class="filtros-linha">
             <label class="campo"><span>Categoria de ingresso</span><select class="select" id="f-categoria"><option value="">Todas</option></select></label>
             <label class="campo"><span>Etapa do pipeline</span><select class="select" id="f-etapa"><option value="">Todas</option></select></label>
+            <label class="campo"><span>Prazo da etapa</span>
+              <select class="select" id="f-prazo">
+                <option value="">Todos</option>
+                <option value="atrasados">Atenção + atrasados</option>
+                <option value="amarelo">Atenção (passou do prazo)</option>
+                <option value="vermelho">Atrasado (limite crítico)</option>
+                <option value="ok">No prazo</option>
+              </select></label>
             <label class="campo"><span>Atividade</span><select class="select" id="f-atividade"><option value="">Não filtrar</option></select></label>
             <label class="campo"><span>Pres. atividade</span>
               <select class="select" id="f-pres-atv">

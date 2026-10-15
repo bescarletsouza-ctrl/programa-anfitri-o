@@ -21,6 +21,7 @@ import { eventoNome, eventoId } from "./evento.js";
 import { imprimirCracha, imprimirCrachas } from "./cracha.js";
 import { parsearTabela, lerXlsx, baixarXLSX, baixarModeloXLSX, normalizarCab } from "./tabela.js";
 import { abrirEnvioEmail } from "./email.js";
+import { avaliarPrazo, fmtDuracao, ROTULO_NIVEL, textoPrazo, resumirPrazos } from "./prazo.js";
 
 const _iniciando = iniciarPagina("participantes");
 const el = (id) => document.getElementById(id);
@@ -108,12 +109,18 @@ const textoMov = (id) => {
   const m = movs[id];
   return m ? `Movido para ${m.para} em ${formatarData(m.em, true)}` : "";
 };
+// prazo da etapa atual: desde a última movimentação (ou o cadastro, se nunca foi
+// movido). Desativado ("não vai") e sem etapa não contam.
+function prazoDe(p) {
+  if (!p.etapa_id || situacaoDe(p) === "Desativado") return null;
+  return avaliarPrazo(etapas.find((e) => e.id === p.etapa_id), movs[p.id]?.em || p.created_at);
+}
 let vista = "lista";
 let pagina = 1;
 const selecionados = new Set();
 const FILTROS_VAZIO = {
   busca: "", campo: "", situacao: "", tipo: "", pagamento: "", dataDe: "", dataAte: "",
-  categoria: "", etapa: "", atividade: "", presAtv: "", presenca: "", responsavel: "",
+  categoria: "", etapa: "", atividade: "", presAtv: "", presenca: "", responsavel: "", prazo: "",
 };
 const filtros = { ...FILTROS_VAZIO };
 
@@ -269,6 +276,7 @@ function ligarEventos() {
   el("f-atividade").onchange = refiltra((e) => { filtros.atividade = e.target.value; });
   el("f-pres-atv").onchange = refiltra((e) => { filtros.presAtv = e.target.value; });
   el("f-presenca").onchange = refiltra((e) => { filtros.presenca = e.target.value; });
+  el("f-prazo").onchange = refiltra((e) => { filtros.prazo = e.target.value; });
 
   el("btn-toggle-filtros").onclick = () => {
     const painel = el("filtros-painel");
@@ -279,7 +287,7 @@ function ligarEventos() {
   el("btn-limpar-filtros").onclick = () => {
     Object.assign(filtros, FILTROS_VAZIO);
     ["f-busca", "f-campo", "f-situacao", "f-tipo", "f-responsavel", "f-pagamento", "f-data-de", "f-data-ate",
-     "f-categoria", "f-etapa", "f-atividade", "f-pres-atv", "f-presenca"].forEach((id) => (el(id).value = ""));
+     "f-categoria", "f-etapa", "f-atividade", "f-pres-atv", "f-presenca", "f-prazo"].forEach((id) => (el(id).value = ""));
     pagina = 1;
     render();
   };
@@ -327,7 +335,7 @@ function render() {
 
 function filtrosAtivos() {
   return ["busca", "campo", "situacao", "tipo", "responsavel", "pagamento", "dataDe", "dataAte",
-    "categoria", "etapa", "atividade", "presAtv", "presenca"].some((k) => filtros[k]);
+    "categoria", "etapa", "atividade", "presAtv", "presenca", "prazo"].some((k) => filtros[k]);
 }
 
 function filtrarLista(incluirDesativados = false) {
@@ -344,6 +352,10 @@ function filtrarLista(incluirDesativados = false) {
     if (filtros.pagamento && p.pagamento !== filtros.pagamento) return false;
     if (filtros.categoria && (p.ingresso || "").trim() !== filtros.categoria) return false;
     if (filtros.etapa && p.etapa_id !== filtros.etapa) return false;
+    if (filtros.prazo) {
+      const nivel = prazoDe(p)?.nivel;
+      if (filtros.prazo === "atrasados" ? nivel !== "amarelo" && nivel !== "vermelho" : nivel !== filtros.prazo) return false;
+    }
     if (filtros.presenca === "sim" && !p.presente) return false;
     if (filtros.presenca === "nao" && p.presente) return false;
     if (filtros.atividade && filtros.presAtv) {
@@ -450,7 +462,7 @@ function celulaHtml(p, c) {
     case "telefone":
       return `<td>${p.telefone ? esc(p.telefone) : `<span class="cel-tenue">—</span>`}</td>`;
     case "etapa":
-      return `<td class="celula-edit" data-campo="etapa" title="Alterar etapa"><span>${esc(nomeEtapa(p.etapa_id))}</span>${movs[p.id] ? `<span class="cel-sub">desde ${esc(formatarData(movs[p.id].em, true))}</span>` : ""}${lapis()}</td>`;
+      return `<td class="celula-edit" data-campo="etapa" title="Alterar etapa"><span>${esc(nomeEtapa(p.etapa_id))}</span>${movs[p.id] ? `<span class="cel-sub">desde ${esc(formatarData(movs[p.id].em, true))}</span>` : ""}${(() => { const r = prazoDe(p); return r && r.nivel !== "ok" ? `<span class="sla-tag ${r.nivel}" title="Amarelo após ${esc(fmtDuracao(r.prazo))}, vermelho após ${esc(fmtDuracao(r.critico))}">⏱ ${esc(fmtDuracao(r.horas))}</span>` : ""; })()}${lapis()}</td>`;
     case "presenca":
       return `<td>${p.presente
         ? `<span class="badge badge-ok" title="Check-in às ${esc(horaCurta(p.checkin_at))}">Presente</span>`
@@ -760,6 +772,7 @@ function renderPipeline() {
           </span>` : ""}
         </div>
         ${et?.situacao_alvo ? `<div class="coluna-vinculo" title="Ao mover para cá, a situação vira ${esc(et.situacao_alvo)}">→ situação: <b>${esc(et.situacao_alvo)}</b></div>` : ""}
+        ${et?.sla_horas ? cabecalhoPrazo(et, itens) : ""}
         <div class="coluna-corpo">
           ${ordenados.map((p) => cardPart(p)).join("") || `<p class="pagina-sub" style="margin:8px 0;font-size:.78rem">—</p>`}
         </div>
@@ -824,6 +837,17 @@ function renderPipeline() {
 }
 
 let arrastandoEtapaId = null;
+
+// linha do cabeçalho da coluna: prazo configurado + quantos cards estão em atenção/atrasados
+function cabecalhoPrazo(et, itens) {
+  const c = resumirPrazos(itens.map(prazoDe));
+  const crit = Number(et.sla_critico_horas) > Number(et.sla_horas) ? Number(et.sla_critico_horas) : Number(et.sla_horas) * 2;
+  return `<div class="coluna-vinculo coluna-prazo" title="Amarelo depois de ${fmtDuracao(Number(et.sla_horas))}, vermelho depois de ${fmtDuracao(crit)} na etapa">
+    <span>⏱ prazo <b>${fmtDuracao(Number(et.sla_horas))}</b> · crítico <b>${fmtDuracao(crit)}</b></span>
+    ${c.amarelo ? `<span class="sla-tag amarelo">${c.amarelo} em atenção</span>` : ""}
+    ${c.vermelho ? `<span class="sla-tag vermelho">${c.vermelho} atrasado${c.vermelho === 1 ? "" : "s"}</span>` : ""}
+  </div>`;
+}
 
 async function reordenarEtapa(dragChave, alvoChave) {
   if (dragChave === alvoChave || dragChave === "sem") return;
@@ -903,6 +927,13 @@ function modalEtapa(et) {
           <option value="">Não mudar</option>
           ${SITUACOES.map((s) => `<option ${s === (et?.situacao_alvo || "") ? "selected" : ""}>${s}</option>`).join("")}
         </select></label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <label class="campo"><span>Prazo nesta etapa (horas)</span>
+          <input class="input" name="sla_horas" type="number" min="0" step="any" value="${esc(et?.sla_horas ?? "")}" placeholder="Ex.: 24" /></label>
+        <label class="campo"><span>Vira vermelho após (horas)</span>
+          <input class="input" name="sla_critico_horas" type="number" min="0" step="any" value="${esc(et?.sla_critico_horas ?? "")}" placeholder="Ex.: 48" /></label>
+      </div>
+      <span class="cel-tenue" style="font-size:.72rem">O card fica <b>amarelo</b> ao passar do prazo e <b>vermelho</b> ao passar do limite crítico (vazio = o dobro do prazo). Conta horas corridas desde que entrou na etapa. Deixe em branco se a etapa não tem prazo.</span>
       ${et ? `<button type="button" class="btn btn-perigo btn-sm" id="etapa-excluir" style="margin-top:6px">Excluir etapa</button>` : ""}`,
     aoMontar: (root) => {
       root.querySelector("#etapa-excluir")?.addEventListener("click", () => {
@@ -912,12 +943,24 @@ function modalEtapa(et) {
     },
     onConfirmar: async (form) => {
       const f = Object.fromEntries(new FormData(form));
-      const reg = { nome: f.nome.trim(), ordem: Number(f.ordem) || 0, cor: f.cor || null, situacao_alvo: f.situacao_alvo || null };
+      const horas = (v) => (Number(v) > 0 ? Number(v) : null);
+      const reg = {
+        nome: f.nome.trim(), ordem: Number(f.ordem) || 0, cor: f.cor || null, situacao_alvo: f.situacao_alvo || null,
+        sla_horas: horas(f.sla_horas), sla_critico_horas: horas(f.sla_critico_horas),
+      };
+      if (reg.sla_horas && reg.sla_critico_horas && reg.sla_critico_horas <= reg.sla_horas) {
+        toast("O limite vermelho precisa ser maior que o prazo (ou deixe vazio).", "erro");
+        return false;
+      }
       if (et) reg.id = et.id;
       try {
         await salvar("etapas_participante", reg);
       } catch (e) {
-        if (/situacao_alvo|schema cache|could not find/i.test(e.message || "")) {
+        if (/sla_horas|sla_critico/i.test(e.message || "")) {
+          delete reg.sla_horas; delete reg.sla_critico_horas;
+          await salvar("etapas_participante", reg);
+          toast("Etapa salva (rode a migração 0038 para ativar o prazo).", "erro");
+        } else if (/situacao_alvo|schema cache|could not find/i.test(e.message || "")) {
           delete reg.situacao_alvo;
           await salvar("etapas_participante", reg);
           toast("Etapa salva (rode a migração 0013 para vincular a situação).", "erro");
@@ -961,7 +1004,8 @@ function iniciaisDe(nome) {
 function cardPart(p) {
   const desativado = situacaoDe(p) === "Desativado";
   const nomeResp = nomeMembro(p.responsavel_user_id);
-  return `<div class="card-part ${desativado ? "card-desativado" : ""}" data-id="${p.id}" draggable="true">
+  const prazo = prazoDe(p);
+  return `<div class="card-part ${desativado ? "card-desativado" : ""} ${prazo && prazo.nivel !== "ok" ? "sla-" + prazo.nivel : ""}" data-id="${p.id}" draggable="true">
     <div class="card-corpo">
       <div style="display:flex;justify-content:space-between;gap:8px;align-items:start">
         <strong style="font-size:.9rem">${esc(p.nome)}</strong>
@@ -979,6 +1023,7 @@ function cardPart(p) {
         <span class="pagina-sub" style="margin:0;font-size:.68rem">${formatarData(p.created_at)}</span>
       </div>
       ${movs[p.id] ? `<div class="pagina-sub" style="margin:6px 0 0;font-size:.68rem" title="${esc(`${movs[p.id].de} → ${movs[p.id].para}`)}">↪ ${esc(textoMov(p.id))}</div>` : ""}
+      ${prazo ? `<div style="margin-top:6px"><span class="sla-tag ${prazo.nivel}" title="${esc(`${ROTULO_NIVEL[prazo.nivel]} — amarelo após ${fmtDuracao(prazo.prazo)}, vermelho após ${fmtDuracao(prazo.critico)}`)}">${esc(textoPrazo(prazo))}</span></div>` : ""}
     </div>
     <select class="select" data-mover style="margin-top:8px;font-size:.8rem;padding:6px 8px">
       <option value="">Sem etapa</option>
@@ -1447,6 +1492,9 @@ async function exportar(dados) {
     { chave: "pagamento", rotulo: "Pagamento" },
     { chave: "quantidade", rotulo: "Quantidade" },
     { rotulo: "Etapa", valor: (p) => nomeEtapa(p.etapa_id) },
+    { rotulo: "Na etapa desde", valor: (p) => (movs[p.id]?.em ? formatarData(movs[p.id].em, true) : "") },
+    { rotulo: "Tempo na etapa (h)", valor: (p) => { const r = prazoDe(p); return r ? Math.round(r.horas * 10) / 10 : ""; } },
+    { rotulo: "Prazo da etapa", valor: (p) => { const r = prazoDe(p); return r ? ROTULO_NIVEL[r.nivel] : ""; } },
     { rotulo: "Presente", valor: (p) => (p.presente ? "Sim" : "Não") },
     { rotulo: "Check-in", valor: (p) => formatarData(p.checkin_at, true) },
     { rotulo: "Data de cadastro", valor: (p) => formatarData(p.created_at) },
