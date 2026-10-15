@@ -6,7 +6,7 @@
 // =============================================================================
 import {
   iniciarPagina, esc, debounce, formatarData, abrirModal, abrirGaveta,
-  fecharGaveta, toast, confirmar, icone, abrirMenu, normalizarFaturamento,
+  fecharGaveta, toast, confirmar, icone, abrirMenu, normalizarFaturamento, htmlHistoricoMov,
 } from "./ui.js";
 import {
   listParticipantes, listEtapasParticipante, listAtividades, listCheckins, listTiposIngresso, listGrupos,
@@ -14,6 +14,7 @@ import {
   salvar, remover, inserirLote, atualizarEmLote, removerEmLote, registrarCheckin, listarEquipe,
   sincParticipanteAnfitriao, desvincularAoExcluirParticipante, dispararIntegracoes, definirStatusConvidado,
   listEventos, eventoAtivo, transferirParticipantes,
+  listUltimasMovimentacoes, listMovimentacoes,
 } from "./supabase.js";
 import { STATUS_CONVIDADO } from "./config.js";
 import { eventoNome, eventoId } from "./evento.js";
@@ -95,6 +96,18 @@ const normSituacao = (v) => {
 
 let CTX = null;
 let participantes = [], etapas = [], atividades = [], checkins = [], tiposIngresso = [], grupos = [], membrosOrg = [], camposPersonalizados = [];
+// última movimentação de etapa de cada participante: { [id]: { de, para, em } }
+let movs = {};
+const nomeEtapaMov = (id) => etapas.find((e) => e.id === id)?.nome || "Sem etapa";
+// atualiza na hora o que o card mostra, sem esperar recarregar (o banco já gravou por trigger)
+function registrarMovLocal(id, etapaAnterior, etapaNova) {
+  if ((etapaAnterior || null) === (etapaNova || null)) return;
+  movs[id] = { de: nomeEtapaMov(etapaAnterior), para: nomeEtapaMov(etapaNova), em: new Date().toISOString() };
+}
+const textoMov = (id) => {
+  const m = movs[id];
+  return m ? `Movido para ${m.para} em ${formatarData(m.em, true)}` : "";
+};
 let vista = "lista";
 let pagina = 1;
 const selecionados = new Set();
@@ -190,13 +203,14 @@ _iniciando.then((ctx) => { if (ctx) { CTX = ctx; carregar(ctx); } });
 
 async function carregar() {
   try {
-    [participantes, etapas, atividades, checkins, tiposIngresso, grupos, membrosOrg, camposPersonalizados] = await Promise.all([
+    [participantes, etapas, atividades, checkins, tiposIngresso, grupos, membrosOrg, camposPersonalizados, movs] = await Promise.all([
       listParticipantes(), listEtapasParticipante(),
       listAtividades().catch(() => []), listCheckins().catch(() => []),
       listTiposIngresso().catch(() => []),
       listGrupos().catch(() => []),
       CTX?.org?.id ? listarEquipe(CTX.org.id).catch(() => []) : Promise.resolve([]),
       listCamposPersonalizados().catch(() => []),
+      listUltimasMovimentacoes("participante"),
     ]);
     mesclarColunasCampos();
     TIPOS = tiposDisponiveis(grupos);
@@ -436,7 +450,7 @@ function celulaHtml(p, c) {
     case "telefone":
       return `<td>${p.telefone ? esc(p.telefone) : `<span class="cel-tenue">—</span>`}</td>`;
     case "etapa":
-      return `<td class="celula-edit" data-campo="etapa" title="Alterar etapa"><span>${esc(nomeEtapa(p.etapa_id))}</span>${lapis()}</td>`;
+      return `<td class="celula-edit" data-campo="etapa" title="Alterar etapa"><span>${esc(nomeEtapa(p.etapa_id))}</span>${movs[p.id] ? `<span class="cel-sub">desde ${esc(formatarData(movs[p.id].em, true))}</span>` : ""}${lapis()}</td>`;
     case "presenca":
       return `<td>${p.presente
         ? `<span class="badge badge-ok" title="Check-in às ${esc(horaCurta(p.checkin_at))}">Presente</span>`
@@ -553,8 +567,10 @@ async function editarCelula(id, campo, td) {
   td.classList.add("salvando");
   try {
     if (campo === "etapa") {
+      const etapaAntes = p.etapa_id;
       const salvo = await salvar("participantes", { id, etapa_id: escolha || null });
       Object.assign(p, salvo);
+      registrarMovLocal(id, etapaAntes, escolha || null);
     } else if (campo === "tipo") {
       const salvo = await salvar("participantes", {
         id, tipo: escolha, responsavel_user_id: responsavelAutomatico(escolha, p.ingresso),
@@ -847,6 +863,8 @@ async function moverEtapa(id, etapaId) {
   renderPipeline();
   try {
     await salvar("participantes", { id, etapa_id: etapaId, ...(novaSit ? { situacao: novaSit } : {}) });
+    registrarMovLocal(id, anterior.etapa_id, etapaId);
+    renderPipeline();
     if (novaSit) {
       toast(`${p.nome}: situação → ${novaSit}.`, "ok");
       dispararIntegracoes("participante.situacao", {
@@ -960,6 +978,7 @@ function cardPart(p) {
         ${p.presente ? `<span class="badge badge-ok" style="font-size:.65rem">Presente</span>` : ""}
         <span class="pagina-sub" style="margin:0;font-size:.68rem">${formatarData(p.created_at)}</span>
       </div>
+      ${movs[p.id] ? `<div class="pagina-sub" style="margin:6px 0 0;font-size:.68rem" title="${esc(`${movs[p.id].de} → ${movs[p.id].para}`)}">↪ ${esc(textoMov(p.id))}</div>` : ""}
     </div>
     <select class="select" data-mover style="margin-top:8px;font-size:.8rem;padding:6px 8px">
       <option value="">Sem etapa</option>
@@ -1086,6 +1105,7 @@ async function recarregar() {
   mesclarColunasCampos();
   TIPOS = tiposDisponiveis(grupos);
   participantes = await listParticipantes();
+  movs = await listUltimasMovimentacoes("participante");
   render();
 }
 
@@ -1216,6 +1236,10 @@ function abrirGavetaDetalhe(id) {
         ${etapas.map((e) => `<option value="${e.id}" ${e.id === p.etapa_id ? "selected" : ""}>${esc(e.nome)}</option>`).join("")}</select>
     </div>
     <div class="secao">
+      <h4>Movimentações no pipeline</h4>
+      <div id="g-historico-mov"><p class="pagina-sub" style="margin:0">Carregando…</p></div>
+    </div>
+    <div class="secao">
       <h4>Responsável</h4>
       <select class="select" id="g-resp"><option value="">—</option>
         ${membrosOrg.map((m) => `<option value="${esc(m.user_id)}" ${m.user_id === p.responsavel_user_id ? "selected" : ""}>${esc(m.nome || m.email)}</option>`).join("")}</select>
@@ -1236,6 +1260,9 @@ function abrirGavetaDetalhe(id) {
     </div>`
   );
   const g = document.getElementById("gaveta");
+  listMovimentacoes("participante", p.id)
+    .then((lista) => { const box = g.querySelector("#g-historico-mov"); if (box) box.innerHTML = htmlHistoricoMov(lista, nomeMembro); })
+    .catch(() => { const box = g.querySelector("#g-historico-mov"); if (box) box.innerHTML = `<p class="pagina-sub" style="margin:0">Histórico indisponível (rode a migração 0037).</p>`; });
   g.querySelector("#g-editar").onclick = () => { fecharGaveta(); abrirForm(p); };
   g.querySelector("#g-presenca").onclick = async () => {
     try {

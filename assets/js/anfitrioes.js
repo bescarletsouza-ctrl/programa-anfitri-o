@@ -3,7 +3,7 @@
 // =============================================================================
 import {
   iniciarPagina, esc, debounce, formatarData, slugify, gerarSlugAnfitriao, telParaWhatsApp,
-  abrirModal, abrirGaveta, fecharGaveta, abrirMenu, toast, confirmar, icone,
+  abrirModal, abrirGaveta, fecharGaveta, abrirMenu, toast, confirmar, icone, htmlHistoricoMov,
 } from "./ui.js";
 import {
   listEstagios, listGrupos, listAnfitrioes, listarEquipe, listTiposIngresso,
@@ -11,6 +11,7 @@ import {
   reSincCategoriaAnfitriao, reSincResponsavelAnfitriao,
   sincAnfitriaoParticipante, desvincularAoExcluirAnfitriao,
   listSituacaoDosAnfitrioes, definirSituacaoDoAnfitriao,
+  listUltimasMovimentacoes, listMovimentacoes,
 } from "./supabase.js";
 import { APP, TIPOS_ANFITRIAO } from "./config.js";
 import { parsearTabela, lerXlsx, baixarXLSX, baixarModeloXLSX } from "./tabela.js";
@@ -23,6 +24,15 @@ let CTX = null;
 let estagios = [], grupos = [], membrosOrg = [], tiposIngresso = [], lista = [];
 // situação do anfitrião = a do participante ligado a ele: { [anfitriao_id]: situacao }
 let situacoes = {};
+// última movimentação de estágio de cada anfitrião: { [id]: { de, para, em } }
+let movs = {};
+const nomeEstagioMov = (id) => estagios.find((s) => s.id === id)?.nome || "Sem estágio";
+// atualiza na hora o que o card mostra (o banco já gravou por trigger)
+function registrarMovLocal(id, estagioAnterior, estagioNovo) {
+  if ((estagioAnterior || null) === (estagioNovo || null)) return;
+  movs[id] = { de: nomeEstagioMov(estagioAnterior), para: nomeEstagioMov(estagioNovo), em: new Date().toISOString() };
+}
+const textoMov = (id) => (movs[id] ? `Movido para ${movs[id].para} em ${formatarData(movs[id].em, true)}` : "");
 const SITUACOES = ["Confirmado", "Pendente", "Fila de espera", "Pré-inscrito", "Desativado"];
 const badgeSituacao = (s) =>
   ({ Confirmado: "badge-ok", Pendente: "badge-alerta", "Fila de espera": "badge-info",
@@ -79,12 +89,13 @@ _iniciando.then((ctx) => { if (ctx) { CTX = ctx; carregar(ctx); } });
 
 async function carregar() {
   try {
-    [estagios, grupos, membrosOrg, tiposIngresso, lista, situacoes] = await Promise.all([
+    [estagios, grupos, membrosOrg, tiposIngresso, lista, situacoes, movs] = await Promise.all([
       listEstagios(), listGrupos(),
       CTX?.org?.id ? listarEquipe(CTX.org.id).catch(() => []) : Promise.resolve([]),
       listTiposIngresso().catch(() => []),
       listAnfitrioes(),
       listSituacaoDosAnfitrioes().catch(() => ({})),
+      listUltimasMovimentacoes("anfitriao"),
     ]);
     el("f-situacao").innerHTML = `<option value="">Todas as situações</option>` +
       SITUACOES.map((s) => `<option>${esc(s)}</option>`).join("");
@@ -105,9 +116,10 @@ async function carregar() {
 }
 
 async function recarregarLista() {
-  [lista, situacoes] = await Promise.all([
+  [lista, situacoes, movs] = await Promise.all([
     listAnfitrioes(),
     listSituacaoDosAnfitrioes().catch(() => situacoes),
+    listUltimasMovimentacoes("anfitriao"),
   ]);
 }
 
@@ -279,7 +291,7 @@ function celulaHtml(a, c) {
       return `<td class="celula-edit" data-campo="responsavel" title="Alterar responsável">${nome ? esc(nome) : `<span class="cel-tenue">—</span>`}${lapis()}</td>`;
     }
     case "estagio":
-      return `<td class="celula-edit" data-campo="estagio" title="Alterar estágio"><span class="badge badge-neutro">${esc(nomeEstagio(a.estagio_id))}</span>${lapis()}</td>`;
+      return `<td class="celula-edit" data-campo="estagio" title="Alterar estágio"><span class="badge badge-neutro">${esc(nomeEstagio(a.estagio_id))}</span>${movs[a.id] ? `<span class="cel-sub">desde ${esc(formatarData(movs[a.id].em, true))}</span>` : ""}${lapis()}</td>`;
     case "situacao": {
       const s = situacoes[a.id];
       if (!s) return `<td><span class="cel-tenue" title="Só quem vai ao evento tem situação">—</span></td>`;
@@ -346,8 +358,10 @@ async function editarCelula(id, campo, td) {
       Object.assign(a, atualizado);
       await reSincResponsavelAnfitriao(id, escolha || null).catch(() => {});
     } else if (campo === "estagio") {
+      const estagioAntes = a.estagio_id;
       const atualizado = await salvar("anfitrioes", { id, estagio_id: escolha || null });
       Object.assign(a, atualizado);
+      registrarMovLocal(id, estagioAntes, escolha || null);
       const novaSit = await aplicarSituacaoDoEstagio(a, escolha || null);
       if (novaSit) toast(`${a.nome}: situação → ${novaSit}.`, "ok");
     } else if (campo === "situacao") {
@@ -460,6 +474,7 @@ function cardAnf(a) {
         ${a.presenca ? `<span class="badge badge-ok" style="font-size:.65rem">Presente</span>` : ""}
         <span class="pagina-sub" style="margin:0;font-size:.68rem">${formatarData(a.created_at)}</span>
       </div>
+      ${movs[a.id] ? `<div class="pagina-sub" style="margin:6px 0 0;font-size:.68rem" title="${esc(`${movs[a.id].de} → ${movs[a.id].para}`)}">↪ ${esc(textoMov(a.id))}</div>` : ""}
     </div>
     <select class="select" data-mover style="margin-top:8px;font-size:.8rem;padding:6px 8px">
       <option value="">Sem estágio</option>
@@ -592,8 +607,10 @@ async function moverEstagio(id, estagioId) {
   renderPipeline();
   try {
     await salvar("anfitrioes", { id, estagio_id: estagioId });
+    registrarMovLocal(id, anterior, estagioId);
     const novaSit = await aplicarSituacaoDoEstagio(a, estagioId);
-    if (novaSit) { toast(`${a.nome}: situação → ${novaSit}.`, "ok"); renderPipeline(); }
+    if (novaSit) toast(`${a.nome}: situação → ${novaSit}.`, "ok");
+    renderPipeline();
   } catch (err) {
     a.estagio_id = anterior;
     renderPipeline();
@@ -995,6 +1012,8 @@ async function abrirGavetaDetalhe(id) {
       <label class="campo"><span>Estágio do funil</span>
         <select class="select" id="d-estagio"><option value="">—</option>
           ${estagios.map((s) => `<option value="${s.id}" ${s.id === a.estagio_id ? "selected" : ""}>${esc(s.nome)}</option>`).join("")}</select></label>
+      <div class="campo"><span>Movimentações no funil</span>
+        <div id="d-historico-mov"><p class="pagina-sub" style="margin:0">Carregando…</p></div></div>
       ${situacoes[a.id] ? `<label class="campo"><span>Situação</span>
         <select class="select" id="d-situacao">
           ${SITUACOES.map((s) => `<option ${s === situacoes[a.id] ? "selected" : ""}>${s}</option>`).join("")}</select></label>` : ""}
@@ -1034,6 +1053,9 @@ async function abrirGavetaDetalhe(id) {
   );
 
   const g = document.getElementById("gaveta");
+  listMovimentacoes("anfitriao", a.id)
+    .then((hist) => { const box = g.querySelector("#d-historico-mov"); if (box) box.innerHTML = htmlHistoricoMov(hist, nomeMembro); })
+    .catch(() => { const box = g.querySelector("#d-historico-mov"); if (box) box.innerHTML = `<p class="pagina-sub" style="margin:0">Histórico indisponível (rode a migração 0037).</p>`; });
   const atualizarRespGaveta = () => {
     const r = responsavelAutomatico(g.querySelector("#d-grupo").value, g.querySelector("#d-ingresso").value || null);
     if (r) g.querySelector("#d-resp").value = r;

@@ -240,6 +240,19 @@ function montarTopbarMobile(sidebar) {
 /* ---- Datas (fuso Brasília) ------------------------------------------------ */
 const TZ = "America/Sao_Paulo";
 
+// Lista do histórico de movimentações no pipeline (gaveta). lista vem de
+// listMovimentacoes(); nomeDe(uid) devolve o nome de quem mexeu (ou vazio).
+export function htmlHistoricoMov(lista, nomeDe = () => "") {
+  if (!lista?.length) return `<p class="pagina-sub" style="margin:0">Nenhuma movimentação registrada ainda.</p>`;
+  return lista.map((m) => {
+    const quem = m.user_id ? nomeDe(m.user_id) : "";
+    return `<div style="padding:7px 0;border-bottom:1px solid var(--cinza-100);font-size:.84rem">
+      <div><span class="cel-tenue">${esc(m.de_nome || "—")}</span> → <b>${esc(m.para_nome || "—")}</b></div>
+      <div class="pagina-sub" style="margin:2px 0 0;font-size:.72rem">${esc(formatarData(m.em, true))}${quem ? ` · por ${esc(quem)}` : ""}</div>
+    </div>`;
+  }).join("");
+}
+
 export function formatarData(iso, comHora = false) {
   if (!iso) return "—";
   const d = new Date(iso);

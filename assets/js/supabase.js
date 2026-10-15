@@ -360,6 +360,19 @@ export async function desvincularAoExcluirAnfitriao(anfitriao) {
   if (p?.origem_anfitriao) await supabase.from("participantes").delete().eq("id", pid);
 }
 
+// Última movimentação de etapa/estágio de cada registro do evento:
+// { [registro_id]: { de, para, em } }. tipo: "participante" | "anfitriao".
+// Sem a migração 0037 devolve {} (o card só não mostra a data).
+export const listUltimasMovimentacoes = (tipo, eid) =>
+  supabase.rpc("ultimas_movimentacoes", { p_evento: ev(eid), p_tipo: tipo })
+    .then((r) => (r.error ? {} : (r.data || {})), () => ({}));
+
+// Histórico completo de um registro (mais recente primeiro).
+export const listMovimentacoes = (tipo, registroId) =>
+  supabase.from("movimentacoes_pipeline").select("*")
+    .eq("registro_tipo", tipo).eq("registro_id", registroId)
+    .order("em", { ascending: false }).limit(50).then(ok);
+
 // Evento "ativo" = não desativado e com data ainda não passada (ou sem data).
 // Mesma regra da função transferir_participantes no banco.
 export function eventoAtivo(e) {
