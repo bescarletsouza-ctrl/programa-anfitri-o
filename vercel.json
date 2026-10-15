@@ -1,6 +1,7 @@
 {
   "rewrites": [
     { "source": "/convite-:slug", "destination": "/convite.html" },
-    { "source": "/painel-:slug", "destination": "/painel.html" }
+    { "source": "/painel-:slug", "destination": "/painel.html" },
+    { "source": "/api/v1/:path*", "destination": "https://xiuhqkvkiexmbgwyvunr.supabase.co/functions/v1/api/:path*" }
   ]
 }

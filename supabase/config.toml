@@ -27,6 +27,12 @@ verify_jwt = false
 [functions.plataforma]
 verify_jwt = false
 
+# API de leitura (GET /api/v1/eventos e /participantes). Autenticada por token
+# somente-leitura próprio (Bearer wev_…, guardado como hash em api_tokens), não
+# por JWT do Supabase.
+[functions.api]
+verify_jwt = false
+
 # Serve os dados das páginas públicas (convite/painel/status) por slug/id, sem
 # expor o banco pela chave anon.
 [functions.publico]

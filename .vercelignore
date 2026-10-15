@@ -4,4 +4,5 @@
 # conseguia ler /supabase/migrations/*.sql, /supabase/config.toml e até o
 # código-fonte das Edge Functions.
 supabase/
+docs/
 README.md
