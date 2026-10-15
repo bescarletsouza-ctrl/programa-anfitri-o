@@ -107,14 +107,16 @@ function registrarMovLocal(id, etapaAnterior, etapaNova) {
 }
 const textoMov = (id) => {
   const m = movs[id];
-  return m ? `${m.de ? "Movido para" : "Entrou em"} ${m.para} em ${formatarData(m.em, true)}` : "";
+  return m ? `${m.de ? "Movido para" : "Entrou em"} ${m.para} em ${formatarData(m.em, true)}${m.est ? " (estimado)" : ""}` : "";
 };
 // prazo da etapa atual: conta desde que o card ENTROU na etapa (última
 // movimentação/entrada registrada) — não desde o cadastro. Sem registro de
 // entrada → nivel "sem-data". Desativado ("não vai") e sem etapa não contam.
 function prazoDe(p) {
   if (!p.etapa_id || situacaoDe(p) === "Desativado") return null;
-  return avaliarPrazo(etapas.find((e) => e.id === p.etapa_id), movs[p.id]?.em);
+  const r = avaliarPrazo(etapas.find((e) => e.id === p.etapa_id), movs[p.id]?.em);
+  if (r) r.estimada = !!movs[p.id]?.est;
+  return r;
 }
 let vista = "lista";
 let pagina = 1;

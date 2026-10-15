@@ -248,7 +248,7 @@ export function htmlHistoricoMov(lista, nomeDe = () => "") {
     const quem = m.user_id ? nomeDe(m.user_id) : "";
     return `<div style="padding:7px 0;border-bottom:1px solid var(--cinza-100);font-size:.84rem">
       <div>${m.de_nome ? `<span class="cel-tenue">${esc(m.de_nome)}</span> → ` : `<span class="cel-tenue">Entrou em</span> `}<b>${esc(m.para_nome || "—")}</b></div>
-      <div class="pagina-sub" style="margin:2px 0 0;font-size:.72rem">${esc(formatarData(m.em, true))}${quem ? ` · por ${esc(quem)}` : ""}</div>
+      <div class="pagina-sub" style="margin:2px 0 0;font-size:.72rem">${esc(formatarData(m.em, true))}${m.estimada ? " · data estimada (anterior ao registro de movimentações)" : ""}${quem ? ` · por ${esc(quem)}` : ""}</div>
     </div>`;
   }).join("");
 }

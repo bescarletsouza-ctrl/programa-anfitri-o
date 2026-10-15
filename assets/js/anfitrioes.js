@@ -33,13 +33,15 @@ function registrarMovLocal(id, estagioAnterior, estagioNovo) {
   if ((estagioAnterior || null) === (estagioNovo || null)) return;
   movs[id] = { de: nomeEstagioMov(estagioAnterior), para: nomeEstagioMov(estagioNovo), em: new Date().toISOString() };
 }
-const textoMov = (id) => (movs[id] ? `${movs[id].de ? "Movido para" : "Entrou em"} ${movs[id].para} em ${formatarData(movs[id].em, true)}` : "");
+const textoMov = (id) => (movs[id] ? `${movs[id].de ? "Movido para" : "Entrou em"} ${movs[id].para} em ${formatarData(movs[id].em, true)}${movs[id].est ? " (estimado)" : ""}` : "");
 // prazo do estágio atual: conta desde que o card ENTROU no estágio (última
 // movimentação/entrada registrada) — não desde o cadastro. Sem registro de
 // entrada → nivel "sem-data". Quem "não vai" e quem está sem estágio não contam.
 function prazoDe(a) {
   if (!a.estagio_id || a.vai === false) return null;
-  return avaliarPrazo(estagios.find((s) => s.id === a.estagio_id), movs[a.id]?.em);
+  const r = avaliarPrazo(estagios.find((s) => s.id === a.estagio_id), movs[a.id]?.em);
+  if (r) r.estimada = !!movs[a.id]?.est;
+  return r;
 }
 const SITUACOES = ["Confirmado", "Pendente", "Fila de espera", "Pré-inscrito", "Desativado"];
 const badgeSituacao = (s) =>

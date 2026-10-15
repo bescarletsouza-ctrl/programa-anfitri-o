@@ -38,10 +38,11 @@ export function fmtDuracao(horas) {
 export const ROTULO_NIVEL = { ok: "No prazo", amarelo: "Atenção", vermelho: "Atrasado", "sem-data": "Sem data de entrada" };
 
 // texto curto pro card: "⏱ 26h · prazo 24h" / "⏱ sem data de entrada"
+// (r.estimada: a data de entrada foi reconstruída, não registrada → "~26h")
 export function textoPrazo(r) {
   if (!r) return "";
   if (r.nivel === "sem-data") return "⏱ sem data de entrada";
-  return `⏱ ${fmtDuracao(r.horas)} · prazo ${fmtDuracao(r.prazo)}`;
+  return `⏱ ${r.estimada ? "~" : ""}${fmtDuracao(r.horas)} · prazo ${fmtDuracao(r.prazo)}`;
 }
 
 // conta cards por nível pro cabeçalho da coluna
