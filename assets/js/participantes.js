@@ -709,6 +709,7 @@ async function acaoEmMassa(acao) {
   if (acao === "tipo") itens = TIPOS.map((t) => ({ valor: t, rotulo: t }));
   else if (acao === "situacao") itens = SITUACOES.map((t) => ({ valor: t, rotulo: t }));
   else if (acao === "pagamento") itens = PAGAMENTOS.map((t) => ({ valor: t, rotulo: t }));
+  else if (acao === "categoria") itens = [{ valor: "", rotulo: "— sem tipo —" }, ...categoriasIngresso().map((c) => ({ valor: c, rotulo: c }))];
   else itens = [{ valor: "", rotulo: "Sem etapa" }, ...etapas.map((e) => ({ valor: e.id, rotulo: e.nome }))];
   const escolha = await abrirMenu(btn, itens);
   if (escolha === null) return;
@@ -722,6 +723,22 @@ async function acaoEmMassa(acao) {
         await atualizarEmLote("participantes", mudarSit.map((p) => p.id), { situacao: alvo });
         mudarSit.forEach((p) => avisarSituacao(p, alvo));
       }
+    } else if (acao === "categoria") {
+      // categoria = tipo de ingresso do participante
+      const categoria = escolha || null;
+      const alvos = participantes.filter((p) => selecionados.has(p.id));
+      await atualizarEmLote("participantes", ids, { ingresso: categoria });
+      // responsável automático da categoria/tipo: só preenche quando existe um e
+      // difere do atual — nunca apaga um responsável já definido à mão
+      const porResp = new Map();
+      alvos.forEach((p) => {
+        const r = responsavelAutomatico(p.tipo, categoria);
+        if (r && r !== p.responsavel_user_id) porResp.set(r, [...(porResp.get(r) || []), p.id]);
+      });
+      for (const [r, lote] of porResp) await atualizarEmLote("participantes", lote, { responsavel_user_id: r });
+      // quem também é anfitrião: a categoria dele acompanha (senão volta ao salvar o anfitrião)
+      const anfs = alvos.filter((p) => p.anfitriao_id).map((p) => p.anfitriao_id);
+      if (anfs.length) await atualizarEmLote("anfitrioes", anfs, { ingresso: categoria }).catch((e) => console.warn(e));
     } else if (acao === "pagamento" || acao === "situacao") {
       await atualizarEmLote("participantes", ids, { [acao]: escolha });
     } else {
