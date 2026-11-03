@@ -501,6 +501,7 @@ function cardAnf(a) {
 
 function renderPipeline() {
   const dados = filtrar();
+  el("btn-toggle-filtros").classList.toggle("ativo", filtrosAtivos());
   el("contador").textContent = `Exibindo ${dados.length} de ${lista.length} anfitriões`;
 
   const semEstagio = dados.filter((a) => !a.estagio_id);

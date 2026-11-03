@@ -379,7 +379,6 @@ function renderRanking(ranking, meuId) {
     .map(
       (r, i) => `<div class="rank-linha ${r.id === meuId ? "eu" : ""}">
         <span><b style="color:var(--texto-suave);margin-right:8px">${i + 1}º</b>${esc(r.nome)}</span>
-        <span style="font-weight:700">${r.aprovados}</span>
       </div>`
     )
     .join("");
