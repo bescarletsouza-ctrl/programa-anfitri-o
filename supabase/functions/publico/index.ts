@@ -26,6 +26,15 @@ const svc = () =>
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
+// evento do painel do anfitrião. "marcos_visiveis" (migração 0041) limita
+// quantos prêmios aparecem na jornada; se a coluna ainda não existe, cai pro
+// select antigo — assim a ordem de "rodar migração / publicar função" não importa.
+async function eventoDoPainel(sb: ReturnType<typeof svc>, eventoId: string) {
+  let r = await sb.from("eventos").select("id, nome, meta_confirmados, marcos_visiveis").eq("id", eventoId).maybeSingle();
+  if (r.error) r = await sb.from("eventos").select("id, nome, meta_confirmados").eq("id", eventoId).maybeSingle();
+  return r.data;
+}
+
 async function anfitriaoPorSlug(sb: ReturnType<typeof svc>, slug: string) {
   const { data } = await sb.from("anfitrioes")
     .select("id, nome, slug, evento_id, grupo_id, vai, categoria_convidado, grupo:grupos(nome)")
@@ -86,7 +95,7 @@ Deno.serve(async (req) => {
           .eq("anfitriao_id", a.id).order("created_at", { ascending: false }),
         sb.from("marcos").select("*").eq("evento_id", a.evento_id).order("quantidade"),
         sb.from("ranking_publico").select("*").eq("evento_id", a.evento_id).order("aprovados", { ascending: false }),
-        sb.from("eventos").select("id, nome, meta_confirmados").eq("id", a.evento_id).maybeSingle(),
+        eventoDoPainel(sb, a.evento_id),
       ]);
       return json({ anfitriao: a, convites: convites || [], marcos: marcos || [], ranking: ranking || [], evento: evento || null });
     }

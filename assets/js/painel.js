@@ -80,7 +80,7 @@ const situacaoDoParticipante = (c) =>
 
     // a jornada avança por convidado aprovado (não só "Confirmado" — esse
     // status costuma vir bem depois, no dia do evento)
-    renderJornada(aprovados, marcos, anfitriao.id);
+    renderJornada(aprovados, marcos, anfitriao.id, Number(evento?.marcos_visiveis) || 0);
     renderConvites(convites, { enviados: convites.length, aprovados, confirmados });
     renderRanking(ranking, anfitriao.id);
 
@@ -111,12 +111,15 @@ function erro(msg) {
   if (msg) box.innerHTML = `<h2 style="margin:0 0 8px">Ops</h2><p style="margin:0">${esc(msg)}</p>`;
 }
 
-function renderJornada(aprovados, marcosTodos, anfitriaoId) {
+// limiteVisiveis: eventos que só mostram os N primeiros prêmios + o final
+// (Configurações → "Prêmios visíveis na jornada"); 0 = mostra todos.
+function renderJornada(aprovados, marcosTodos, anfitriaoId, limiteVisiveis = 0) {
   el("n-confirmados").textContent = aprovados;
   // o marco "prêmio final" não é mais uma bandeira no meio do caminho — ele
   // vira o próprio troféu no fim do tabuleiro/lista.
   const marcoFinal = marcosTodos.find((m) => m.meta_final) || null;
-  const marcos = marcosTodos.filter((m) => !m.meta_final).sort((a, b) => a.quantidade - b.quantidade);
+  const ordenados = marcosTodos.filter((m) => !m.meta_final).sort((a, b) => a.quantidade - b.quantidade);
+  const marcos = limiteVisiveis > 0 ? ordenados.slice(0, limiteVisiveis) : ordenados;
 
   if (!marcos.length && !marcoFinal) {
     el("proximo-marco").textContent = "";

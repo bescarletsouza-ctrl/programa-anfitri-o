@@ -43,6 +43,10 @@ async function carregar() {
     if (form.data_evento) form.data_evento.value = config.data_evento || "";
     form.meta_confirmados.value = config.meta_confirmados ?? 0;
     if (form.tema_convite) form.tema_convite.value = config.tema_convite || "";
+    // a coluna vem da migração 0041; sem ela o campo fica escondido (e não vai no salvar)
+    const temMarcosVisiveis = "marcos_visiveis" in config;
+    el("campo-marcos-visiveis").hidden = !temMarcosVisiveis;
+    if (temMarcosVisiveis) form.marcos_visiveis.value = config.marcos_visiveis || "";
     form.onsubmit = async (e) => {
       e.preventDefault();
       try {
@@ -53,6 +57,7 @@ async function carregar() {
           meta_confirmados: Number(form.meta_confirmados.value) || 0,
           tema_convite: form.tema_convite?.value || null,
         };
+        if (temMarcosVisiveis) patch.marcos_visiveis = Number(form.marcos_visiveis.value) > 0 ? Math.floor(Number(form.marcos_visiveis.value)) : null;
         ["subtitulo_convite", "texto_confirmacao", "texto_em_analise", "texto_aprovado", "texto_recusado"]
           .forEach((k) => { if (form[k]) patch[k] = form[k].value.trim() || null; });
         const salvo = await salvarEvento(patch);
