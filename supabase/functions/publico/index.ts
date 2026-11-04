@@ -29,10 +29,12 @@ const svc = () =>
 // evento do painel do anfitrião. "marcos_visiveis" (migração 0041) limita
 // quantos prêmios aparecem na jornada; se a coluna ainda não existe, cai pro
 // select antigo — assim a ordem de "rodar migração / publicar função" não importa.
+// Devolve o resultado inteiro ({ data, error }), no mesmo formato das outras
+// consultas do Promise.all do painel.
 async function eventoDoPainel(sb: ReturnType<typeof svc>, eventoId: string) {
-  let r = await sb.from("eventos").select("id, nome, meta_confirmados, marcos_visiveis").eq("id", eventoId).maybeSingle();
-  if (r.error) r = await sb.from("eventos").select("id, nome, meta_confirmados").eq("id", eventoId).maybeSingle();
-  return r.data;
+  const r = await sb.from("eventos").select("id, nome, meta_confirmados, marcos_visiveis").eq("id", eventoId).maybeSingle();
+  if (!r.error) return r;
+  return await sb.from("eventos").select("id, nome, meta_confirmados").eq("id", eventoId).maybeSingle();
 }
 
 async function anfitriaoPorSlug(sb: ReturnType<typeof svc>, slug: string) {
