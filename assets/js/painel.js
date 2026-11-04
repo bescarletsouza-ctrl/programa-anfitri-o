@@ -111,15 +111,18 @@ function erro(msg) {
   if (msg) box.innerHTML = `<h2 style="margin:0 0 8px">Ops</h2><p style="margin:0">${esc(msg)}</p>`;
 }
 
-// limiteVisiveis: eventos que só mostram os N primeiros prêmios + o final
-// (Configurações → "Prêmios visíveis na jornada"); 0 = mostra todos.
-function renderJornada(aprovados, marcosTodos, anfitriaoId, limiteVisiveis = 0) {
+// reveladosN (Configurações → "Prêmios revelados"): quantos dos PRIMEIROS prêmios
+// aparecem (título + descrição) antes de serem conquistados — mais o prêmio
+// final. Todas as bandeiras continuam no mapa; os intermediários seguem como
+// "Prêmio bloqueado" (surpresa) até conquistar. 0 = nenhum revelado antes.
+function renderJornada(aprovados, marcosTodos, anfitriaoId, reveladosN = 0) {
   el("n-confirmados").textContent = aprovados;
   // o marco "prêmio final" não é mais uma bandeira no meio do caminho — ele
   // vira o próprio troféu no fim do tabuleiro/lista.
   const marcoFinal = marcosTodos.find((m) => m.meta_final) || null;
-  const ordenados = marcosTodos.filter((m) => !m.meta_final).sort((a, b) => a.quantidade - b.quantidade);
-  const marcos = limiteVisiveis > 0 ? ordenados.slice(0, limiteVisiveis) : ordenados;
+  const marcos = marcosTodos.filter((m) => !m.meta_final).sort((a, b) => a.quantidade - b.quantidade);
+  const reveladosIds = new Set(reveladosN > 0 ? marcos.slice(0, reveladosN).map((m) => m.id) : []);
+  const revelarFinal = reveladosN > 0;
 
   if (!marcos.length && !marcoFinal) {
     el("proximo-marco").textContent = "";
@@ -136,7 +139,7 @@ function renderJornada(aprovados, marcosTodos, anfitriaoId, limiteVisiveis = 0) 
     : "Você chegou à última bandeira! 🏆";
 
   desenharTabuleiro(aprovados, marcos, conquistados, marcoFinal);
-  renderFases(aprovados, marcos, conquistados, marcoFinal);
+  renderFases(aprovados, marcos, conquistados, marcoFinal, reveladosIds, revelarFinal);
   celebrarNovasConquistas(aprovados, marcos, marcoFinal, anfitriaoId);
 }
 
@@ -278,7 +281,7 @@ function desenharTabuleiro(aprovados, marcos, conquistados, marcoFinal) {
 }
 
 /* ---- Fases (cards abaixo do tabuleiro) --------------------------------- */
-function renderFases(aprovados, marcos, conquistados, marcoFinal) {
+function renderFases(aprovados, marcos, conquistados, marcoFinal, reveladosIds = new Set(), revelarFinal = false) {
   const cards = marcos.map((m, idx) => {
     const ok = aprovados >= m.quantidade;
     // "próxima" é só pra mostrar "faltam X" — visualmente ela fica igual às
@@ -292,9 +295,11 @@ function renderFases(aprovados, marcos, conquistados, marcoFinal) {
       ? `<span class="fase-selo bloq">🔒 Próxima meta · faltam ${m.quantidade - aprovados}</span>`
       : `<span class="fase-selo bloq">🔒 Bloqueada</span>`;
     // o prêmio só é revelado (título + descrição) depois de conquistado —
-    // antes disso é surpresa, mesmo na bandeira mais próxima
-    const titulo = ok ? esc(m.titulo) : "🔒 Prêmio bloqueado";
-    const corpo = ok
+    // antes disso é surpresa, mesmo na bandeira mais próxima. Exceção: os
+    // primeiros N configurados no evento já aparecem (a bandeira segue bloqueada).
+    const revelado = ok || reveladosIds.has(m.id);
+    const titulo = revelado ? esc(m.titulo) : "🔒 Prêmio bloqueado";
+    const corpo = revelado
       ? `<p>${esc(m.descricao || "")}</p>`
       : proxima
       ? `<p class="dim">Continue aprovando convidados para descobrir o prêmio!</p>`
@@ -324,13 +329,14 @@ function renderFases(aprovados, marcos, conquistados, marcoFinal) {
   // bandeira numerada no meio da lista
   if (marcoFinal) {
     const ok = aprovados >= marcoFinal.quantidade;
-    const titulo = ok ? esc(marcoFinal.titulo) : "🔒 Prêmio final bloqueado";
+    const revelado = ok || revelarFinal;
+    const titulo = revelado ? esc(marcoFinal.titulo) : "🔒 Prêmio final bloqueado";
     // esconde o NOME do prêmio até conquistar, mas o número da Meta (quantos
     // aprovados faltam) sempre aparece — senão ninguém sabe a meta a bater
     const selo = ok
       ? `<span class="fase-selo ok">Meta conquistada</span>`
       : `<span class="fase-selo bloq">🔒 Meta do evento · faltam ${marcoFinal.quantidade - aprovados}</span>`;
-    const corpo = ok
+    const corpo = revelado
       ? `<p>${esc(marcoFinal.descricao || "")}</p>`
       : `<p class="dim">Alcance ${marcoFinal.quantidade} convidados aprovados para descobrir o grande prêmio!</p>`;
     cards.push(`<div class="fase ${ok ? "conquistada" : "bloqueada"}">
