@@ -109,6 +109,11 @@ const textoMov = (id) => {
   const m = movs[id];
   return m ? `${m.de ? "Movido para" : "Entrou em"} ${m.para} em ${formatarData(m.em, true)}${m.est ? " (estimado)" : ""}` : "";
 };
+// "Outro" (sem acento/maiúscula) abre o campo de texto no formulário; o que foi
+// escrito fica em campos_extra.tipo_outro e aparece junto do tipo ("Outro · Imprensa")
+const ehTipoOutro = (t) => String(t || "").trim().toLowerCase() === "outro";
+const rotuloTipo = (p) => (ehTipoOutro(p.tipo) && p.campos_extra?.tipo_outro ? `${p.tipo} · ${p.campos_extra.tipo_outro}` : p.tipo);
+
 // Situação que a etapa define ao entrar nela (etapa.situacao_alvo), se for
 // diferente da atual do participante. Toda forma de mudar de etapa usa isto.
 const situacaoAlvoDaEtapa = (etapaId, p) => {
@@ -453,7 +458,7 @@ function celulaHtml(p, c) {
     case "codigo":
       return `<td><span class="chip-codigo">${esc(p.codigo || "—")}</span></td>`;
     case "tipo":
-      return `<td class="celula-edit" data-campo="tipo" title="Alterar tipo"><span class="badge ${badgeTipo(p.tipo)}">${esc(p.tipo)}</span>${lapis()}</td>`;
+      return `<td class="celula-edit" data-campo="tipo" title="Alterar tipo"><span class="badge ${badgeTipo(p.tipo)}">${esc(rotuloTipo(p))}</span>${lapis()}</td>`;
     case "categoria": {
       const cat = (p.ingresso || "").trim();
       return `<td class="celula-edit" data-campo="categoria" title="Alterar categoria">${cat ? `<span class="chip-cat">${esc(cat)}</span>` : `<span class="cel-tenue">—</span>`}${lapis()}</td>`;
@@ -1079,7 +1084,7 @@ function cardPart(p) {
       <div style="display:flex;justify-content:space-between;gap:8px;align-items:start">
         <strong style="font-size:.9rem">${esc(p.nome)}</strong>
         <span style="display:flex;gap:6px;align-items:center;flex-shrink:0">
-          <span class="badge ${badgeTipo(p.tipo)}" style="font-size:.65rem">${esc(p.tipo)}</span>
+          <span class="badge ${badgeTipo(p.tipo)}" style="font-size:.65rem">${esc(rotuloTipo(p))}</span>
           ${nomeResp ? `<span title="Responsável: ${esc(nomeResp)}" style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--cinza-100);color:var(--texto-suave);font-size:.62rem;font-weight:700;flex-shrink:0">${esc(iniciaisDe(nomeResp))}</span>` : ""}
         </span>
       </div>
@@ -1155,6 +1160,8 @@ function abrirForm(p) {
       <label class="campo"><span>Empresa</span><input class="input" name="empresa" value="${esc(p?.empresa || "")}" /></label>
       <label class="campo"><span>Tipo *</span>
         <select class="select" name="tipo">${TIPOS.map((t) => `<option ${t === (p?.tipo || "Convidado") ? "selected" : ""}>${t}</option>`).join("")}</select></label>
+      <label class="campo" id="campo-tipo-outro" hidden><span>Qual? *</span>
+        <input class="input" name="tipo_outro" value="${esc(p?.campos_extra?.tipo_outro || "")}" placeholder="Escreva o tipo (ex.: Imprensa, Patrocinador…)" /></label>
       <label class="campo"><span>Ingresso</span>
         <select class="select" name="ingresso">
           <option value="">— sem tipo —</option>
@@ -1185,8 +1192,18 @@ function abrirForm(p) {
         const r = responsavelAutomatico(selTipo.value, selIngresso.value || null);
         if (r) selResp.value = r;
       };
-      selTipo.onchange = atualizarResp;
+      // "Outro" abre um campo pra escrever qual é (obrigatório enquanto visível)
+      const campoOutro = root.querySelector("#campo-tipo-outro");
+      const inputOutro = campoOutro.querySelector("input");
+      const mostrarOutro = () => {
+        const ver = ehTipoOutro(selTipo.value);
+        campoOutro.hidden = !ver;
+        inputOutro.required = ver;
+        if (ver && document.activeElement === selTipo) inputOutro.focus();
+      };
+      selTipo.onchange = () => { atualizarResp(); mostrarOutro(); };
       selIngresso.onchange = atualizarResp;
+      mostrarOutro();
     },
     onConfirmar: async (form) => {
       const f = Object.fromEntries(new FormData(form));
@@ -1199,6 +1216,14 @@ function abrirForm(p) {
         responsavel_user_id: f.responsavel_user_id || null,
         campos_extra: camposExtraDoForm(new FormData(form), p?.campos_extra),
       };
+      // tipo "Outro": guarda o que foi escrito junto dos campos extras (sem coluna nova)
+      if (ehTipoOutro(reg.tipo)) {
+        const qual = (f.tipo_outro || "").trim();
+        if (!qual) { toast("Escreva qual é o tipo em “Qual?”.", "erro"); return false; }
+        reg.campos_extra.tipo_outro = qual;
+      } else {
+        delete reg.campos_extra.tipo_outro;
+      }
       if (p) reg.id = p.id;
       // editou a etapa no formulário sem mexer na situação → vale a regra da etapa
       const novaSitEtapa = p && reg.etapa_id !== (p.etapa_id || null) && reg.situacao === situacaoDe(p)
@@ -1295,7 +1320,7 @@ function abrirGavetaDetalhe(id) {
     esc(p.nome),
     `
     <div class="secao">
-      <span class="badge ${badgeTipo(p.tipo)}">${esc(p.tipo)}</span>
+      <span class="badge ${badgeTipo(p.tipo)}">${esc(rotuloTipo(p))}</span>
       <span class="badge ${badgeSituacao(situacaoDe(p))}">${esc(situacaoDe(p))}</span>
       <span class="badge ${badgePag(p.pagamento)}">${esc(p.pagamento)}</span>
       <span class="badge badge-neutro">${esc(nomeEtapa(p.etapa_id))}</span>
@@ -1561,6 +1586,7 @@ async function exportar(dados) {
     { chave: "telefone", rotulo: "Telefone" },
     { chave: "empresa", rotulo: "Empresa" },
     { chave: "tipo", rotulo: "Tipo" },
+    { rotulo: "Tipo (qual)", valor: (p) => (ehTipoOutro(p.tipo) ? p.campos_extra?.tipo_outro || "" : "") },
     { rotulo: "Situação", valor: (p) => situacaoDe(p) },
     { rotulo: "Status do convite", valor: (p) => p.convidado?.status || "" },
     { chave: "ingresso", rotulo: "Ingresso" },
