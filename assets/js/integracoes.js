@@ -58,7 +58,7 @@ const CONECTORES = {
 };
 
 // Origens de entrada (só um rótulo — todas usam o mesmo mapeador genérico)
-const ORIGENS = ["Genérico / Zapier", "Sympla", "Even3", "Eventbrite", "Hotmart", "Eduzz", "Mercado Pago", "Stripe", "Outro"];
+const ORIGENS = ["Genérico / Zapier", "Guru", "Sympla", "Even3", "Eventbrite", "Hotmart", "Eduzz", "Mercado Pago", "Stripe", "Outro"];
 
 _iniciando.then((ctx) => { if (ctx) carregar(ctx); });
 el("add-webhook").onclick = () => modalWebhook(null);
@@ -319,6 +319,15 @@ function modalEntrada(row) {
       <label class="campo"><span>Categorias por produto (opcional, JSON)</span>
         <textarea class="input" name="categorias_por_produto" rows="3" placeholder='{ "Ps3YneQBTDGU7xKrpPRS": "GOLD", "outroIdDeOferta": "MASTER" }'>${esc(cfg.categorias_por_produto ? JSON.stringify(cfg.categorias_por_produto, null, 0) : "")}</textarea>
         <span class="cel-tenue" style="font-size:.72rem">Vende mais de uma categoria por essa mesma origem (ex.: Hubla)? Mapeie o ID do produto/oferta pra categoria certa — tem prioridade sobre a "Categoria padrão" acima. Na Hubla, o ID de cada oferta aparece no link de checkout: pay.hub.la/<b>ESSE-ID</b>.</span></label>
+      <label class="campo"><span>Categorias por nome da oferta (opcional, JSON) — Guru</span>
+        <textarea class="input" name="categorias_por_oferta" rows="3" placeholder='{ "gold": "GOLD", "master": "MASTER" }'>${esc(cfg.categorias_por_oferta ? JSON.stringify(cfg.categorias_por_oferta, null, 0) : "")}</textarea>
+        <span class="cel-tenue" style="font-size:.72rem">Pra quando a plataforma só tem o <b>nome da oferta</b> (ex.: Guru). Cada item é <code>"trecho do nome": "CATEGORIA"</code>: se o nome da oferta contiver o trecho (sem diferenciar maiúscula/acento), recebe a categoria. O trecho mais longo ganha. Sem correspondência, vale a "Categoria padrão" e, sem ela, o próprio nome da oferta.</span></label>
+      <label class="campo"><span>Só aceitar vendas cujo produto/oferta contenha (opcional)</span>
+        <input class="input" name="filtro_produto" value="${esc(cfg.filtro_produto || "")}" placeholder="Ex.: nitro" />
+        <span class="cel-tenue" style="font-size:.72rem">A Guru manda todas as vendas da conta pra mesma URL. Com isso preenchido, vendas de outros produtos são ignoradas (ficam só no log).</span></label>
+      <label class="campo"><span>Tipo dos participantes criados (opcional)</span>
+        <input class="input" name="tipo_padrao" value="${esc(cfg.tipo_padrao || "")}" placeholder="Ex.: Comprador" />
+        <span class="cel-tenue" style="font-size:.72rem">Vazio = "Convidado". Use o nome exato de um Tipo do evento.</span></label>
       <label class="campo"><span>Mapa de campos (opcional, JSON)</span>
         <textarea class="input" name="mapa" rows="3" placeholder='{ "email": "buyer.email", "nome": "buyer.name" }'>${esc(cfg.mapa ? JSON.stringify(cfg.mapa, null, 0) : "")}</textarea>
         <span class="cel-tenue" style="font-size:.72rem">Sem mapa, o We.events procura nome/e-mail/telefone nas chaves comuns do corpo.</span></label>
@@ -337,7 +346,18 @@ function modalEntrada(row) {
         try { categoriasPorProduto = JSON.parse(categoriasTxt); }
         catch { toast("O mapa de categorias por produto não é um JSON válido.", "erro"); return false; }
       }
+      let categoriasPorOferta = null;
+      const ofertasTxt = (fd.get("categorias_por_oferta") || "").toString().trim();
+      if (ofertasTxt) {
+        try { categoriasPorOferta = JSON.parse(ofertasTxt); }
+        catch { toast("O mapa de categorias por oferta não é um JSON válido.", "erro"); return false; }
+      }
       const config = {};
+      if (categoriasPorOferta) config.categorias_por_oferta = categoriasPorOferta;
+      const filtroProduto = (fd.get("filtro_produto") || "").toString().trim();
+      if (filtroProduto) config.filtro_produto = filtroProduto;
+      const tipoPadrao = (fd.get("tipo_padrao") || "").toString().trim();
+      if (tipoPadrao) config.tipo_padrao = tipoPadrao;
       if (fd.get("situacao_padrao")) config.situacao_padrao = fd.get("situacao_padrao");
       const ingressoPadrao = (fd.get("ingresso_padrao") || "").toString().trim();
       if (ingressoPadrao) config.ingresso_padrao = ingressoPadrao;

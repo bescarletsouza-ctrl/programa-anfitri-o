@@ -28,16 +28,66 @@ const path = (o: unknown, p: string): unknown =>
 
 // primeira chave existente (busca rasa e em objetos aninhados comuns)
 function acha(body: Record<string, unknown>, chaves: string[]): string {
-  const escopos = [body, body.data, body.buyer, body.customer, body.contact, body.order, body.comprador, body.participante, body._hubla]
+  const escopos = [body, body.data, body.buyer, body.customer, body.contact, body.order, body.comprador, body.participante, body._hubla, body._guru]
     .filter((x) => x && typeof x === "object") as Record<string, unknown>[];
   for (const esc of escopos) {
     for (const k of chaves) {
       const v = esc[k];
-      if (v != null && v !== "") return String(v);
+      // só texto/número: um objeto (ex.: "product": {...} da Guru) viraria "[object Object]"
+      if ((typeof v === "string" || typeof v === "number") && v !== "") return String(v);
     }
   }
   return "";
 }
+
+const norm = (s: unknown) =>
+  String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+
+// Categoria pelo NOME da oferta (a Guru não tem campo de categoria): o mapa é
+// { "trecho do nome": "CATEGORIA" } — compara sem acento/maiúscula, vale se o
+// nome da oferta CONTÉM o trecho (ou é igual), e o trecho mais longo ganha.
+export function categoriaPorNome(mapa: Record<string, string> | undefined, nome: string): string {
+  const alvo = norm(nome);
+  if (!mapa || !alvo) return "";
+  const entradas = Object.entries(mapa)
+    .map(([k, v]) => [norm(k), String(v ?? "").trim()] as [string, string])
+    .filter(([k, v]) => k && v)
+    .sort((a, b) => b[0].length - a[0].length);
+  const exata = entradas.find(([k]) => k === alvo);
+  if (exata) return exata[1];
+  return entradas.find(([k]) => alvo.includes(k))?.[1] || "";
+}
+
+const obj = (v: unknown): Record<string, unknown> =>
+  v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
+const txt = (v: unknown) => (typeof v === "string" || typeof v === "number" ? String(v).trim() : "");
+
+// A Guru (Digital Manager) manda o comprador em "contact" e o produto/oferta em
+// "product" / "product.offer". Só vale pra integração marcada como "Guru" (ou
+// payload com webhook_type), pra não confundir com outras origens.
+export function extrairGuru(body: Record<string, unknown>, provedor?: string): Record<string, unknown> | null {
+  if (provedor !== "Guru" && typeof body?.webhook_type !== "string") return null;
+  const c = obj(body.contact), prod = obj(body.product);
+  const oferta = obj(prod.offer), ofertaTopo = obj(body.offer);
+  const ofertaNome = txt(oferta.name) || txt(ofertaTopo.name) || txt(body.offer_name);
+  const ddd = txt(c.phone_local_code), num = txt(c.phone_number);
+  // número sem DDD (até 9 dígitos) + DDD separado → junta; senão usa como veio
+  const telefone = ddd && num && num.replace(/\D/g, "").length <= 9 ? ddd + num : num;
+  return {
+    email: txt(c.email) || txt(body.email),
+    nome: txt(c.name) || txt(body.name),
+    telefone,
+    ingresso: ofertaNome,           // sem mapa de categorias, o nome da oferta vira o ingresso
+    status: txt(body.status),
+    produtoNome: txt(prod.name),
+    ofertaNome,
+    transacaoId: txt(body.id),
+  };
+}
+
+export const GURU_CANCELADO = /refund|cancel|estorn|reembols|charged?back|dispute/;
+export const GURU_PENDENTE = /pending|pendente|waiting|aguard|unpaid|billet|boleto|analys|analis/;
+export const GURU_IGNORAR = /abandon|expir|checkout|started/;
 
 // A Hubla manda um envelope próprio (webhooks v2): dados do comprador em
 // event.invoice.payer / event.user, nome dividido em firstName+lastName, e
@@ -81,6 +131,8 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({})) as Record<string, unknown>;
     const hubla = extrairHubla(body);
     if (hubla) body._hubla = hubla;
+    const guru = extrairGuru(body, (intg.provedor as string) || "");
+    if (guru) body._guru = guru;
 
     // registra a tentativa no log (sucesso ou falha) mesmo se der erro adiante
     const logar = (status: number, ok: boolean, erro?: string, resultado?: unknown) =>
@@ -103,14 +155,31 @@ Deno.serve(async (req) => {
 
     const telefone = val("telefone", ["telefone", "phone", "celular", "whatsapp", "mobile", "phone_number"]).trim();
     const empresa = val("empresa", ["empresa", "company", "organization"]).trim();
-    // Categoria: 1) mapa por produto/oferta (útil quando uma origem só vende
-    // várias categorias, ex.: Hubla com um ID de oferta por categoria),
-    // 2) "Categoria padrão" da Origem, 3) detecção genérica pelo payload.
+    // Categoria: 1) mapa por ID de produto/oferta (Hubla), 2) mapa por NOME da
+    // oferta (Guru, que não tem campo de categoria), 3) "Categoria padrão" da
+    // Origem, 4) detecção genérica pelo payload (na Guru: o próprio nome da oferta).
     const categoriasPorProduto = (cfg.categorias_por_produto || {}) as Record<string, string>;
     const produtoId = String((hubla?.produtoId as string) || "").trim();
+    const categoriasPorOferta = (cfg.categorias_por_oferta || {}) as Record<string, string>;
+    const porOferta = guru
+      ? categoriaPorNome(categoriasPorOferta, guru.ofertaNome as string) || categoriaPorNome(categoriasPorOferta, guru.produtoNome as string)
+      : "";
     const ingresso = (produtoId && categoriasPorProduto[produtoId] ? categoriasPorProduto[produtoId] : "").trim()
+      || porOferta
       || ((cfg.ingresso_padrao as string) || "").trim()
       || val("ingresso", ["ingresso", "ticket", "ticket_name", "ticket_type", "product", "produto", "plano", "categoria"]).trim();
+
+    // Filtro opcional (Origem → "Só aceitar vendas do produto…"): a Guru manda TODAS as
+    // vendas da conta pra mesma URL; só entra quem tem esse texto no produto/oferta.
+    const filtroProduto = norm(cfg.filtro_produto);
+    if (filtroProduto) {
+      const textoProduto = norm([guru?.produtoNome, guru?.ofertaNome, hubla?.ingresso, ingresso].filter(Boolean).join(" "));
+      if (!textoProduto.includes(filtroProduto)) {
+        const r = { acao: "ignorado", motivo: `produto/oferta fora do filtro "${cfg.filtro_produto}"`, produto: guru?.produtoNome, oferta: guru?.ofertaNome };
+        await logar(200, true, undefined, r);
+        return json({ ok: true, ...r });
+      }
+    }
     const faturamento = val("faturamento", ["faturamento", "revenue", "revenue_band", "billing", "faturamento_mensal"]).trim();
     const tipoRaw = val("tipo", ["tipo", "participant_type", "tipo_participante"]).trim();
     // payment_status antes de status: "status" sozinho às vezes é um status
@@ -118,8 +187,22 @@ Deno.serve(async (req) => {
     const statusRaw = val("status", ["payment_status", "status", "situacao", "state"]).trim().toLowerCase();
     const qtd = Number(val("quantidade", ["quantidade", "quantity", "ticket_quantity", "qty"])) || 1;
 
+    // Guru: carrinho abandonado/expirado não é venda — não cria participante
+    if (guru && GURU_IGNORAR.test(statusRaw)) {
+      const r = { acao: "ignorado", motivo: `status "${statusRaw}" não é venda` };
+      await logar(200, true, undefined, r);
+      return json({ ok: true, ...r });
+    }
+
     const statusMap = (cfg.status_map || {}) as Record<string, string>;
-    let situacao = statusMap[statusRaw] || (cfg.situacao_padrao as string) || "";
+    let situacao = statusMap[statusRaw] || "";
+    // Guru: estorno/cancelamento vence a "Situação padrão" (senão um reembolso
+    // viraria Confirmado) e boleto/aguardando fica Pendente
+    if (!situacao && guru) {
+      if (GURU_CANCELADO.test(statusRaw)) situacao = "Desativado";
+      else if (GURU_PENDENTE.test(statusRaw)) situacao = "Pendente";
+    }
+    if (!situacao) situacao = (cfg.situacao_padrao as string) || "";
     if (!situacao) {
       // Sem "Situação padrão" configurada na Origem, entra sempre como
       // Pré-inscrito (mesmo pago/aprovado) — a equipe confirma manualmente
@@ -130,7 +213,7 @@ Deno.serve(async (req) => {
     }
 
     const reg: Record<string, unknown> = {
-      evento_id: eventoId, nome: nome || email, tipo: tipoRaw || "Convidado", pagamento: "Externo",
+      evento_id: eventoId, nome: nome || email, tipo: tipoRaw || ((cfg.tipo_padrao as string) || "").trim() || "Convidado", pagamento: "Externo",
       situacao, quantidade: qtd,
     };
     if (email) reg.email = email;
@@ -150,6 +233,13 @@ Deno.serve(async (req) => {
       existente = data?.[0] || null;
     }
 
+    // Guru: estorno/cancelamento de quem nunca entrou na plataforma não cria ninguém
+    if (guru && situacao === "Desativado" && !existente) {
+      const r = { acao: "ignorado", motivo: `status "${statusRaw}" de alguém que não está na lista` };
+      await logar(200, true, undefined, r);
+      return json({ ok: true, ...r });
+    }
+
     let resultado;
     if (existente) {
       // atualização: só situação + contatos que vieram no payload
@@ -160,11 +250,11 @@ Deno.serve(async (req) => {
       if (faturamento) patch.faturamento = faturamento;
       const { data, error } = await sb.from("participantes").update(patch).eq("id", existente.id).select("id, codigo").single();
       if (error) { await logar(500, false, error.message); return json({ erro: error.message }, 500); }
-      resultado = { acao: "atualizado", ...data };
+      resultado = { acao: "atualizado", ...data, ingresso: ingresso || null, situacao };
     } else {
       const { data, error } = await sb.from("participantes").insert(reg).select("id, codigo").single();
       if (error) { await logar(500, false, error.message); return json({ erro: error.message }, 500); }
-      resultado = { acao: "criado", ...data };
+      resultado = { acao: "criado", ...data, ingresso: ingresso || null, situacao };
     }
 
     await logar(200, true, undefined, resultado);
