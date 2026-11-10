@@ -87,6 +87,51 @@ export function extrairGuru(body: Record<string, unknown>, provedor?: string): R
   };
 }
 
+// "R$ 1.234,56" | "1234,56" | "1234.56" | 1234.56 → 1234.56 (null se não for valor)
+export function paraNumero(v: unknown): number | null {
+  if (typeof v === "number") return Number.isFinite(v) && v >= 0 ? Math.round(v * 100) / 100 : null;
+  if (typeof v !== "string") return null;
+  let s = v.replace(/[^\d.,-]/g, "");
+  if (!/\d/.test(s) || s.includes("-")) return null;
+  const ponto = s.lastIndexOf("."), virg = s.lastIndexOf(",");
+  if (ponto >= 0 && virg >= 0) {
+    // os dois aparecem: o que vem por último é o decimal
+    s = ponto > virg ? s.replace(/,/g, "") : s.replace(/\./g, "").replace(",", ".");
+  } else if (virg >= 0) {
+    s = s.replace(",", ".");
+  } else if (/^\d{1,3}(\.\d{3})+$/.test(s)) {
+    s = s.replace(/\./g, ""); // "1.500" = mil e quinhentos
+  }
+  const n = Number(s);
+  return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : null;
+}
+
+// Valor pago na Guru: tenta os campos mais prováveis, em ordem, e devolve
+// também QUAL caminho achou (vai no log do webhook pra conferência). Se o seu
+// payload usa outro, informe em "Mapa de campos": { "valor_pago": "caminho.do.campo" }.
+const CAMINHOS_VALOR_GURU = [
+  "payment.total", "payment.gross", "payment.value", "payment.amount",
+  "product.total_value", "total_value", "value", "amount", "total", "product.unit_value",
+];
+export function achaValorGuru(body: Record<string, unknown>): { valor: number | null; caminho: string } {
+  for (const c of CAMINHOS_VALOR_GURU) {
+    const n = paraNumero(path(body, c));
+    if (n != null) return { valor: n, caminho: c };
+  }
+  return { valor: null, caminho: "" };
+}
+
+// Forma de pagamento da venda: aprovada = "Pago"; estorno = "Reembolsado";
+// cancelada = "Cancelado"; boleto/aguardando e o que não for reconhecido ficam
+// "Externo" (não dá pra afirmar que foi pago).
+export function pagamentoGuru(statusRaw: string): string {
+  if (/refund|estorn|reembols|charged?back|dispute/.test(statusRaw)) return "Reembolsado";
+  if (/cancel/.test(statusRaw)) return "Cancelado";
+  if (/pending|pendente|waiting|aguard|unpaid|billet|boleto|analys|analis/.test(statusRaw)) return "Externo";
+  if (/approv|aprov|paid|pago|complet|confirm|success|captur/.test(statusRaw)) return "Pago";
+  return "Externo";
+}
+
 export const GURU_CANCELADO = /refund|cancel|estorn|reembols|charged?back|dispute/;
 export const GURU_PENDENTE = /pending|pendente|waiting|aguard|unpaid|billet|boleto|analys|analis/;
 export const GURU_IGNORAR = /abandon|expir|checkout|started/;
@@ -214,10 +259,20 @@ Deno.serve(async (req) => {
       else situacao = "Pré-inscrito";
     }
 
+    // Pagamento e valor pago. Guru: "Pago" quando aprovada + valor da venda (ver
+    // achaValorGuru). Qualquer origem pode informar o caminho do valor no "Mapa de
+    // campos" ({ "valor_pago": "..." }). O valor só é gravado quando a venda está Paga.
+    const pagamento = guru ? pagamentoGuru(statusRaw) : "Externo";
+    const valorInfo = mapa.valor_pago
+      ? { valor: paraNumero(path(body, mapa.valor_pago)), caminho: mapa.valor_pago }
+      : guru ? achaValorGuru(body) : { valor: null, caminho: "" };
+    const valorPago = pagamento === "Pago" || (!guru && mapa.valor_pago) ? valorInfo.valor : null;
+
     const reg: Record<string, unknown> = {
-      evento_id: eventoId, nome: nome || email, tipo: tipoRaw || "Convidado", pagamento: "Externo",
+      evento_id: eventoId, nome: nome || email, tipo: tipoRaw || "Convidado", pagamento,
       situacao, quantidade: qtd,
     };
+    if (valorPago != null) reg.valor_pago = valorPago;
     if (email) reg.email = email;
     if (telefone) reg.telefone = telefone;
     if (empresa) reg.empresa = empresa;
@@ -250,9 +305,17 @@ Deno.serve(async (req) => {
       if (empresa) patch.empresa = empresa;
       if (ingresso) patch.ingresso = ingresso;
       if (faturamento) patch.faturamento = faturamento;
-      const { data, error } = await sb.from("participantes").update(patch).eq("id", existente.id).select("id, codigo").single();
-      if (error) { await logar(500, false, error.message); return json({ erro: error.message }, 500); }
-      resultado = { acao: "atualizado", ...data, ingresso: ingresso || null, situacao };
+      // Guru: a venda manda no pagamento (aprovada → Pago; estorno → Reembolsado…)
+      if (guru) patch.pagamento = pagamento;
+      if (valorPago != null) patch.valor_pago = valorPago;
+      let r = await sb.from("participantes").update(patch).eq("id", existente.id).select("id, codigo").single();
+      if (r.error && /valor_pago/.test(r.error.message)) {
+        // migração 0042 ainda não rodou: salva o resto sem o valor
+        delete patch.valor_pago;
+        r = await sb.from("participantes").update(patch).eq("id", existente.id).select("id, codigo").single();
+      }
+      if (r.error) { await logar(500, false, r.error.message); return json({ erro: r.error.message }, 500); }
+      resultado = { acao: "atualizado", ...r.data, ingresso: ingresso || null, situacao, pagamento: guru ? pagamento : undefined, valor_pago: patch.valor_pago ?? null, valor_origem: valorInfo.caminho || null };
     } else {
       // "Tipo padrão" da origem (ex.: "Aplicação") separa quem chega por aqui de
       // quem veio por convite de anfitrião (esses continuam "Convidado"). Se o
@@ -265,9 +328,14 @@ Deno.serve(async (req) => {
         if (!achado) await sb.from("grupos").insert({ evento_id: eventoId, nome: tipoPadrao });
         reg.tipo = achado?.nome || tipoPadrao;
       }
-      const { data, error } = await sb.from("participantes").insert(reg).select("id, codigo").single();
-      if (error) { await logar(500, false, error.message); return json({ erro: error.message }, 500); }
-      resultado = { acao: "criado", ...data, tipo: reg.tipo, ingresso: ingresso || null, situacao };
+      let r = await sb.from("participantes").insert(reg).select("id, codigo").single();
+      if (r.error && /valor_pago/.test(r.error.message)) {
+        // migração 0042 ainda não rodou: cria sem o valor (não perde a venda)
+        delete reg.valor_pago;
+        r = await sb.from("participantes").insert(reg).select("id, codigo").single();
+      }
+      if (r.error) { await logar(500, false, r.error.message); return json({ erro: r.error.message }, 500); }
+      resultado = { acao: "criado", ...r.data, tipo: reg.tipo, ingresso: ingresso || null, situacao, pagamento, valor_pago: reg.valor_pago ?? null, valor_origem: valorInfo.caminho || null };
     }
 
     await logar(200, true, undefined, resultado);

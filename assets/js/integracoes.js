@@ -330,7 +330,7 @@ function modalEntrada(row) {
         <span class="cel-tenue" style="font-size:.72rem">Quem chegar por esta origem entra com esse Tipo, separado de quem veio por convite de anfitrião (que continua "Convidado"). Se o Tipo ainda não existir no evento, é criado sozinho. Vazio = "Convidado". Só vale pra participantes novos.</span></label>
       <label class="campo"><span>Mapa de campos (opcional, JSON)</span>
         <textarea class="input" name="mapa" rows="3" placeholder='{ "email": "buyer.email", "nome": "buyer.name" }'>${esc(cfg.mapa ? JSON.stringify(cfg.mapa, null, 0) : "")}</textarea>
-        <span class="cel-tenue" style="font-size:.72rem">Sem mapa, o We.events procura nome/e-mail/telefone nas chaves comuns do corpo.</span></label>
+        <span class="cel-tenue" style="font-size:.72rem">Sem mapa, o We.events procura nome/e-mail/telefone nas chaves comuns do corpo. Para o <b>valor pago</b>, a Guru já é lida sozinha (<code>payment.total</code> e alternativas); se o seu payload usa outro campo, informe aqui: <code>{ "valor_pago": "caminho.do.campo" }</code>.</span></label>
       ${row ? "" : `<p class="pagina-sub" style="margin:6px 0 0;font-size:.8rem">A URL com token aparece na lista depois de criar.</p>`}`,
     onConfirmar: async (form) => {
       const fd = new FormData(form);

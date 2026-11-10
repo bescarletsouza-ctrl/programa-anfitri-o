@@ -115,6 +115,14 @@ export function formatarEvento(r) {
   };
 }
 
+// valor pago: o valor REAL gravado no participante (webhook/cadastro, migração
+// 0042) tem prioridade; sem ele, cai no preço de tabela × quantidade como antes.
+export function valorPagoFinal(r) {
+  const real = r.valor_pago_real;
+  if (real != null && real !== "" && Number.isFinite(Number(real))) return Math.round(Number(real) * 100) / 100;
+  return valorPago(r);
+}
+
 export function formatarParticipante(r) {
   return {
     id: r.id,
@@ -125,7 +133,7 @@ export function formatarParticipante(r) {
     email: r.email ?? null,
     telefone: r.telefone ?? null,
     tipo_ingresso: r.ingresso ?? null,
-    valor_pago: valorPago(r),
+    valor_pago: valorPagoFinal(r),
     pagamento: r.pagamento ?? null,
     status_inscricao: statusInscricao(r),
     checkin: !!r.presente,

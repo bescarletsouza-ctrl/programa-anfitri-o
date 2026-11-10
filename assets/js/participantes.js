@@ -38,7 +38,8 @@ function tiposDisponiveis(grupos) {
   const temProprios = nomes.some((n) => (n || "").trim().toLowerCase() !== "anfitrião");
   return temProprios ? nomes : [...new Set([...TIPOS_PADRAO, ...nomes])];
 }
-const PAGAMENTOS = ["Gratuito", "Pago", "Convidado", "Cancelado", "Reembolsado"];
+// "Externo" = veio de integração (webhook) sem confirmação de pagamento
+const PAGAMENTOS = ["Gratuito", "Pago", "Convidado", "Externo", "Cancelado", "Reembolsado"];
 const SITUACOES = ["Confirmado", "Pendente", "Fila de espera", "Pré-inscrito", "Desativado"];
 const FAIXAS = [
   "Não faturo ainda", "Até 50 mil/mês", "50 mil – 150 mil/mês", "150 mil – 500 mil/mês",
@@ -58,6 +59,7 @@ const COLUNAS_BASE = {
   situacao:   "Situação",
   statusConvite: "Status do convite",
   pagamento:  "Pagamento",
+  valorpago:  "Valor pago",
   faturamento: "Faturamento",
   empresa:    "Empresa",
   telefone:   "Telefone",
@@ -157,6 +159,11 @@ const ORDENACOES = [
 let ordemPipe = {};
 try { ordemPipe = JSON.parse(localStorage.getItem("part_pipe_ordem") || "{}") || {}; } catch {}
 const salvarOrdemPipe = () => { try { localStorage.setItem("part_pipe_ordem", JSON.stringify(ordemPipe)); } catch {} };
+
+const brl = (v) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(v) || 0);
+// a coluna valor_pago vem da migração 0042; sem ela o campo some do formulário
+// (e não vai no salvar, senão todo salvamento quebraria)
+const temValorPago = () => participantes.some((x) => "valor_pago" in x);
 
 const badgeTipo = (t) => (t === "Anfitrião" ? "badge-laranja" : "badge-neutro");
 const badgePag = (p) =>
@@ -476,6 +483,8 @@ function celulaHtml(p, c) {
     }
     case "pagamento":
       return `<td class="celula-edit" data-campo="pagamento" title="Alterar pagamento"><span class="badge ${badgePag(p.pagamento)}">${esc(p.pagamento)}</span>${lapis()}</td>`;
+    case "valorpago":
+      return `<td>${p.valor_pago != null ? esc(brl(p.valor_pago)) : `<span class="cel-tenue">—</span>`}</td>`;
     case "faturamento":
       return `<td>${p.faturamento ? esc(p.faturamento) : `<span class="cel-tenue">—</span>`}</td>`;
     case "empresa":
@@ -1179,6 +1188,9 @@ function abrirForm(p) {
           ${FAIXAS.map((f) => `<option ${f === p?.faturamento ? "selected" : ""}>${f}</option>`).join("")}</select></label>
       <label class="campo"><span>Pagamento</span>
         <select class="select" name="pagamento">${PAGAMENTOS.map((x) => `<option ${x === (p?.pagamento || "Gratuito") ? "selected" : ""}>${x}</option>`).join("")}</select></label>
+      ${temValorPago() ? `<label class="campo"><span>Valor pago (R$)</span>
+        <input class="input" name="valor_pago" type="number" min="0" step="0.01" value="${esc(p?.valor_pago ?? "")}" placeholder="Ex.: 497,00" />
+        <span class="cel-tenue" style="font-size:.72rem">O valor que o cliente de fato pagou. Preenchido sozinho pelas vendas que chegam por integração (ex.: Guru).</span></label>` : ""}
       <label class="campo"><span>Quantidade</span><input class="input" name="quantidade" type="number" min="1" value="${p?.quantidade ?? 1}" /></label>
       <label class="campo"><span>Etapa do pipeline</span>
         <select class="select" name="etapa_id"><option value="">Sem etapa</option>
@@ -1216,6 +1228,10 @@ function abrirForm(p) {
         responsavel_user_id: f.responsavel_user_id || null,
         campos_extra: camposExtraDoForm(new FormData(form), p?.campos_extra),
       };
+      if (temValorPago() && "valor_pago" in f) {
+        const bruto = String(f.valor_pago ?? "").trim().replace(",", ".");
+        reg.valor_pago = bruto !== "" && Number(bruto) >= 0 ? Math.round(Number(bruto) * 100) / 100 : null;
+      }
       // tipo "Outro": guarda o que foi escrito junto dos campos extras (sem coluna nova)
       if (ehTipoOutro(reg.tipo)) {
         const qual = (f.tipo_outro || "").trim();
@@ -1322,7 +1338,7 @@ function abrirGavetaDetalhe(id) {
     <div class="secao">
       <span class="badge ${badgeTipo(p.tipo)}">${esc(rotuloTipo(p))}</span>
       <span class="badge ${badgeSituacao(situacaoDe(p))}">${esc(situacaoDe(p))}</span>
-      <span class="badge ${badgePag(p.pagamento)}">${esc(p.pagamento)}</span>
+      <span class="badge ${badgePag(p.pagamento)}">${esc(p.pagamento)}${p.valor_pago != null ? ` · ${esc(brl(p.valor_pago))}` : ""}</span>
       <span class="badge badge-neutro">${esc(nomeEtapa(p.etapa_id))}</span>
       <span class="chip-codigo">${esc(p.codigo || "—")}</span>
     </div>
@@ -1593,6 +1609,7 @@ async function exportar(dados) {
     { rotulo: "Responsável", valor: (p) => nomeMembro(p.responsavel_user_id) || "" },
     { chave: "faturamento", rotulo: "Faturamento" },
     { chave: "pagamento", rotulo: "Pagamento" },
+    { rotulo: "Valor pago (R$)", valor: (p) => (p.valor_pago != null ? Number(p.valor_pago) : "") },
     { chave: "quantidade", rotulo: "Quantidade" },
     { rotulo: "Etapa", valor: (p) => nomeEtapa(p.etapa_id) },
     { rotulo: "Na etapa desde", valor: (p) => (movs[p.id]?.em ? formatarData(movs[p.id].em, true) : "") },

@@ -85,6 +85,15 @@ teste("valorPago: só quem pagou, preço de tabela × quantidade", () => {
   igual(api.valorPago({ pagamento: "Gratuito", preco_ingresso: "R$ 500", quantidade: 1 }), null);
   igual(api.valorPago({ pagamento: "Pago", preco_ingresso: null, quantidade: 1 }), null);
 });
+teste("valorPagoFinal: o valor real gravado vence o preço de tabela", () => {
+  const base = { pagamento: "Pago", preco_ingresso: "R$ 500,00", quantidade: 1 };
+  igual(api.valorPagoFinal({ ...base, valor_pago_real: "397.50" }), 397.5);
+  igual(api.valorPagoFinal({ ...base, valor_pago_real: 0 }), 0);
+  igual(api.valorPagoFinal({ ...base, valor_pago_real: null }), 500);
+  igual(api.valorPagoFinal({ ...base }), 500);
+  igual(api.valorPagoFinal({ pagamento: "Externo", preco_ingresso: "R$ 500", quantidade: 1, valor_pago_real: 97 }), 97);
+  igual(api.valorPagoFinal({ pagamento: "Convidado", preco_ingresso: "R$ 500", quantidade: 1 }), null);
+});
 teste("statusInscricao: todas as regras", () => {
   const s = api.statusInscricao;
   igual(s({ pagamento: "Cancelado", situacao: "Confirmado" }), "cancelado");
