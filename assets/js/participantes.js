@@ -606,6 +606,27 @@ async function editarCelula(id, campo, td) {
   itens.forEach((it) => (it.atual = it.valor === atualValor));
   const escolha = await abrirMenu(td, itens);
   if (escolha === null || escolha === atualValor) return;
+
+  // Linha marcada + mais linhas marcadas: a alteração vale pra todas as selecionadas,
+  // depois de um popup de confirmação (dá pra desmarcar e alterar só esta).
+  if (selecionados.has(id) && selecionados.size > 1) {
+    const alvos = participantes.filter((x) => selecionados.has(x.id));
+    const r = await confirmarEdicaoEmMassa(campo, itens.find((it) => it.valor === escolha)?.rotulo ?? String(escolha), alvos);
+    if (r === null) return;
+    if (r === "todos") {
+      td.classList.add("salvando");
+      try {
+        await aplicarCampoEmMassa(campo, escolha, alvos.map((x) => x.id));
+        toast(`${alvos.length} participante(s) atualizado(s).`, "ok");
+        await recarregar();   // a seleção continua marcada pra você seguir ajustando outras colunas
+      } catch (e) {
+        toast(e.message, "erro");
+        td.classList.remove("salvando");
+      }
+      return;
+    }
+  }
+
   td.classList.add("salvando");
   try {
     if (campo === "etapa") {
@@ -728,47 +749,103 @@ async function acaoEmMassa(acao) {
   const escolha = await abrirMenu(btn, itens);
   if (escolha === null) return;
   try {
-    if (acao === "etapa") {
-      // quem muda de etapa recebe a situação que a etapa define (se tiver), como ao arrastar o card
-      const alvo = etapas.find((e) => e.id === escolha)?.situacao_alvo;
-      const mudarSit = alvo ? participantes.filter((p) => selecionados.has(p.id) && situacaoDe(p) !== alvo) : [];
-      await atualizarEmLote("participantes", ids, { etapa_id: escolha || null });
-      if (mudarSit.length) {
-        await atualizarEmLote("participantes", mudarSit.map((p) => p.id), { situacao: alvo });
-        mudarSit.forEach((p) => avisarSituacao(p, alvo));
-      }
-    } else if (acao === "categoria") {
-      // categoria = tipo de ingresso do participante
-      const categoria = escolha || null;
-      const alvos = participantes.filter((p) => selecionados.has(p.id));
-      await atualizarEmLote("participantes", ids, { ingresso: categoria });
-      // responsável automático da categoria/tipo: só preenche quando existe um e
-      // difere do atual — nunca apaga um responsável já definido à mão
-      const porResp = new Map();
-      alvos.forEach((p) => {
-        const r = responsavelAutomatico(p.tipo, categoria);
-        if (r && r !== p.responsavel_user_id) porResp.set(r, [...(porResp.get(r) || []), p.id]);
-      });
-      for (const [r, lote] of porResp) await atualizarEmLote("participantes", lote, { responsavel_user_id: r });
-      // quem também é anfitrião: a categoria dele acompanha (senão volta ao salvar o anfitrião)
-      const anfs = alvos.filter((p) => p.anfitriao_id).map((p) => p.anfitriao_id);
-      if (anfs.length) await atualizarEmLote("anfitrioes", anfs, { ingresso: categoria }).catch((e) => console.warn(e));
-    } else if (acao === "pagamento" || acao === "situacao") {
-      await atualizarEmLote("participantes", ids, { [acao]: escolha });
-    } else {
-      // tipo: pode virar Anfitrião → precisa criar/limpar vínculo por linha; e o
-      // responsável (que depende da categoria/ingresso de cada um) é recalculado por linha
-      await atualizarEmLote("participantes", ids, { tipo: escolha });
-      participantes = await listParticipantes();
-      for (const p of participantes.filter((x) => selecionados.has(x.id))) {
-        await salvar("participantes", { id: p.id, responsavel_user_id: responsavelAutomatico(escolha, p.ingresso) }).catch((e) => console.warn(e));
-        await sincParticipanteAnfitriao(p).catch((e) => console.warn(e));
-      }
-    }
+    await aplicarCampoEmMassa(acao, escolha, ids);
     selecionados.clear();
     toast(`${ids.length} participante(s) atualizado(s).`, "ok");
     await recarregar();
   } catch (e) { toast(e.message, "erro"); }
+}
+
+// Aplica UM valor num campo para vários participantes de uma vez. É o mesmo
+// caminho da barra de ações em massa e da edição de célula com linhas marcadas.
+// campo: tipo | categoria | situacao | pagamento | etapa | responsavel | statusConvite
+async function aplicarCampoEmMassa(campo, escolha, ids) {
+  const conjunto = new Set(ids);
+  const alvos = participantes.filter((p) => conjunto.has(p.id));
+  if (campo === "etapa") {
+    // quem muda de etapa recebe a situação que a etapa define (se tiver), como ao arrastar o card
+    const alvo = etapas.find((e) => e.id === escolha)?.situacao_alvo;
+    const mudarSit = alvo ? alvos.filter((p) => situacaoDe(p) !== alvo) : [];
+    await atualizarEmLote("participantes", ids, { etapa_id: escolha || null });
+    if (mudarSit.length) {
+      await atualizarEmLote("participantes", mudarSit.map((p) => p.id), { situacao: alvo });
+      mudarSit.forEach((p) => avisarSituacao(p, alvo));
+    }
+  } else if (campo === "categoria") {
+    // categoria = tipo de ingresso do participante
+    const categoria = escolha || null;
+    await atualizarEmLote("participantes", ids, { ingresso: categoria });
+    // responsável automático da categoria/tipo: só preenche quando existe um e
+    // difere do atual — nunca apaga um responsável já definido à mão
+    const porResp = new Map();
+    alvos.forEach((p) => {
+      const r = responsavelAutomatico(p.tipo, categoria);
+      if (r && r !== p.responsavel_user_id) porResp.set(r, [...(porResp.get(r) || []), p.id]);
+    });
+    for (const [r, lote] of porResp) await atualizarEmLote("participantes", lote, { responsavel_user_id: r });
+    // quem também é anfitrião: a categoria dele acompanha (senão volta ao salvar o anfitrião)
+    const anfs = alvos.filter((p) => p.anfitriao_id).map((p) => p.anfitriao_id);
+    if (anfs.length) await atualizarEmLote("anfitrioes", anfs, { ingresso: categoria }).catch((e) => console.warn(e));
+  } else if (campo === "pagamento" || campo === "situacao") {
+    await atualizarEmLote("participantes", ids, { [campo]: escolha });
+  } else if (campo === "responsavel") {
+    await atualizarEmLote("participantes", ids, { responsavel_user_id: escolha || null });
+  } else if (campo === "statusConvite") {
+    // só quem veio por convite tem status de convite
+    for (const p of alvos.filter((x) => x.convidado_id)) await definirStatusConvidado(p.convidado_id, escolha);
+    participantes = await listParticipantes();
+  } else {
+    // tipo: pode virar Anfitrião → precisa criar/limpar vínculo por linha; e o
+    // responsável (que depende da categoria/ingresso de cada um) é recalculado por linha
+    await atualizarEmLote("participantes", ids, { tipo: escolha });
+    participantes = await listParticipantes();
+    for (const p of participantes.filter((x) => conjunto.has(x.id))) {
+      await salvar("participantes", { id: p.id, responsavel_user_id: responsavelAutomatico(escolha, p.ingresso) }).catch((e) => console.warn(e));
+      await sincParticipanteAnfitriao(p).catch((e) => console.warn(e));
+    }
+  }
+}
+
+const ROTULO_CAMPO = {
+  tipo: "Tipo", categoria: "Categoria", situacao: "Situação", pagamento: "Pagamento",
+  etapa: "Etapa", responsavel: "Responsável", statusConvite: "Status do convite",
+};
+
+// Popup de confirmação antes de mexer em vários participantes de uma vez.
+// Resolve "todos" | "um" (desmarcou "aplicar a todos") | null (cancelou).
+function confirmarEdicaoEmMassa(campo, valorRotulo, alvos) {
+  return new Promise((resolve) => {
+    let respondeu = false;
+    const nomes = alvos.slice(0, 8).map((p) => `<li>${esc(p.nome)}</li>`).join("");
+    const mais = alvos.length > 8 ? `<li style="list-style:none;color:var(--texto-suave)">e mais ${alvos.length - 8}…</li>` : "";
+    const aviso = campo === "statusConvite" && alvos.some((p) => !p.convidado_id)
+      ? `<p class="pagina-sub" style="margin:8px 0 0">Só quem veio por convite tem status de convite; os demais ficam como estão.</p>` : "";
+    const m = abrirModal({
+      titulo: "Confirmar alteração em massa",
+      textoConfirmar: "Confirmar alteração",
+      corpoHtml: `
+        <p style="margin:0 0 10px">Alterar <strong>${esc(ROTULO_CAMPO[campo] || campo)}</strong> para
+          <strong>${esc(valorRotulo || "— vazio —")}</strong> em <strong>${alvos.length} participantes</strong>?</p>
+        <ul style="margin:0 0 12px;padding-left:18px;max-height:180px;overflow:auto">${nomes}${mais}</ul>
+        ${aviso}
+        <label style="display:flex;gap:8px;align-items:flex-start;margin-top:10px">
+          <input type="checkbox" data-todos checked style="margin-top:3px;flex-shrink:0;width:auto" />
+          <span>Aplicar a todos os ${alvos.length} selecionados<br><span class="cel-tenue">Desmarque para alterar só o participante em que você clicou.</span></span>
+        </label>`,
+      onConfirmar: (form) => {
+        respondeu = true;
+        resolve(form.querySelector("[data-todos]").checked ? "todos" : "um");
+      },
+    });
+    // fechou sem confirmar (Cancelar, X, Esc, clique fora)
+    const obs = new MutationObserver(() => {
+      if (!document.body.contains(m.elemento)) {
+        obs.disconnect();
+        if (!respondeu) resolve(null);
+      }
+    });
+    obs.observe(document.body, { childList: true });
+  });
 }
 
 function renderPaginacao(total, totalPag) {
