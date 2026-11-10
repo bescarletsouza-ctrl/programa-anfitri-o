@@ -326,8 +326,8 @@ function modalEntrada(row) {
         <input class="input" name="filtro_produto" value="${esc(cfg.filtro_produto || "")}" placeholder="Ex.: nitro" />
         <span class="cel-tenue" style="font-size:.72rem">A Guru manda todas as vendas da conta pra mesma URL. Com isso preenchido, vendas de outros produtos são ignoradas (ficam só no log).</span></label>
       <label class="campo"><span>Tipo dos participantes criados (opcional)</span>
-        <input class="input" name="tipo_padrao" value="${esc(cfg.tipo_padrao || "")}" placeholder="Ex.: Comprador" />
-        <span class="cel-tenue" style="font-size:.72rem">Vazio = "Convidado". Use o nome exato de um Tipo do evento.</span></label>
+        <input class="input" name="tipo_padrao" value="${esc(cfg.tipo_padrao || "")}" placeholder="Ex.: Aplicação aprovada" />
+        <span class="cel-tenue" style="font-size:.72rem">Quem chegar por esta origem entra com esse Tipo, separado de quem veio por convite de anfitrião (que continua "Convidado"). Se o Tipo ainda não existir no evento, é criado sozinho. Vazio = "Convidado". Só vale pra participantes novos.</span></label>
       <label class="campo"><span>Mapa de campos (opcional, JSON)</span>
         <textarea class="input" name="mapa" rows="3" placeholder='{ "email": "buyer.email", "nome": "buyer.name" }'>${esc(cfg.mapa ? JSON.stringify(cfg.mapa, null, 0) : "")}</textarea>
         <span class="cel-tenue" style="font-size:.72rem">Sem mapa, o We.events procura nome/e-mail/telefone nas chaves comuns do corpo.</span></label>

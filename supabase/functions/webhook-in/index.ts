@@ -213,7 +213,7 @@ Deno.serve(async (req) => {
     }
 
     const reg: Record<string, unknown> = {
-      evento_id: eventoId, nome: nome || email, tipo: tipoRaw || ((cfg.tipo_padrao as string) || "").trim() || "Convidado", pagamento: "Externo",
+      evento_id: eventoId, nome: nome || email, tipo: tipoRaw || "Convidado", pagamento: "Externo",
       situacao, quantidade: qtd,
     };
     if (email) reg.email = email;
@@ -252,9 +252,20 @@ Deno.serve(async (req) => {
       if (error) { await logar(500, false, error.message); return json({ erro: error.message }, 500); }
       resultado = { acao: "atualizado", ...data, ingresso: ingresso || null, situacao };
     } else {
+      // "Tipo padrão" da origem (ex.: "Aplicação") separa quem chega por aqui de
+      // quem veio por convite de anfitrião (esses continuam "Convidado"). Se o
+      // tipo ainda não existe no evento, é criado — assim aparece nos filtros,
+      // no cadastro e na Visão por tipo. Só vale pra quem NÃO mandou tipo no payload.
+      const tipoPadrao = ((cfg.tipo_padrao as string) || "").trim();
+      if (!tipoRaw && tipoPadrao) {
+        const { data: gs } = await sb.from("grupos").select("nome").eq("evento_id", eventoId);
+        const achado = (gs || []).find((g) => norm(g.nome) === norm(tipoPadrao));
+        if (!achado) await sb.from("grupos").insert({ evento_id: eventoId, nome: tipoPadrao });
+        reg.tipo = achado?.nome || tipoPadrao;
+      }
       const { data, error } = await sb.from("participantes").insert(reg).select("id, codigo").single();
       if (error) { await logar(500, false, error.message); return json({ erro: error.message }, 500); }
-      resultado = { acao: "criado", ...data, ingresso: ingresso || null, situacao };
+      resultado = { acao: "criado", ...data, tipo: reg.tipo, ingresso: ingresso || null, situacao };
     }
 
     await logar(200, true, undefined, resultado);

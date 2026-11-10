@@ -1159,7 +1159,7 @@ function abrirForm(p) {
       <label class="campo"><span>Telefone</span><input class="input" name="telefone" value="${esc(p?.telefone || "")}" /></label>
       <label class="campo"><span>Empresa</span><input class="input" name="empresa" value="${esc(p?.empresa || "")}" /></label>
       <label class="campo"><span>Tipo *</span>
-        <select class="select" name="tipo">${TIPOS.map((t) => `<option ${t === (p?.tipo || "Convidado") ? "selected" : ""}>${t}</option>`).join("")}</select></label>
+        <select class="select" name="tipo">${[...new Set([...TIPOS, ...(p?.tipo ? [p.tipo] : [])])].map((t) => `<option ${t === (p?.tipo || "Convidado") ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></label>
       <label class="campo" id="campo-tipo-outro" hidden><span>Qual? *</span>
         <input class="input" name="tipo_outro" value="${esc(p?.campos_extra?.tipo_outro || "")}" placeholder="Escreva o tipo (ex.: Imprensa, Patrocinador…)" /></label>
       <label class="campo"><span>Ingresso</span>
