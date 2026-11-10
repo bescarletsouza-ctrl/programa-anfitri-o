@@ -12,7 +12,9 @@
 //
 // Deploy:  supabase functions deploy webhook-in
 // =============================================================================
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.117.2";
+// "npm:" é resolvido pelo próprio Supabase (não depende do esm.sh, que às vezes dá
+// timeout no deploy). Versão fixa, a mesma que já usávamos.
+import { createClient } from "npm:@supabase/supabase-js@2.117.2";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
