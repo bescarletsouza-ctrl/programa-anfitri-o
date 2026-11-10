@@ -42,6 +42,7 @@ const PATHS = {
   externo: '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>',
   meta: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/>',
   balao: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>',
+  raio: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
 };
 
 export function icone(nome, cls = "") {
@@ -81,6 +82,7 @@ const NAV = [
       { chave: "participantes", rotulo: "Participantes",      href: "participantes.html", ico: "participantes" },
       { chave: "checkin",       rotulo: "Check-in",           href: "checkin.html",       ico: "check" },
       { chave: "atividades",    rotulo: "Atividades",         href: "atividades.html",    ico: "agenda" },
+      { chave: "automacoes",    rotulo: "Automações",         href: "automacoes.html",    ico: "raio" },
       { chave: "relatorios",    rotulo: "Relatórios",         href: "relatorios.html",    ico: "grafico" },
     ],
   },

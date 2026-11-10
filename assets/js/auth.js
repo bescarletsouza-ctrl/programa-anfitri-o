@@ -68,7 +68,7 @@ export const CLUSTERS_POR_ACESSO = {
 const CLUSTER_DA_CHAVE = {
   geral: "Geral",
   "painel-evento": "Evento", ingressos: "Evento", participantes: "Evento",
-  checkin: "Evento", atividades: "Evento", relatorios: "Evento",
+  checkin: "Evento", atividades: "Evento", relatorios: "Evento", automacoes: "Evento",
   painel: "Anfitriões", anfitrioes: "Anfitriões", convidados: "Anfitriões", formulario: "Anfitriões",
   config: "*", integracoes: "*", eventos: "*",   // sempre visíveis (rodapé)
   plataforma: "plataforma",

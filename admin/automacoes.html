@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<script>try{var t=localStorage.getItem('tema')==='dark'?'dark':'light';document.documentElement.dataset.theme=t;document.documentElement.style.background=t==='dark'?'#0c0c0d':'#f7f7f6';}catch(e){}</script>
+<script>try{if(!localStorage.getItem("sb-xiuhqkvkiexmbgwyvunr-auth-token")){try{sessionStorage.setItem("we_next",location.pathname+location.search);}catch(e){}location.replace("/login.html");}}catch(e){}</script>
+<title>Automações — We.events</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../assets/css/theme.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside id="sidebar" class="sidebar"></aside>
+  <main class="conteudo">
+    <div class="barra-topo">
+      <div>
+        <h1 class="pagina-titulo">Automações</h1>
+        <p class="pagina-sub">Regras que rodam sozinhas quando um participante entra ou muda — por cadastro, importação, integração (Guru, webhook) ou edição.</p>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-secundario" id="btn-modelos">Modelos prontos</button>
+        <button class="btn btn-primario" id="btn-nova">+ Nova automação</button>
+      </div>
+    </div>
+
+    <div id="carregando" class="vazio">Carregando…</div>
+
+    <div id="painel" hidden>
+      <div class="aviso" style="margin-bottom:16px">
+        As regras são aplicadas <b>em ordem</b> (de cima pra baixo) a cada participante novo e, nas de gatilho
+        “quando passar a atender”, também quando uma edição faz ele passar a atender as condições. O responsável
+        só é preenchido se estiver vazio — um responsável que você definiu à mão não é sobrescrito.
+      </div>
+      <div id="lista"></div>
+      <div id="vazio" class="vazio" hidden>
+        Nenhuma automação ainda. Comece por um <b>modelo pronto</b> (ex.: distribuir novos participantes igualmente entre a equipe) ou crie a sua em “+ Nova automação”.
+      </div>
+    </div>
+  </main>
+</div>
+<script type="module" src="../assets/js/automacoes.js"></script>
+</body>
+</html>

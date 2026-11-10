@@ -32,7 +32,7 @@ const TABELAS_EVENTO = new Set([
   "grupos", "responsaveis", "estagios", "anfitrioes", "convidados",
   "form_perguntas", "marcos", "etapas_participante", "participantes", "checkins",
   "atividades", "tipos_ingresso", "integracoes", "webhook_entregas",
-  "campos_personalizados",
+  "campos_personalizados", "automacoes",
 ]);
 
 // eid: id explícito (páginas públicas). Sem argumento → evento atual do admin.
@@ -372,6 +372,28 @@ export const listMovimentacoes = (tipo, registroId) =>
   supabase.from("movimentacoes_pipeline").select("*")
     .eq("registro_tipo", tipo).eq("registro_id", registroId)
     .order("em", { ascending: false }).limit(50).then(ok);
+
+/* ---- Automações (migração 0043) ------------------------------------------ */
+export const listAutomacoes = (eid) =>
+  supabase.from("automacoes").select("*").eq("evento_id", ev(eid))
+    .order("ordem").order("created_at").then(ok);
+
+// { [automacao_id]: { total, ultima } } dos últimos 30 dias
+export const automacaoEstatisticas = (eid) =>
+  supabase.rpc("automacao_estatisticas", { p_evento: ev(eid) })
+    .then((r) => (r.error ? {} : (r.data || {})), () => ({}));
+
+export const automacaoPrevia = (id) => supabase.rpc("automacao_preview", { p_id: id }).then(ok);
+export const automacaoAplicarExistentes = (id) => supabase.rpc("automacao_aplicar_existentes", { p_id: id }).then(ok);
+
+export const listAutomacaoExecucoes = (automacaoId, limite = 15) =>
+  supabase.from("automacao_execucoes").select("*").eq("automacao_id", automacaoId)
+    .order("em", { ascending: false }).limit(limite).then(ok);
+
+export const nomesDeParticipantes = (ids) =>
+  ids.length
+    ? supabase.from("participantes").select("id, nome").in("id", ids).then(ok)
+    : Promise.resolve([]);
 
 // Evento "ativo" = não desativado e com data ainda não passada (ou sem data).
 // Mesma regra da função transferir_participantes no banco.
