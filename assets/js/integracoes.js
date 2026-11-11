@@ -67,9 +67,10 @@ el("add-entrada").onclick = () => modalEntrada(null);
 
 async function carregar() {
   try {
-    [integracoes, entregas] = await Promise.all([
+    [integracoes, entregas, etapas] = await Promise.all([
       listIntegracoes(),
       listWebhookEntregas().catch(() => []),
+      listEtapasParticipante().catch(() => []),
     ]);
     el("carregando").hidden = true;
     el("conteudo").hidden = false;
