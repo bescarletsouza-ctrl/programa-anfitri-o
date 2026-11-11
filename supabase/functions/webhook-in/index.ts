@@ -10,6 +10,10 @@
 // (procura nome/email/telefone/etc. em várias chaves comuns) ou um mapa
 // explícito em config.mapa = { "email": "buyer.email", "nome": "buyer.name" }.
 //
+// Mover de etapa (ex.: n8n): corpo { "email": "...", "etapa": "Interesse VIP" } ou
+// "Mover para a etapa" fixo na origem (config.etapa_destino). Quem já existe só
+// troca de etapa; quem não existe é criado já nela.
+//
 // Deploy:  supabase functions deploy webhook-in
 // =============================================================================
 // "npm:" é resolvido pelo próprio Supabase (não depende do esm.sh, que às vezes dá
@@ -135,6 +139,18 @@ export function pagamentoGuru(statusRaw: string): string {
 export const GURU_CANCELADO = /refund|cancel|estorn|reembols|charged?back|dispute/;
 export const GURU_PENDENTE = /pending|pendente|waiting|aguard|unpaid|billet|boleto|analys|analis/;
 export const GURU_IGNORAR = /abandon|expir|checkout|started/;
+
+// Etapa do pipeline de Participantes por id, nome exato ou (se ninguém bater) nome
+// que contém o texto — sem diferenciar maiúscula/acento. Devolve null se não achar.
+export type EtapaPart = { id: string; nome: string; situacao_alvo?: string | null };
+export function acharEtapa(etapas: EtapaPart[], ref: string): EtapaPart | null {
+  const alvo = norm(ref);
+  if (!alvo) return null;
+  return etapas.find((e) => e.id === ref.trim())
+    || etapas.find((e) => norm(e.nome) === alvo)
+    || etapas.find((e) => norm(e.nome).includes(alvo))
+    || null;
+}
 
 // A Hubla manda um envelope próprio (webhooks v2): dados do comprador em
 // event.invoice.payer / event.user, nome dividido em firstName+lastName, e
@@ -268,9 +284,44 @@ Deno.serve(async (req) => {
       : guru ? achaValorGuru(body) : { valor: null, caminho: "" };
     const valorPago = pagamento === "Pago" || (!guru && mapa.valor_pago) ? valorInfo.valor : null;
 
+    // Etapas do pipeline do evento (a 1ª é onde entra quem chega sem etapa definida)
+    let etapasEv: EtapaPart[] = [];
+    {
+      let q = await sb.from("etapas_participante").select("id, nome, situacao_alvo")
+        .eq("evento_id", eventoId).order("ordem");
+      if (q.error) q = await sb.from("etapas_participante").select("id, nome").eq("evento_id", eventoId).order("ordem");
+      etapasEv = (q.data || []) as EtapaPart[];
+    }
+
+    // Mover para uma etapa: o corpo manda "etapa" (nome ou id; ou o caminho em
+    // mapa.etapa) ou a origem fixa uma "etapa_destino" na configuração.
+    // Com etapa definida o webhook vira um "mover": quem já existe só troca de
+    // etapa (não reescreve situação/categoria); quem não existe é criado já nela.
+    const etapaDoCorpo = val("etapa", ["etapa", "etapa_destino", "stage", "pipeline_stage"]).trim();
+    const etapaDaOrigem = String(cfg.etapa_destino || "").trim();
+    let etapaDestino = etapaDoCorpo ? acharEtapa(etapasEv, etapaDoCorpo) : null;
+    let etapaIgnorada = "";
+    if (etapaDoCorpo && !etapaDestino) {
+      // um campo "etapa" solto no corpo que não bate com nenhuma etapa do evento não
+      // pode derrubar integrações antigas: segue como antes e registra no log
+      etapaIgnorada = etapaDoCorpo;
+    }
+    if (!etapaDestino && etapaDaOrigem) {
+      etapaDestino = acharEtapa(etapasEv, etapaDaOrigem);
+      if (!etapaDestino) {
+        // etapa configurada de propósito na origem e não encontrada (apagada/renomeada): avisa
+        const msg = `Etapa "${etapaDaOrigem}" (configurada na origem) não existe neste evento. Etapas: ${etapasEv.map((e) => e.nome).join(", ") || "(nenhuma)"}.`;
+        await logar(422, false, msg);
+        return json({ erro: msg }, 422);
+      }
+    }
+    // a etapa pode definir a situação do participante que entra nela (situação-alvo)
+    const sitDaEtapa = etapaDestino?.situacao_alvo || "";
+    const situacaoNova = sitDaEtapa || situacao;
+
     const reg: Record<string, unknown> = {
       evento_id: eventoId, nome: nome || email, tipo: tipoRaw || "Convidado", pagamento,
-      situacao, quantidade: qtd,
+      situacao: situacaoNova, quantidade: qtd,
     };
     if (valorPago != null) reg.valor_pago = valorPago;
     if (email) reg.email = email;
@@ -279,15 +330,13 @@ Deno.serve(async (req) => {
     if (ingresso) reg.ingresso = ingresso;
     if (faturamento) reg.faturamento = faturamento;
 
-    // primeira etapa do pipeline
-    const { data: et } = await sb.from("etapas_participante").select("id")
-      .eq("evento_id", eventoId).order("ordem").limit(1).maybeSingle();
-    if (et?.id) reg.etapa_id = et.id;
+    const etapaInicial = etapaDestino?.id || etapasEv[0]?.id;
+    if (etapaInicial) reg.etapa_id = etapaInicial;
 
-    let existente = null;
+    let existente: { id: string; etapa_id: string | null } | null = null;
     if (email) {
-      const { data } = await sb.from("participantes").select("id").eq("evento_id", eventoId).ilike("email", email).limit(1);
-      existente = data?.[0] || null;
+      const { data } = await sb.from("participantes").select("id, etapa_id").eq("evento_id", eventoId).ilike("email", email).limit(1);
+      existente = (data?.[0] as { id: string; etapa_id: string | null }) || null;
     }
 
     // Guru: estorno/cancelamento de quem nunca entrou na plataforma não cria ninguém
@@ -299,23 +348,40 @@ Deno.serve(async (req) => {
 
     let resultado;
     if (existente) {
-      // atualização: só situação + contatos que vieram no payload
-      const patch: Record<string, unknown> = { situacao };
+      // atualização: situação + contatos que vieram no payload
+      const patch: Record<string, unknown> = {};
+      if (!etapaDestino) {
+        patch.situacao = situacao;
+      } else {
+        // modo "mover": não mexe na situação/categoria atuais, só aplica o que a etapa
+        // define (situação-alvo) ou um status enviado de propósito no corpo
+        if (sitDaEtapa) patch.situacao = sitDaEtapa;
+        else if (statusRaw && statusMap[statusRaw]) patch.situacao = statusMap[statusRaw];
+        if (existente.etapa_id !== etapaDestino.id) patch.etapa_id = etapaDestino.id;
+      }
       if (telefone) patch.telefone = telefone;
       if (empresa) patch.empresa = empresa;
-      if (ingresso) patch.ingresso = ingresso;
+      if (ingresso && !etapaDestino) patch.ingresso = ingresso;
       if (faturamento) patch.faturamento = faturamento;
       // Guru: a venda manda no pagamento (aprovada → Pago; estorno → Reembolsado…)
       if (guru) patch.pagamento = pagamento;
       if (valorPago != null) patch.valor_pago = valorPago;
-      let r = await sb.from("participantes").update(patch).eq("id", existente.id).select("id, codigo").single();
+      const salvarPatch = () => Object.keys(patch).length
+        ? sb.from("participantes").update(patch).eq("id", existente!.id).select("id, codigo").single()
+        : sb.from("participantes").select("id, codigo").eq("id", existente!.id).single();
+      let r = await salvarPatch();
       if (r.error && /valor_pago/.test(r.error.message)) {
         // migração 0042 ainda não rodou: salva o resto sem o valor
         delete patch.valor_pago;
-        r = await sb.from("participantes").update(patch).eq("id", existente.id).select("id, codigo").single();
+        r = await salvarPatch();
       }
       if (r.error) { await logar(500, false, r.error.message); return json({ erro: r.error.message }, 500); }
-      resultado = { acao: "atualizado", ...r.data, ingresso: ingresso || null, situacao, pagamento: guru ? pagamento : undefined, valor_pago: patch.valor_pago ?? null, valor_origem: valorInfo.caminho || null };
+      resultado = {
+        acao: "atualizado", ...r.data, ingresso: etapaDestino ? undefined : (ingresso || null),
+        situacao: (patch.situacao as string) ?? (etapaDestino ? undefined : situacao),
+        etapa: etapaDestino?.nome, movido: etapaDestino ? "etapa_id" in patch : undefined, etapa_ignorada: etapaIgnorada || undefined,
+        pagamento: guru ? pagamento : undefined, valor_pago: patch.valor_pago ?? null, valor_origem: valorInfo.caminho || null,
+      };
     } else {
       // "Tipo padrão" da origem (ex.: "Aplicação") separa quem chega por aqui de
       // quem veio por convite de anfitrião (esses continuam "Convidado"). Se o
@@ -335,7 +401,7 @@ Deno.serve(async (req) => {
         r = await sb.from("participantes").insert(reg).select("id, codigo").single();
       }
       if (r.error) { await logar(500, false, r.error.message); return json({ erro: r.error.message }, 500); }
-      resultado = { acao: "criado", ...r.data, tipo: reg.tipo, ingresso: ingresso || null, situacao, pagamento, valor_pago: reg.valor_pago ?? null, valor_origem: valorInfo.caminho || null };
+      resultado = { acao: "criado", ...r.data, tipo: reg.tipo, ingresso: ingresso || null, situacao: situacaoNova, etapa: etapaDestino?.nome, etapa_ignorada: etapaIgnorada || undefined, pagamento, valor_pago: reg.valor_pago ?? null, valor_origem: valorInfo.caminho || null };
     }
 
     await logar(200, true, undefined, resultado);

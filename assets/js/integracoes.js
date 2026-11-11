@@ -8,7 +8,7 @@
 // =============================================================================
 import { iniciarPagina, esc, formatarData, abrirModal, toast, confirmar, icone } from "./ui.js";
 import {
-  listIntegracoes, listWebhookEntregas, salvar, remover,
+  listIntegracoes, listWebhookEntregas, listEtapasParticipante, salvar, remover,
   webhookEntradaUrl, testarIntegracao,
 } from "./supabase.js";
 
@@ -17,6 +17,7 @@ const el = (id) => document.getElementById(id);
 
 let integracoes = [];
 let entregas = [];
+let etapas = [];   // etapas do pipeline de Participantes (pra "Mover para a etapa")
 
 const GATILHOS = [
   { valor: "participante.criado",     rotulo: "Participante criado" },
@@ -58,7 +59,7 @@ const CONECTORES = {
 };
 
 // Origens de entrada (só um rótulo — todas usam o mesmo mapeador genérico)
-const ORIGENS = ["Genérico / Zapier", "Guru", "Sympla", "Even3", "Eventbrite", "Hotmart", "Eduzz", "Mercado Pago", "Stripe", "Outro"];
+const ORIGENS = ["Genérico / Zapier", "n8n", "Guru", "Sympla", "Even3", "Eventbrite", "Hotmart", "Eduzz", "Mercado Pago", "Stripe", "Outro"];
 
 _iniciando.then((ctx) => { if (ctx) carregar(ctx); });
 el("add-webhook").onclick = () => modalWebhook(null);
@@ -83,6 +84,7 @@ async function carregar() {
 async function recarregar() {
   integracoes = await listIntegracoes().catch(() => integracoes);
   entregas = await listWebhookEntregas().catch(() => entregas);
+  etapas = await listEtapasParticipante().catch(() => etapas);
   render();
 }
 
@@ -308,6 +310,13 @@ function modalEntrada(row) {
         <select class="select" name="provedor">
           ${ORIGENS.map((o) => `<option ${o === (row?.provedor || "") ? "selected" : ""}>${o}</option>`).join("")}
         </select></label>
+      <label class="campo"><span>Mover para a etapa (opcional)</span>
+        <select class="select" name="etapa_destino">
+          <option value="">— não mover (entra na primeira etapa) —</option>
+          ${etapas.map((e) => `<option value="${esc(e.id)}" ${e.id === cfg.etapa_destino ? "selected" : ""}>${esc(e.nome)}</option>`).join("")}
+          ${cfg.etapa_destino && !etapas.some((e) => e.id === cfg.etapa_destino) ? `<option value="${esc(cfg.etapa_destino)}" selected>${esc(cfg.etapa_destino)}</option>` : ""}
+        </select>
+        <span class="cel-tenue" style="font-size:.72rem">Tudo que chegar por esta URL vai para essa etapa do pipeline de Participantes. Quem já está na lista (achado pelo e-mail) só troca de etapa — situação e categoria ficam como estão, salvo a situação-alvo da etapa. Quem não está é criado já nela. Dá para escolher a etapa também pelo corpo da chamada: <code>{ "etapa": "Interesse VIP" }</code>.</span></label>
       <label class="campo"><span>Situação dos participantes criados</span>
         <select class="select" name="situacao_padrao">
           ${["", "Confirmado", "Pendente", "Pré-inscrito", "Fila de espera"].map((s) =>
@@ -358,6 +367,7 @@ function modalEntrada(row) {
       if (filtroProduto) config.filtro_produto = filtroProduto;
       const tipoPadrao = (fd.get("tipo_padrao") || "").toString().trim();
       if (tipoPadrao) config.tipo_padrao = tipoPadrao;
+      if (fd.get("etapa_destino")) config.etapa_destino = fd.get("etapa_destino");
       if (fd.get("situacao_padrao")) config.situacao_padrao = fd.get("situacao_padrao");
       const ingressoPadrao = (fd.get("ingresso_padrao") || "").toString().trim();
       if (ingressoPadrao) config.ingresso_padrao = ingressoPadrao;
