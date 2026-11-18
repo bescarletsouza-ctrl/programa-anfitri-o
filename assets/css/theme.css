@@ -632,6 +632,9 @@ table.tabela tbody tr:last-child td { border-bottom: none; }
 .menu-flutuante button.atual { color: var(--cor-laranja-forte); font-weight: 600; }
 .menu-flutuante button svg { width: 14px; height: 14px; flex-shrink: 0; }
 
+/* ---- Perfil Agente: some o que é só de admin (ui.js põe .perfil-agente no body) ---- */
+.perfil-agente .so-admin { display: none !important; }
+
 /* ---- Observações em histórico (assets/js/observacoes.js) ---- */
 .obs-lista { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
 .obs-item {

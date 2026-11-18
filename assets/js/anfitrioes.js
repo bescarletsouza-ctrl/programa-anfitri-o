@@ -429,7 +429,7 @@ function renderLista() {
         ${colunas.map((c) => celulaHtml(a, c)).join("")}
         <td class="linha-acoes">
           <button class="icone-btn" data-editar title="Editar">${icone("editar")}</button>
-          <button class="icone-btn" data-excluir title="Excluir">${icone("excluir")}</button>
+          <button class="icone-btn so-admin" data-excluir title="Excluir">${icone("excluir")}</button>
         </td>
       </tr>`;
     })
@@ -522,15 +522,15 @@ function renderPipeline() {
       const ordenados = ordenarCardsPipe(itens, chave);
       return `<div class="coluna" data-chave="${esc(chave)}">
         <div class="coluna-topo">
-          ${et ? `<span class="coluna-grip" draggable="true" title="Arraste para reordenar">⠿</span>` : ""}
+          ${et ? `<span class="coluna-grip so-admin" draggable="true" title="Arraste para reordenar">⠿</span>` : ""}
           <button type="button" class="coluna-titulo" data-ordenar="${esc(chave)}" title="Ordenar cards">
             <span class="ponto" style="background:${esc(cor)}"></span>
             ${esc(et ? et.nome : "Sem estágio")}<span class="ind-ordem">${ind}</span>
           </button>
           <span class="qtd">${itens.length}</span>
           ${et ? `<span class="linha-acoes coluna-acoes">
-            <button type="button" class="icone-btn" data-editar-etapa="${et.id}" title="Editar estágio">${icone("editar")}</button>
-            <button type="button" class="icone-btn" data-excluir-etapa="${et.id}" title="Excluir estágio">${icone("excluir")}</button>
+            <button type="button" class="icone-btn so-admin" data-editar-etapa="${et.id}" title="Editar estágio">${icone("editar")}</button>
+            <button type="button" class="icone-btn so-admin" data-excluir-etapa="${et.id}" title="Excluir estágio">${icone("excluir")}</button>
           </span>` : ""}
         </div>
         ${et?.situacao_alvo ? `<div class="coluna-vinculo" title="Ao mover para cá, a situação vira ${esc(et.situacao_alvo)}">→ situação: <b>${esc(et.situacao_alvo)}</b></div>` : ""}
@@ -1140,7 +1140,7 @@ async function abrirGavetaDetalhe(id) {
       }
     </div>
 
-    <div class="secao zona-perigo">
+    <div class="secao zona-perigo so-admin">
       <p>Excluir remove o anfitrião e todos os convidados dele.</p>
       <button class="btn btn-perigo" id="d-excluir">Excluir anfitrião</button>
     </div>`

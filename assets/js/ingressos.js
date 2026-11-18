@@ -85,9 +85,9 @@ function renderCampos() {
         ${cp.tipo !== "texto" && cp.opcoes?.length ? `<div class="integ-tags">${cp.opcoes.map((o) => `<span class="integ-tag">${esc(o)}</span>`).join("")}</div>` : ""}
       </div>
       <span class="linha-acoes">
-        <button class="icone-btn" data-toggle-campo="${cp.id}" title="${cp.ativo ? "Pausar" : "Ativar"}">${icone(cp.ativo ? "pausar" : "play")}</button>
-        <button class="icone-btn" data-editar-campo="${cp.id}" title="Editar">${icone("editar")}</button>
-        <button class="icone-btn" data-excluir-campo="${cp.id}" title="Excluir">${icone("excluir")}</button>
+        <button class="icone-btn so-admin" data-toggle-campo="${cp.id}" title="${cp.ativo ? "Pausar" : "Ativar"}">${icone(cp.ativo ? "pausar" : "play")}</button>
+        <button class="icone-btn so-admin" data-editar-campo="${cp.id}" title="Editar">${icone("editar")}</button>
+        <button class="icone-btn so-admin" data-excluir-campo="${cp.id}" title="Excluir">${icone("excluir")}</button>
       </span>
     </div>`).join("") : `<p class="pagina-sub" style="margin:0">Nenhum campo personalizado ainda.</p>`;
   c.querySelectorAll("[data-editar-campo]").forEach((b) => {
@@ -183,8 +183,8 @@ function linhaHtml(t) {
     <td>${chips || `<span class="cel-tenue">—</span>`}</td>
     <td>${t.ativo ? `<span class="badge badge-ok">Ativo</span>` : `<span class="badge badge-neutro">Inativo</span>`}</td>
     <td class="linha-acoes">
-      <button class="icone-btn" data-editar title="Editar">${icone("editar")}</button>
-      <button class="icone-btn" data-excluir title="Excluir">${icone("excluir")}</button>
+      <button class="icone-btn so-admin" data-editar title="Editar">${icone("editar")}</button>
+      <button class="icone-btn so-admin" data-excluir title="Excluir">${icone("excluir")}</button>
     </td>
   </tr>`;
 }

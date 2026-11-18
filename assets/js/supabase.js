@@ -696,7 +696,9 @@ async function chamarEquipe(body) {
 }
 export const listarEquipe = (orgId) => chamarEquipe({ acao: "listar", org_id: orgId }).then((d) => d.membros || []);
 export const criarMembroEquipe = (orgId, dados) => chamarEquipe({ acao: "criar", org_id: orgId, ...dados });
-export const trocarSenhaMembro = (orgId, membroId, senha) => chamarEquipe({ acao: "senha", org_id: orgId, membro_id: membroId, senha });
+// dados: { nome?, telefone?, papel?: "admin" | "agente", email? } — só o que vier é alterado
+export const editarMembroEquipe = (orgId, membroId, dados) => chamarEquipe({ acao: "editar", org_id: orgId, membro_id: membroId, ...dados });
+export const trocarSenhaMembro =(orgId, membroId, senha) => chamarEquipe({ acao: "senha", org_id: orgId, membro_id: membroId, senha });
 export const removerMembroEquipe = (orgId, membroId) => chamarEquipe({ acao: "remover", org_id: orgId, membro_id: membroId });
 
 /* ---- Plataforma (Edge Function "plataforma") — só a super-admin --------- */

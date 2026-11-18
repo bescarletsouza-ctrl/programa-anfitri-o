@@ -9,7 +9,7 @@
 //
 // Deploy:  supabase functions deploy equipe
 // =============================================================================
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.117.2";
+import { createClient } from "npm:@supabase/supabase-js@2.117.2";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -33,9 +33,13 @@ async function caller(req: Request) {
   return data.user || null;
 }
 
-async function podeGerir(sb: ReturnType<typeof svc>, userId: string, orgId: string) {
+async function ehPlataforma(sb: ReturnType<typeof svc>, userId: string) {
   const { data: plat } = await sb.from("plataforma_admins").select("user_id").eq("user_id", userId).maybeSingle();
-  if (plat) return true;
+  return !!plat;
+}
+
+async function podeGerir(sb: ReturnType<typeof svc>, userId: string, orgId: string) {
+  if (await ehPlataforma(sb, userId)) return true;
   const { data: m } = await sb.from("org_membros").select("id")
     .eq("org_id", orgId).eq("user_id", userId).eq("papel", "admin").maybeSingle();
   return !!m;
@@ -63,7 +67,7 @@ Deno.serve(async (req) => {
         membros: (membros || [])
           .map((m) => ({
             id: m.id, user_id: m.user_id, email: m.email || porId.get(m.user_id)?.email,
-            nome: m.nome, papel: m.papel,
+            nome: m.nome, telefone: m.telefone || null, papel: m.papel,
             ultimo_login: porId.get(m.user_id)?.last_sign_in_at || null,
           }))
           .filter((m) => ids.includes(m.user_id))
@@ -96,10 +100,48 @@ Deno.serve(async (req) => {
 
       const { error: eM } = await sb.from("org_membros").upsert({
         org_id, user_id: userId, email: mail, nome: nome || null, telefone: telefone || null,
-        papel: papel === "admin" ? "admin" : "membro",
+        papel: papel === "admin" ? "admin" : "agente",
       }, { onConflict: "org_id,user_id" });
       if (eM) return json({ erro: eM.message }, 400);
       return json({ ok: true, user_id: userId, link });
+    }
+
+    // Editar um usuário da organização: nome, telefone, perfil (admin | agente) e e-mail de login.
+    // Só mexe no que vier no corpo. A organização nunca fica sem admin (a super-admin pode).
+    if (acao === "editar") {
+      if (!membro_id) return json({ erro: "membro_id obrigatório." }, 400);
+      const { data: m } = await sb.from("org_membros").select("*").eq("id", membro_id).eq("org_id", org_id).maybeSingle();
+      if (!m) return json({ erro: "Membro não encontrado." }, 404);
+      const patch: Record<string, unknown> = {};
+
+      if (nome !== undefined) patch.nome = String(nome || "").trim() || null;
+      if (telefone !== undefined) patch.telefone = String(telefone || "").trim() || null;
+
+      if (papel !== undefined) {
+        const novo = papel === "admin" ? "admin" : "agente";
+        if (m.papel === "admin" && novo !== "admin" && !(await ehPlataforma(sb, u.id))) {
+          const { count } = await sb.from("org_membros").select("id", { count: "exact", head: true })
+            .eq("org_id", org_id).eq("papel", "admin");
+          if ((count || 0) <= 1) return json({ erro: "A organização precisa ter pelo menos um admin." }, 400);
+        }
+        patch.papel = novo;
+      }
+
+      if (email !== undefined) {
+        const mail = String(email || "").trim().toLowerCase();
+        if (!/^\S+@\S+\.\S+$/.test(mail)) return json({ erro: "E-mail inválido." }, 400);
+        if (mail !== String(m.email || "").toLowerCase()) {
+          const { error: eA } = await sb.auth.admin.updateUserById(m.user_id, { email: mail, email_confirm: true });
+          if (eA) return json({ erro: eA.message }, 400);
+          patch.email = mail;
+        }
+      }
+
+      if (Object.keys(patch).length) {
+        const { error: eU } = await sb.from("org_membros").update(patch).eq("id", membro_id);
+        if (eU) return json({ erro: eU.message }, 400);
+      }
+      return json({ ok: true });
     }
 
     if (acao === "senha") {

@@ -5,7 +5,7 @@ import { APP } from "./config.js";
 import { CONFIGURADO, listEventos } from "./supabase.js";
 import { eventoId, eventoNome, definirEvento } from "./evento.js";
 import {
-  exigirLogin, contexto, guardAcesso, sair, planoBloqueado, CLUSTERS_POR_ACESSO,
+  exigirLogin, contexto, guardAcesso, sair, planoBloqueado, CLUSTERS_POR_ACESSO, ehAgente, PAGINAS_SO_ADMIN,
 } from "./auth.js";
 
 /* ---- Ícones (feather-style, stroke currentColor) --------------------- */
@@ -149,9 +149,13 @@ export function renderSidebar(ativo, ctx) {
     ];
   } else {
     const clusters = CLUSTERS_POR_ACESSO[ctx?.acesso || "tudo"] || CLUSTERS_POR_ACESSO.tudo;
-    nav = NAV.filter((b) => clusters.includes(b.grupo));
+    const agente = ehAgente(ctx);   // agente não vê Automações, Formulário, Configurações e Integrações
+    nav = NAV.filter((b) => clusters.includes(b.grupo))
+      .map((b) => ({ ...b, itens: b.itens.filter((n) => !(agente && PAGINAS_SO_ADMIN.includes(n.chave))) }))
+      .filter((b) => b.itens.length);
     rodape = NAV_RODAPE.filter((n) =>
-      n.chave !== "integracoes" || (ctx?.acesso || "tudo") !== "anfitrioes");
+      (n.chave !== "integracoes" || (ctx?.acesso || "tudo") !== "anfitrioes") &&
+      !(agente && PAGINAS_SO_ADMIN.includes(n.chave)));
   }
 
   el.innerHTML = `
@@ -474,10 +478,14 @@ export function iniciarPagina(chaveNav, opts = {}) {
     if (!guardAcesso(chaveNav, ctx)) return null;
     if (!opts.semEvento && !eventoId()) { location.href = "eventos.html"; return null; }
     renderSidebar(chaveNav, ctx);
+    document.body.classList.toggle("perfil-agente", ehAgente(ctx));   // esconde o que tem .so-admin
     bannerPlano(ctx);
     return ctx;
   })();
 }
+
+// true quando quem está logado é Agente (use pra pular ações de admin)
+export const souAgente = () => document.body.classList.contains("perfil-agente");
 
 function avisoConfig() {
   if (CONFIGURADO) return;

@@ -5,7 +5,7 @@ import { iniciarPagina, esc, abrirModal, toast, confirmar, icone, formatarData }
 import {
   listGrupos, listEstagios, listEtapasParticipante, listMarcos, listTiposIngresso,
   getEvento, salvar, remover, salvarEvento,
-  listarEquipe, criarMembroEquipe, trocarSenhaMembro, removerMembroEquipe,
+  listarEquipe, criarMembroEquipe, editarMembroEquipe, trocarSenhaMembro, removerMembroEquipe,
 } from "./supabase.js";
 import { eventoId, definirEvento } from "./evento.js";
 import { montarCrachaHtml, CRACHA_PADRAO, TAMANHOS_CRACHA, snapTamanho, qrDataURL } from "./cracha.js";
@@ -460,18 +460,21 @@ async function montarEquipe() {
     c.innerHTML = membros.map((m) => `
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--cinza-100)" data-id="${esc(m.id)}">
         <div style="min-width:0">
-          <div style="font-size:.9rem;font-weight:600;overflow:hidden;text-overflow:ellipsis">${esc(m.email || "—")}</div>
+          <div style="font-size:.9rem;font-weight:600;overflow:hidden;text-overflow:ellipsis">${esc(m.nome || m.email || "—")}
+            <span class="badge ${m.papel === "admin" ? "badge-info" : "badge-neutro"}" style="margin-left:6px;font-weight:600">${m.papel === "admin" ? "Admin" : "Agente"}</span></div>
           <div class="pagina-sub" style="margin:2px 0 0;font-size:.74rem">
-            ${m.ultimo_login ? "último acesso " + formatarData(m.ultimo_login) : "nunca acessou"}
+            ${m.nome ? esc(m.email || "") + " · " : ""}${m.ultimo_login ? "último acesso " + formatarData(m.ultimo_login) : "nunca acessou"}
           </div>
         </div>
         <span class="linha-acoes">
+          <button class="btn btn-secundario btn-sm" data-editar title="Editar nome, e-mail, telefone e perfil">Editar</button>
           <button class="btn btn-secundario btn-sm" data-senha title="Trocar senha">Senha</button>
           <button class="icone-btn" data-excluir title="Remover acesso">${icone("excluir")}</button>
         </span>
       </div>`).join("");
     c.querySelectorAll("[data-id]").forEach((row) => {
       const m = membros.find((x) => x.id === row.dataset.id);
+      row.querySelector("[data-editar]").onclick = () => modalEditarMembro(m);
       row.querySelector("[data-senha]").onclick = () => modalMembro(m);
       row.querySelector("[data-excluir]").onclick = async () => {
         if (!confirmar(`Remover o acesso de ${m.email}?`)) return;
@@ -486,6 +489,36 @@ async function montarEquipe() {
   }
 }
 
+const TEXTO_PERFIS = "<b>Admin</b>: tudo, inclusive usuários e configurações. <b>Agente</b>: opera participantes, credenciamento e check-in; não aprova, não exclui e não altera tipos de ingresso, metas, formulário, automações, integrações nem configurações.";
+
+function modalEditarMembro(m) {
+  abrirModal({
+    titulo: `Editar usuário — ${m.nome || m.email}`,
+    textoConfirmar: "Salvar",
+    corpoHtml: `
+      <label class="campo"><span>Nome</span>
+        <input class="input" name="nome" value="${esc(m.nome || "")}" placeholder="Nome da pessoa" /></label>
+      <label class="campo"><span>E-mail (login) *</span>
+        <input class="input" name="email" type="email" required value="${esc(m.email || "")}" />
+        <span class="cel-tenue" style="font-size:.72rem">Trocar o e-mail muda o login dessa pessoa.</span></label>
+      <label class="campo"><span>Telefone</span>
+        <input class="input" name="telefone" value="${esc(m.telefone || "")}" placeholder="(00) 00000-0000" /></label>
+      <label class="campo"><span>Perfil</span>
+        <select class="select" name="papel">
+          <option value="agente" ${m.papel !== "admin" ? "selected" : ""}>Agente</option>
+          <option value="admin" ${m.papel === "admin" ? "selected" : ""}>Admin</option></select>
+        <span class="cel-tenue" style="font-size:.72rem">${TEXTO_PERFIS}</span></label>`,
+    onConfirmar: async (form) => {
+      const f = Object.fromEntries(new FormData(form));
+      const dados = { nome: f.nome.trim(), telefone: f.telefone.trim(), papel: f.papel };
+      if ((f.email || "").trim().toLowerCase() !== (m.email || "").toLowerCase()) dados.email = f.email.trim();
+      await editarMembroEquipe(CTX.org.id, m.id, dados);
+      toast("Usuário atualizado.", "ok");
+      montarEquipe();
+    },
+  });
+}
+
 function modalMembro(m) {
   abrirModal({
     titulo: m ? `Trocar senha — ${m.email}` : "Adicionar pessoa à organização",
@@ -495,8 +528,9 @@ function modalMembro(m) {
           <input class="input" name="nome" placeholder="Nome da pessoa" /></label>
         <label class="campo"><span>E-mail *</span>
           <input class="input" name="email" type="email" required placeholder="pessoa@email.com" /></label>
-        <label class="campo"><span>Papel</span>
-          <select class="select" name="papel"><option value="membro">Membro</option><option value="admin">Admin (gerencia usuários)</option></select></label>`}
+        <label class="campo"><span>Perfil</span>
+          <select class="select" name="papel"><option value="agente">Agente</option><option value="admin">Admin</option></select>
+          <span class="cel-tenue" style="font-size:.72rem">${TEXTO_PERFIS}</span></label>`}
       <label class="campo"><span>${m ? "Nova senha *" : "Senha (opcional)"}</span>
         <input class="input" name="senha" type="text" ${m ? "required" : ""} minlength="6" placeholder="${m ? "mín. 6 caracteres" : "em branco = manda convite por e-mail"}" /></label>`,
     onConfirmar: async (form) => {

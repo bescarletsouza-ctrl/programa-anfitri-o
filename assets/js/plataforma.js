@@ -4,7 +4,7 @@
 // usuários de cada organização. Tudo via a Edge Function "plataforma".
 // =============================================================================
 import { iniciarPagina, esc, formatarData, abrirModal, toast, confirmar, icone } from "./ui.js";
-import { listarOrgs, criarOrg, editarOrg, removerOrg, addMembroOrg, removerMembroOrg, reenviarConvite } from "./supabase.js";
+import { listarOrgs, criarOrg, editarOrg, removerOrg, addMembroOrg, removerMembroOrg, reenviarConvite, editarMembroEquipe } from "./supabase.js";
 
 const el = (id) => document.getElementById(id);
 let orgs = [];
@@ -180,8 +180,12 @@ function modalMembros(o) {
   const linha = (m) => `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--cinza-100)" data-mid="${esc(m.id)}">
     <div style="min-width:0">
       <div style="font-size:.88rem;font-weight:600">${esc(m.email || m.nome || "—")}</div>
-      <div class="cel-tenue" style="font-size:.72rem">${m.papel === "admin" ? "admin" : "membro"}</div>
+      <div class="cel-tenue" style="font-size:.72rem">${m.nome ? esc(m.nome) : ""}</div>
     </div>
+    <select class="select" data-papel style="width:auto;height:32px;font-size:.8rem" title="Perfil">
+      <option value="agente" ${m.papel !== "admin" ? "selected" : ""}>Agente</option>
+      <option value="admin" ${m.papel === "admin" ? "selected" : ""}>Admin</option>
+    </select>
     <button class="icone-btn" data-rm title="Remover">${icone("excluir")}</button>
   </div>`;
   abrirModal({
@@ -191,7 +195,7 @@ function modalMembros(o) {
       <div id="mlista">${(o.equipe || []).map(linha).join("") || `<p class="pagina-sub" style="margin:0">Só o responsável por enquanto.</p>`}</div>
       <hr class="cfg-sep" />
       <label class="campo"><span>Adicionar por e-mail</span><input class="input" id="m-email" type="email" placeholder="pessoa@email.com" /></label>
-      <label class="campo"><span>Papel</span><select class="select" id="m-papel"><option value="membro">Membro</option><option value="admin">Admin</option></select></label>
+      <label class="campo"><span>Perfil</span><select class="select" id="m-papel"><option value="agente">Agente</option><option value="admin">Admin</option></select></label>
       <button class="btn btn-secundario btn-sm" id="m-add" type="button">Enviar convite</button>`,
     aoMontar: (root) => {
       root.querySelector("#m-add").onclick = async () => {
@@ -205,6 +209,13 @@ function modalMembros(o) {
         } catch (e) { toast(e.message, "erro"); }
       };
       root.querySelectorAll("[data-mid]").forEach((r) => {
+        r.querySelector("[data-papel]").onchange = async (e) => {
+          try {
+            await editarMembroEquipe(o.id, r.dataset.mid, { papel: e.target.value });
+            toast("Perfil atualizado.", "ok");
+            carregar();
+          } catch (err) { toast(err.message, "erro"); }
+        };
         r.querySelector("[data-rm]").onclick = async () => {
           if (!confirmar("Remover este usuário?")) return;
           try { await removerMembroOrg(r.dataset.mid); r.remove(); carregar(); }

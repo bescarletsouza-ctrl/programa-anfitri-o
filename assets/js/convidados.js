@@ -3,7 +3,7 @@
 // =============================================================================
 import {
   iniciarPagina, esc, debounce, formatarData, telParaWhatsApp,
-  abrirModal, abrirGaveta, fecharGaveta, toast, confirmar, icone,
+  abrirModal, abrirGaveta, fecharGaveta, toast, confirmar, icone, souAgente,
 } from "./ui.js";
 import {
   listGrupos, listAnfitrioes, listConvidados, listFormPerguntas, salvar, remover,
@@ -133,7 +133,7 @@ function render() {
         <td>${formatarData(c.created_at)}</td>
         <td class="linha-acoes">
           <button class="icone-btn" data-editar title="Editar">${icone("editar")}</button>
-          <button class="icone-btn" data-excluir title="Excluir">${icone("excluir")}</button>
+          <button class="icone-btn so-admin" data-excluir title="Excluir">${icone("excluir")}</button>
         </td>
       </tr>`;
     })
@@ -298,19 +298,20 @@ function abrirGavetaDetalhe(id) {
     `
     <div class="secao">
       <h4>Decisão</h4>
-      <div style="display:flex;gap:8px;margin-bottom:10px">
+      <div class="so-admin" style="display:flex;gap:8px;margin-bottom:10px">
         <button class="btn btn-primario" id="d-aprovar" style="flex:1;background:var(--ok-solid);border-color:var(--ok-solid)"
           ${c.status === "Aprovado" || c.status === "Confirmado" ? "disabled" : ""}>${icone("check")} Aprovar</button>
         <button class="btn btn-perigo" id="d-reprovar" style="flex:1"
           ${c.status === "Recusado" ? "disabled" : ""}>${icone("x")} Reprovar</button>
       </div>
-      <select class="select" id="d-status">
+      <select class="select so-admin" id="d-status">
         ${STATUS_CONVIDADO.map((s) => `<option ${s === c.status ? "selected" : ""}>${s}</option>`).join("")}
       </select>
       <p class="pagina-sub" style="margin:6px 0 0;font-size:.72rem">
         Status atual: <b>${esc(c.status)}</b> — o convidado vê isso na página de acompanhamento.
       </p>
-      <p class="pagina-sub" style="margin:6px 0 0;font-size:.72rem">
+      ${souAgente() ? `<p class="pagina-sub" style="margin:6px 0 0;font-size:.72rem">Só um administrador aprova ou recusa convidados.</p>` : ""}
+      <p class="pagina-sub so-admin" style="margin:6px 0 0;font-size:.72rem">
         Ao aprovar, entra na lista de Participantes${
           c.anfitriao?.categoria_convidado
             ? ` na categoria <b>${esc(c.anfitriao.categoria_convidado)}</b>`
@@ -359,7 +360,7 @@ function abrirGavetaDetalhe(id) {
       <p class="pagina-sub" style="margin:0;font-size:.75rem">Recebido em ${formatarData(c.created_at, true)}</p>
     </div>
 
-    <div class="secao zona-perigo">
+    <div class="secao zona-perigo so-admin">
       <p>Use apenas para registros de teste.</p>
       <button class="btn btn-perigo" id="d-excluir">Excluir convidado</button>
     </div>`

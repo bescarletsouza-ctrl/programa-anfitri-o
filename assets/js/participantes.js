@@ -6,7 +6,7 @@
 // =============================================================================
 import {
   iniciarPagina, esc, debounce, formatarData, abrirModal, abrirGaveta,
-  fecharGaveta, toast, confirmar, icone, abrirMenu, normalizarFaturamento, htmlHistoricoMov,
+  fecharGaveta, toast, confirmar, icone, abrirMenu, normalizarFaturamento, htmlHistoricoMov, souAgente,
 } from "./ui.js";
 import {
   listParticipantes, listEtapasParticipante, listAtividades, listCheckins, listTiposIngresso, listGrupos,
@@ -454,7 +454,7 @@ function linhaHtml(p) {
     ${colunas.map((c) => celulaHtml(p, c)).join("")}
     <td class="linha-acoes">
       <button class="icone-btn" data-editar title="Editar">${icone("editar")}</button>
-      <button class="icone-btn" data-excluir title="Excluir">${icone("excluir")}</button>
+      <button class="icone-btn so-admin" data-excluir title="Excluir">${icone("excluir")}</button>
     </td>
   </tr>`;
 }
@@ -485,6 +485,8 @@ function celulaHtml(p, c) {
     case "statusConvite": {
       if (!p.convidado_id) return `<td><span class="cel-tenue">—</span></td>`;
       const st = p.convidado?.status || "Pendente";
+      // aprovar/recusar convite é só de admin: pro agente a célula é só leitura
+      if (souAgente()) return `<td><span class="badge ${badgeStatusConvite(st)}">${esc(st)}</span></td>`;
       return `<td class="celula-edit" data-campo="statusConvite" title="Alterar status do convite"><span class="badge ${badgeStatusConvite(st)}">${esc(st)}</span>${lapis()}</td>`;
     }
     case "pagamento":
@@ -899,15 +901,15 @@ function renderPipeline() {
       const ordenados = ordenarCards(itens, chave);
       return `<div class="coluna" data-chave="${esc(chave)}">
         <div class="coluna-topo">
-          ${et ? `<span class="coluna-grip" draggable="true" title="Arraste para reordenar">⠿</span>` : ""}
+          ${et ? `<span class="coluna-grip so-admin" draggable="true" title="Arraste para reordenar">⠿</span>` : ""}
           <button type="button" class="coluna-titulo" data-ordenar="${esc(chave)}" title="Ordenar cards">
             <span class="ponto" style="background:${esc(cor)}"></span>
             ${esc(et ? et.nome : "Sem etapa")}<span class="ind-ordem">${ind}</span>
           </button>
           <span class="qtd">${itens.length}</span>
           ${et ? `<span class="linha-acoes coluna-acoes">
-            <button type="button" class="icone-btn" data-editar-etapa="${et.id}" title="Editar etapa">${icone("editar")}</button>
-            <button type="button" class="icone-btn" data-excluir-etapa="${et.id}" title="Excluir etapa">${icone("excluir")}</button>
+            <button type="button" class="icone-btn so-admin" data-editar-etapa="${et.id}" title="Editar etapa">${icone("editar")}</button>
+            <button type="button" class="icone-btn so-admin" data-excluir-etapa="${et.id}" title="Excluir etapa">${icone("excluir")}</button>
           </span>` : ""}
         </div>
         ${et?.situacao_alvo ? `<div class="coluna-vinculo" title="Ao mover para cá, a situação vira ${esc(et.situacao_alvo)}">→ situação: <b>${esc(et.situacao_alvo)}</b></div>` : ""}
@@ -1470,8 +1472,11 @@ function abrirGavetaDetalhe(id) {
     ${p.convidado_id ? `<div class="secao">
       <h4>Status do convite</h4>
       <p class="pagina-sub" style="margin:0 0 8px">Separado da Situação acima — é o andamento do convite dele (Pendente/Aprovado/Recusado/Confirmado).</p>
-      <select class="select" id="g-status-convite">
-        ${STATUS_CONVIDADO.map((s) => `<option ${s === (p.convidado?.status || "Pendente") ? "selected" : ""}>${s}</option>`).join("")}</select>
+      ${souAgente()
+        ? `<span class="badge ${badgeStatusConvite(p.convidado?.status || "Pendente")}">${esc(p.convidado?.status || "Pendente")}</span>
+           <span class="cel-tenue" style="font-size:.74rem"> · só um administrador aprova ou recusa convites</span>`
+        : `<select class="select" id="g-status-convite">
+        ${STATUS_CONVIDADO.map((s) => `<option ${s === (p.convidado?.status || "Pendente") ? "selected" : ""}>${s}</option>`).join("")}</select>`}
     </div>` : ""}
     <div class="secao">
       <h4>Etapa do pipeline</h4>
@@ -1496,7 +1501,7 @@ function abrirGavetaDetalhe(id) {
       <p class="pagina-sub" style="margin:0 0 8px">Move para outro evento ativo mantendo o código e a origem.</p>
       <button class="btn btn-secundario" id="g-transferir">Transferir para outro evento</button>
     </div>`}
-    <div class="secao zona-perigo">
+    <div class="secao zona-perigo so-admin">
       <p>Remover da lista de participantes.${p.anfitriao_id ? " (O registro na gestão de anfitriões não é apagado.)" : ""}</p>
       <button class="btn btn-perigo" id="g-excluir">Excluir participante</button>
     </div>`

@@ -73,7 +73,15 @@ const CLUSTER_DA_CHAVE = {
   config: "*", integracoes: "*", eventos: "*",   // sempre visíveis (rodapé)
   plataforma: "plataforma",
 };
-const HOME_POR_ACESSO = { tudo: "index.html", eventos: "painel-evento.html", anfitrioes: "index.html" };
+/* ---- Perfil: admin | agente ----------------------------------------------- */
+// Agente opera o dia a dia (participantes, credenciamento, check-in). Não aprova,
+// não exclui e não mexe em configuração. As telas abaixo ele nem abre; o resto
+// esconde os botões de admin (classe .so-admin) — e o banco barra de qualquer jeito
+// (migração 0045).
+export const ehAgente = (ctx) => ctx?.papel === "agente";
+export const PAGINAS_SO_ADMIN = ["config", "integracoes", "automacoes", "formulario"];
+
+const HOME_POR_ACESSO ={ tudo: "index.html", eventos: "painel-evento.html", anfitrioes: "index.html" };
 
 export function homeDoAcesso(ctx) {
   return HOME_POR_ACESSO[ctx?.acesso || "tudo"] || "index.html";
@@ -90,6 +98,7 @@ export function guardAcesso(chave, ctx) {
     return false;
   }
   if (cluster === "plataforma") { location.replace(homeDoAcesso(ctx)); return false; }
+  if (ehAgente(ctx) && PAGINAS_SO_ADMIN.includes(chave)) { location.replace(homeDoAcesso(ctx)); return false; }
   if (cluster === "*") return true;
   if ((CLUSTERS_POR_ACESSO[ctx.acesso] || CLUSTERS_POR_ACESSO.tudo).includes(cluster)) return true;
   location.replace(homeDoAcesso(ctx));

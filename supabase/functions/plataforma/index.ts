@@ -11,7 +11,7 @@
 // Secrets (opcionais — se faltarem, o link de convite volta na resposta para
 // copiar à mão):  RESEND_API_KEY, EMAIL_FROM
 // =============================================================================
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.117.2";
+import { createClient } from "npm:@supabase/supabase-js@2.117.2";
 
 const OWNER_EMAIL = "bescarletsouza@gmail.com";
 
@@ -262,7 +262,7 @@ Deno.serve(async (req) => {
       const { error } = await sb.from("org_membros").upsert({
         org_id: orgId, user_id: c.userId, email,
         nome: body.nome || null, telefone: body.telefone || null,
-        papel: body.papel === "admin" ? "admin" : "membro",
+        papel: body.papel === "admin" ? "admin" : "agente",
       }, { onConflict: "org_id,user_id" });
       if (error) return json({ erro: error.message }, 400);
       const env = await mandarConvite(email, c.link);

@@ -5,7 +5,7 @@
 import { esc, formatarData, abrirModal, toast, icone } from "./ui.js";
 import { listEventos, criarEvento, salvarEventoPorId, excluirEvento, listarOrgs } from "./supabase.js";
 import { definirEvento, eventoId, sairEvento } from "./evento.js";
-import { exigirLogin, contexto, sair, planoBloqueado } from "./auth.js";
+import { exigirLogin, contexto, sair, planoBloqueado, ehAgente } from "./auth.js";
 
 const el = (id) => document.getElementById(id);
 let CTX = null;
@@ -16,6 +16,7 @@ el("btn-criar").onclick = modalCriar;
 (async function () {
   if (!(await exigirLogin())) return;
   CTX = await contexto();
+  document.body.classList.toggle("perfil-agente", ehAgente(CTX));   // agente não edita nem exclui evento
   if (el("eventos-sair")) el("eventos-sair").onclick = sair;
   carregar();
 })();
@@ -52,8 +53,8 @@ function renderLista(eventos) {
           ${e.id === atual ? '<span class="badge badge-laranja">aberto agora</span>' : ""}
         </button>
         <div class="evento-card-acoes">
-          <button class="icone-btn" data-editar="${esc(e.id)}" title="Editar evento" aria-label="Editar evento">${icone("editar")}</button>
-          <button class="icone-btn" data-excluir="${esc(e.id)}" title="Excluir evento" aria-label="Excluir evento">${icone("excluir")}</button>
+          <button class="icone-btn so-admin" data-editar="${esc(e.id)}" title="Editar evento" aria-label="Editar evento">${icone("editar")}</button>
+          <button class="icone-btn so-admin" data-excluir="${esc(e.id)}" title="Excluir evento" aria-label="Excluir evento">${icone("excluir")}</button>
         </div>
       </div>`;
     })
