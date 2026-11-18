@@ -18,6 +18,29 @@ let filtroGrupo = [];   // tipos marcados no filtro ([] = todos)
 let faixaModo = "Confirmado";
 let topAnfModo = "Confirmado";
 
+// "Confirmado" no painel = o convite está Confirmado OU o participante ligado a ele está
+// com Situação "Confirmado" (é o que aparece na lista de Participantes e o que o
+// Planejamento conta). Antes contava só o status do convite, que só muda à mão — então
+// quase todo mundo aparecia zerado. Aprovado = Aprovado ou Confirmado.
+const situacaoDoParticipante = (c) =>
+  (Array.isArray(c.participante) ? c.participante[0]?.situacao : c.participante?.situacao) || null;
+const eConfirmado = (c) => c.status === "Confirmado" || situacaoDoParticipante(c) === "Confirmado";
+const eAprovado = (c) => c.status === "Aprovado" || eConfirmado(c);
+
+// enviados / aprovados / confirmados de cada anfitrião, contados nos convidados
+function contagemPorAnfitriao() {
+  const m = new Map();
+  (dados?.convidados || []).forEach((c) => {
+    if (!c.anfitriao_id) return;
+    const v = m.get(c.anfitriao_id) || { enviados: 0, aprovados: 0, confirmados: 0 };
+    v.enviados++;
+    if (eAprovado(c)) v.aprovados++;
+    if (eConfirmado(c)) v.confirmados++;
+    m.set(c.anfitriao_id, v);
+  });
+  return m;
+}
+
 el("data-hoje").textContent =
   dataPorExtenso().replace(/^\w/, (c) => c.toUpperCase());
 
@@ -93,7 +116,6 @@ function renderAplicacoesDiarias() {
   const todos = dados.convidados;
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
-  const eAprovado = (c) => c.status === "Aprovado" || c.status === "Confirmado";
 
   const chaveDia = (d) => d.toISOString().slice(0, 10);
   const recebidasPorDia = new Map();
@@ -207,7 +229,9 @@ function renderFunilConvidados() {
   const c = convNoGrupo();
   const cont = (s) => c.filter((x) => x.status === s).length;
   const total = c.length;
-  const pend = cont("Pendente"), apr = cont("Aprovado") + cont("Confirmado"), conf = cont("Confirmado");
+  const conf = c.filter(eConfirmado).length;
+  const apr = c.filter(eAprovado).length;
+  const pend = c.filter((x) => x.status === "Pendente" && !eConfirmado(x)).length;
   let html = "";
   // Pendentes/Aprovados são categorias que se excluem (ninguém está nas
   // duas), então cada uma compara com o Total recebido, não uma com a
@@ -244,8 +268,8 @@ function renderFunilConvidados() {
 function renderFaixas() {
   if (!dados) return;
   let base = convNoGrupo();
-  if (faixaModo === "Confirmado") base = base.filter((c) => c.status === "Confirmado");
-  else if (faixaModo === "Aprovado") base = base.filter((c) => c.status === "Aprovado" || c.status === "Confirmado");
+  if (faixaModo === "Confirmado") base = base.filter(eConfirmado);
+  else if (faixaModo === "Aprovado") base = base.filter(eAprovado);
   const total = base.length;
   const mapa = new Map();
   base.forEach((c) => {
@@ -273,11 +297,12 @@ function renderVisaoGrupos() {
   const wrap = el("visao-grupos");
   const grupos = filtroGrupo.length ? dados.grupos.filter((g) => filtroGrupo.includes(g.id)) : dados.grupos;
   if (!grupos.length) { wrap.innerHTML = `<p class="pagina-sub">Nenhum grupo cadastrado.</p>`; return; }
+  const cont = contagemPorAnfitriao();
   wrap.innerHTML = grupos
     .map((g) => {
       const anf = dados.anfitrioes.filter((a) => a.grupo_id === g.id);
-      const enviados = anf.reduce((s, a) => s + (a.enviados || 0), 0);
-      const conf = anf.reduce((s, a) => s + (a.confirmados || 0), 0);
+      const enviados = anf.reduce((s, a) => s + (cont.get(a.id)?.enviados || 0), 0);
+      const conf = anf.reduce((s, a) => s + (cont.get(a.id)?.confirmados || 0), 0);
       return `<div class="card" style="box-shadow:none">
         <div class="badge badge-laranja" style="margin-bottom:10px">${esc(g.nome)}</div>
         <div class="grid grid-3">
@@ -295,22 +320,25 @@ function renderTopAnfitrioes() {
   // Todo anfitrião que indicou pelo menos 1 convidado (qualquer status) entra no ranking,
   // sem limite de posições. A ordem segue a mesma de antes: por confirmados/aprovados
   // (conforme a aba), do maior pro menor; empate mantém a ordem da lista.
+  const cont = contagemPorAnfitriao();
   const top = anfNoGrupo()
-    .filter((a) => (a.enviados || 0) >= 1)
-    .sort((a, b) => (b[campo] || 0) - (a[campo] || 0));
+    .map((a) => ({ a, ...(cont.get(a.id) || { enviados: 0, aprovados: 0, confirmados: 0 }) }))
+    .filter((x) => x.enviados >= 1)
+    .sort((x, y) => (y[campo] || 0) - (x[campo] || 0));
   el("top-anfitrioes").innerHTML = top.length
-    ? top.map((a, i) => rankLinha(i + 1, a.nome,
-        `${a[campo] || 0} ${rotulo} · ${a.enviados} indicado${a.enviados === 1 ? "" : "s"}`)).join("")
+    ? top.map((x, i) => rankLinha(i + 1, x.a.nome,
+        `${x[campo] || 0} ${rotulo} · ${x.enviados} indicado${x.enviados === 1 ? "" : "s"}`)).join("")
     : `<p class="pagina-sub" style="margin:0">Nenhum anfitrião indicou convidados ainda.</p>`;
 }
 
 function renderTopResponsaveis() {
   const mapa = new Map();
+  const cont = contagemPorAnfitriao();
   anfNoGrupo().forEach((a) => {
     if (!a.responsavel_user_id) return;
     const cur = mapa.get(a.responsavel_user_id) || { enviados: 0, confirmados: 0 };
-    cur.enviados += a.enviados || 0;
-    cur.confirmados += a.confirmados || 0;
+    cur.enviados += cont.get(a.id)?.enviados || 0;
+    cur.confirmados += cont.get(a.id)?.confirmados || 0;
     mapa.set(a.responsavel_user_id, cur);
   });
   const nome = (id) => {
