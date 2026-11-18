@@ -96,6 +96,7 @@ function cartao(a, i) {
         <button class="icone-btn" data-excluir title="Excluir">${icone("excluir")}</button>
       </div>
     </div>
+    ${r.avisos?.length ? `<div class="aviso aviso-erro" style="margin:12px 0 0;font-size:.82rem"><b>Esta regra nunca roda.</b> ${esc(r.avisos[0])} Clique em editar para corrigir.</div>` : ""}
     <div style="margin-top:12px;display:grid;gap:6px;font-size:.88rem">
       <div><span class="cel-tenue" style="font-weight:700;letter-spacing:.04em;text-transform:uppercase;font-size:.68rem">Se</span>
         ${r.se.map((t) => `<span class="chip-cat" style="margin:2px 6px 2px 4px">${esc(t)}</span>`).join("")}</div>
@@ -354,8 +355,9 @@ const comAtualLista = (opcoes, atuais) =>
 function linhaAcao(x, i) {
   const tipos = TIPOS_ACAO.map((t) => `<option value="${t.valor}" ${t.valor === x.tipo ? "selected" : ""}>${esc(t.rotulo)}</option>`).join("");
   const usuarios = lk.usuarios.map((u) => ({ valor: u.user_id, rotulo: u.nome || u.email }));
-  const soVazio = `<label style="display:flex;gap:6px;align-items:center;font-size:.8rem;width:100%">
-    <input type="checkbox" data-vazio ${x.somente_se_vazio !== false ? "checked" : ""} /> só se o participante estiver sem responsável (não sobrescreve quem já tem)</label>`;
+  const soVazio = `<label style="display:flex;gap:8px;align-items:flex-start;font-size:.8rem;width:100%">
+    <input type="checkbox" data-vazio ${x.somente_se_vazio !== false ? "checked" : ""} style="margin-top:3px;flex-shrink:0;width:auto" />
+    <span>só se o participante estiver sem responsável<br><span class="cel-tenue" style="font-size:.72rem">Marcado: não troca quem já chegou com responsável (ex.: o do anfitrião, ou o definido por tipo/categoria em Configurações). Desmarcado: esta regra sempre manda.</span></span></label>`;
   let corpo = "", extra = ""; // corpo = ao lado do seletor de ação; extra = linha(s) abaixo
   const larg = "flex:2 1 200px;width:auto;min-width:0";
   if (x.tipo === "responsavel") {

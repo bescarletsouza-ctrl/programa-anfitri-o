@@ -48,7 +48,10 @@ export const GATILHOS = [
 
 export const condicaoVazia = () => ({ campo: "ingresso", op: "igual", valor: "" });
 export function acaoVazia(tipo = "responsavel") {
-  if (tipo === "responsavel") return { tipo, usuario: "", somente_se_vazio: true };
+  // "Tipo X → fulano": a regra manda mesmo se o participante já chegou com responsável
+  // (o convidado, por exemplo, vem com o responsável do anfitrião). Quem quiser poupar
+  // quem já tem responsável marca a caixinha da ação.
+  if (tipo === "responsavel") return { tipo, usuario: "", somente_se_vazio: false };
   if (tipo === "responsavel_rodizio") return { tipo, usuarios: [], somente_se_vazio: true };
   if (tipo === "etapa") return { tipo, etapa_id: "" };
   return { tipo, valor: "" };
@@ -99,12 +102,38 @@ export function descreverAcao(a, ctx) {
 
 export const rotuloGatilho = (g) => (GATILHOS.find((x) => x.valor === g) || GATILHOS[1]).curto;
 
+// Todas as condições precisam valer JUNTAS ("e"). Aponta combinações que nunca se
+// cumprem — ex.: Tipo é “Convidado” E Tipo é “Comprador” (ninguém tem dois tipos
+// ao mesmo tempo; o certo é “Tipo é um destes: Convidado, Comprador”).
+export function condicoesImpossiveis(conds = [], ctx = {}) {
+  const msgs = [];
+  const norm = (v) => String(v ?? "").trim().toLowerCase();
+  const porCampo = {};
+  (conds || []).forEach((c) => { (porCampo[c.campo] ||= []).push(c); });
+  for (const [campo, lista] of Object.entries(porCampo)) {
+    const def = CAMPOS[campo];
+    if (!def || def.kind === "simnao" || lista.length < 2) continue;
+    const nome = (v) => `“${rotuloValor(campo, v, ctx)}”`;
+    const iguais = lista.filter((c) => c.op === "igual" && norm(c.valor));
+    const distintos = [...new Map(iguais.map((c) => [norm(c.valor), c.valor])).values()];
+    if (distintos.length > 1) {
+      msgs.push(`${def.rotulo} não pode ser ${distintos.map(nome).join(" e ")} ao mesmo tempo — todas as condições precisam valer juntas, então essa regra nunca vai rodar. Use uma condição só com “é um destes”.`);
+      continue;
+    }
+    const sem = lista.some((c) => c.op === "vazio");
+    const com = lista.some((c) => c.op === "preenchido" || (c.op === "igual" && norm(c.valor)));
+    if (sem && com) msgs.push(`${def.rotulo} não pode estar vazio e preenchido ao mesmo tempo — essa regra nunca vai rodar.`);
+  }
+  return msgs;
+}
+
 export function resumo(auto, ctx) {
   const conds = (auto.condicoes || []).map((c) => descreverCondicao(c, ctx));
   return {
     quando: rotuloGatilho(auto.gatilho),
     se: conds.length ? conds : ["sempre (sem condições — vale pra todos)"],
     entao: (auto.acoes || []).map((a) => descreverAcao(a, ctx)),
+    avisos: condicoesImpossiveis(auto.condicoes, ctx),
   };
 }
 
@@ -122,6 +151,8 @@ export function validar(auto) {
       }
     }
   }
+  const impossivel = condicoesImpossiveis(auto.condicoes);
+  if (impossivel.length) return impossivel[0];
   for (const a of auto.acoes) {
     const t = TIPOS_ACAO.find((x) => x.valor === a.tipo);
     if (!t) return "Há uma ação inválida.";
