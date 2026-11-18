@@ -18,6 +18,7 @@ import {
 } from "./supabase.js";
 import { STATUS_CONVIDADO } from "./config.js";
 import { multiSelects, valoresDe, casa } from "./multiselect.js";
+import { montarObservacoes } from "./observacoes.js";
 import { eventoNome, eventoId } from "./evento.js";
 import { imprimirCracha, imprimirCrachas } from "./cracha.js";
 import { parsearTabela, lerXlsx, baixarXLSX, baixarModeloXLSX, normalizarCab } from "./tabela.js";
@@ -1487,9 +1488,8 @@ function abrirGavetaDetalhe(id) {
         ${membrosOrg.map((m) => `<option value="${esc(m.user_id)}" ${m.user_id === p.responsavel_user_id ? "selected" : ""}>${esc(m.nome || m.email)}</option>`).join("")}</select>
     </div>
     <div class="secao">
-      <h4>Observação</h4>
-      <textarea class="input" id="g-obs" rows="3">${esc(p.observacao || "")}</textarea>
-      <button class="btn btn-secundario" id="g-salvar-obs" style="margin-top:8px">Salvar observação</button>
+      <h4>Observações</h4>
+      <div id="g-obs-box"></div>
     </div>
     ${p.anfitriao_id ? "" : `<div class="secao">
       <h4>Transferir de evento</h4>
@@ -1553,14 +1553,7 @@ function abrirGavetaDetalhe(id) {
       await recarregar();
     } catch (err) { toast(err.message, "erro"); }
   };
-  g.querySelector("#g-salvar-obs").onclick = async () => {
-    try {
-      await salvar("participantes", { id: p.id, observacao: g.querySelector("#g-obs").value.trim() || null });
-      toast("Observação salva.", "ok");
-      await recarregar();
-      fecharGaveta();
-    } catch (err) { toast(err.message, "erro"); }
-  };
+  montarObservacoes(g.querySelector("#g-obs-box"), { tipo: "participante", id: p.id, tabela: "participantes", legado: p.observacao });
   g.querySelector("#g-transferir")?.addEventListener("click", () => modalTransferir([p]));
   g.querySelector("#g-excluir").onclick = () => excluir(p.id);
 }

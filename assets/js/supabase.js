@@ -32,7 +32,7 @@ const TABELAS_EVENTO = new Set([
   "grupos", "responsaveis", "estagios", "anfitrioes", "convidados",
   "form_perguntas", "marcos", "etapas_participante", "participantes", "checkins",
   "atividades", "tipos_ingresso", "integracoes", "webhook_entregas",
-  "campos_personalizados", "automacoes",
+  "campos_personalizados", "automacoes", "observacoes",
 ]);
 
 // eid: id explícito (páginas públicas). Sem argumento → evento atual do admin.
@@ -382,6 +382,11 @@ export const listAutomacoes = (eid) =>
 export const automacaoEstatisticas = (eid) =>
   supabase.rpc("automacao_estatisticas", { p_evento: ev(eid) })
     .then((r) => (r.error ? {} : (r.data || {})), () => ({}));
+
+// Observações de um registro (participante | anfitriao | convidado), mais recentes primeiro
+export const listObservacoes = (tipo, registroId) =>
+  supabase.from("observacoes").select("*").eq("registro_tipo", tipo).eq("registro_id", registroId)
+    .order("created_at", { ascending: false }).then(ok);
 
 export const automacaoPrevia = (id) => supabase.rpc("automacao_preview", { p_id: id }).then(ok);
 export const automacaoAplicarExistentes = (id) => supabase.rpc("automacao_aplicar_existentes", { p_id: id }).then(ok);

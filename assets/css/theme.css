@@ -632,6 +632,20 @@ table.tabela tbody tr:last-child td { border-bottom: none; }
 .menu-flutuante button.atual { color: var(--cor-laranja-forte); font-weight: 600; }
 .menu-flutuante button svg { width: 14px; height: 14px; flex-shrink: 0; }
 
+/* ---- Observações em histórico (assets/js/observacoes.js) ---- */
+.obs-lista { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.obs-item {
+  border: 1px solid var(--borda); border-radius: var(--raio); background: var(--superficie-2);
+  padding: 10px 12px;
+}
+.obs-cab { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-bottom: 4px; }
+.obs-autor { font-weight: 650; font-size: .84rem; }
+.obs-quando { font-size: .74rem; color: var(--texto-tenue); }
+.obs-acoes { margin-left: auto; display: inline-flex; gap: 2px; }
+.obs-acoes .icone-btn { width: 26px; height: 26px; }
+.obs-texto { font-size: .88rem; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.obs-botoes { display: flex; gap: 8px; margin-top: 8px; }
+
 /* ---- Filtro de seleção múltipla (assets/js/multiselect.js) ---- */
 .ms { position: relative; width: 100%; min-width: 0; }
 .ms-btn {

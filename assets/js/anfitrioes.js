@@ -15,6 +15,7 @@ import {
 } from "./supabase.js";
 import { APP, TIPOS_ANFITRIAO } from "./config.js";
 import { multiSelects, valoresDe, casa } from "./multiselect.js";
+import { montarObservacoes } from "./observacoes.js";
 import { parsearTabela, lerXlsx, baixarXLSX, baixarModeloXLSX } from "./tabela.js";
 import { baixarQR } from "./cracha.js";
 import { avaliarPrazo, fmtDuracao, ROTULO_NIVEL, textoPrazo, resumirPrazos } from "./prazo.js";
@@ -1110,8 +1111,12 @@ async function abrirGavetaDetalhe(id) {
         <input type="checkbox" id="d-vai" ${a.vai !== false ? "checked" : ""} /> <span style="margin:0">Vai ao evento</span></label>
       <label class="campo" style="display:flex;gap:8px;align-items:center">
         <input type="checkbox" id="d-presenca" ${a.presenca ? "checked" : ""} /> <span style="margin:0">Presença confirmada</span></label>
-      <label class="campo"><span>Observação</span><textarea class="input" id="d-obs" rows="2">${esc(a.observacao || "")}</textarea></label>
       <button class="btn btn-primario" id="d-salvar">Salvar alterações</button>
+    </div>
+
+    <div class="secao">
+      <h4>Observações</h4>
+      <div id="d-obs-box"></div>
     </div>
 
     <div class="secao">
@@ -1145,6 +1150,7 @@ async function abrirGavetaDetalhe(id) {
   listMovimentacoes("anfitriao", a.id)
     .then((hist) => { const box = g.querySelector("#d-historico-mov"); if (box) box.innerHTML = htmlHistoricoMov(hist, nomeMembro); })
     .catch(() => { const box = g.querySelector("#d-historico-mov"); if (box) box.innerHTML = `<p class="pagina-sub" style="margin:0">Histórico indisponível (rode a migração 0037).</p>`; });
+  montarObservacoes(g.querySelector("#d-obs-box"), { tipo: "anfitriao", id: a.id, tabela: "anfitrioes", legado: a.observacao });
   const atualizarRespGaveta = () => {
     const r = responsavelAutomatico(g.querySelector("#d-grupo").value, g.querySelector("#d-ingresso").value || null);
     if (r) g.querySelector("#d-resp").value = r;
@@ -1170,7 +1176,6 @@ async function abrirGavetaDetalhe(id) {
         estagio_id: g.querySelector("#d-estagio").value || null,
         vai: g.querySelector("#d-vai").checked,
         presenca: g.querySelector("#d-presenca").checked,
-        observacao: g.querySelector("#d-obs").value.trim() || null,
       });
       if (catConv !== (a.categoria_convidado || null)) {
         await reSincCategoriaAnfitriao(a.id, catConv).catch(() => {});

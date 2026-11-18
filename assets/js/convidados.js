@@ -11,6 +11,7 @@ import {
 } from "./supabase.js";
 import { STATUS_CONVIDADO } from "./config.js";
 import { multiSelects, valoresDe, casa } from "./multiselect.js";
+import { montarObservacoes } from "./observacoes.js";
 
 const _iniciando = iniciarPagina("convidados");
 const el = (id) => document.getElementById(id);
@@ -350,9 +351,8 @@ function abrirGavetaDetalhe(id) {
     }
 
     <div class="secao">
-      <h4>Observação interna</h4>
-      <textarea class="input" id="d-obs" rows="3">${esc(c.observacao || "")}</textarea>
-      <button class="btn btn-primario" id="d-salvar" style="margin-top:10px">Salvar</button>
+      <h4>Observações internas</h4>
+      <div id="d-obs-box"></div>
     </div>
 
     <div class="secao">
@@ -383,8 +383,7 @@ function abrirGavetaDetalhe(id) {
     salvarConvidado({ status: "Aprovado" }, "Convidado aprovado.").then(fecharGaveta);
   g.querySelector("#d-reprovar").onclick = () =>
     salvarConvidado({ status: "Recusado" }, "Convidado reprovado.").then(fecharGaveta);
-  g.querySelector("#d-salvar").onclick = () =>
-    salvarConvidado({ observacao: g.querySelector("#d-obs").value.trim() || null }, "Observação salva.").then(fecharGaveta);
+  montarObservacoes(g.querySelector("#d-obs-box"), { tipo: "convidado", id: c.id, tabela: "convidados", legado: c.observacao });
   g.querySelector("#d-excluir").onclick = () => excluirConvidado(c);
 }
 
