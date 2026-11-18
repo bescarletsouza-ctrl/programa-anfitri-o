@@ -292,13 +292,16 @@ function renderVisaoGrupos() {
 function renderTopAnfitrioes() {
   const campo = topAnfModo === "Aprovado" ? "aprovados" : "confirmados";
   const rotulo = topAnfModo === "Aprovado" ? "aprovados" : "confirmados";
+  // Todo anfitrião que indicou pelo menos 1 convidado (qualquer status) entra no ranking,
+  // sem limite de posições. A ordem segue a mesma de antes: por confirmados/aprovados
+  // (conforme a aba), do maior pro menor; empate mantém a ordem da lista.
   const top = anfNoGrupo()
-    .filter((a) => (a[campo] || 0) > 0)
-    .sort((a, b) => (b[campo] || 0) - (a[campo] || 0))
-    .slice(0, 10);
+    .filter((a) => (a.enviados || 0) >= 1)
+    .sort((a, b) => (b[campo] || 0) - (a[campo] || 0));
   el("top-anfitrioes").innerHTML = top.length
-    ? top.map((a, i) => rankLinha(i + 1, a.nome, `${a[campo]} ${rotulo}`)).join("")
-    : `<p class="pagina-sub" style="margin:0">Ninguém com ${rotulo} ainda.</p>`;
+    ? top.map((a, i) => rankLinha(i + 1, a.nome,
+        `${a[campo] || 0} ${rotulo} · ${a.enviados} indicado${a.enviados === 1 ? "" : "s"}`)).join("")
+    : `<p class="pagina-sub" style="margin:0">Nenhum anfitrião indicou convidados ainda.</p>`;
 }
 
 function renderTopResponsaveis() {
