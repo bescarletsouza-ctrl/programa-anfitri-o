@@ -7,13 +7,14 @@ import {
 } from "./supabase.js";
 import { eventoId } from "./evento.js";
 import { APP } from "./config.js";
+import { multiSelect, valoresDe, casa } from "./multiselect.js";
 
 const _iniciando = iniciarPagina("painel");
 
 const el = (id) => document.getElementById(id);
 let CTX = null;
 let dados = null;
-let filtroGrupo = "";
+let filtroGrupo = [];   // tipos marcados no filtro ([] = todos)
 let faixaModo = "Confirmado";
 let topAnfModo = "Confirmado";
 
@@ -32,7 +33,8 @@ async function iniciar() {
 
     const fg = el("filtro-grupo");
     grupos.forEach((g) => fg.add(new Option(g.nome, g.id)));
-    fg.onchange = () => { filtroGrupo = fg.value; render(); };
+    multiSelect(fg);
+    fg.onchange = () => { filtroGrupo = valoresDe(fg); render(); };
 
     el("fx-toggle").querySelectorAll("button").forEach((b) => {
       b.onclick = () => {
@@ -64,9 +66,9 @@ async function iniciar() {
 
 /* -- filtros -- */
 const anfNoGrupo = () =>
-  dados.anfitrioes.filter((a) => !filtroGrupo || a.grupo_id === filtroGrupo);
+  dados.anfitrioes.filter((a) => casa(filtroGrupo, a.grupo_id));
 const convNoGrupo = () =>
-  dados.convidados.filter((c) => !filtroGrupo || c.anfitriao?.grupo_id === filtroGrupo);
+  dados.convidados.filter((c) => casa(filtroGrupo, c.anfitriao?.grupo_id));
 
 function render() {
   renderFunilAnfitrioes();
@@ -269,7 +271,7 @@ function renderFaixas() {
 
 function renderVisaoGrupos() {
   const wrap = el("visao-grupos");
-  const grupos = filtroGrupo ? dados.grupos.filter((g) => g.id === filtroGrupo) : dados.grupos;
+  const grupos = filtroGrupo.length ? dados.grupos.filter((g) => filtroGrupo.includes(g.id)) : dados.grupos;
   if (!grupos.length) { wrap.innerHTML = `<p class="pagina-sub">Nenhum grupo cadastrado.</p>`; return; }
   wrap.innerHTML = grupos
     .map((g) => {

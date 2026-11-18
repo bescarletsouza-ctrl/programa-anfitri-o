@@ -14,6 +14,7 @@ import {
   listUltimasMovimentacoes, listMovimentacoes,
 } from "./supabase.js";
 import { APP, TIPOS_ANFITRIAO } from "./config.js";
+import { multiSelects, valoresDe, casa } from "./multiselect.js";
 import { parsearTabela, lerXlsx, baixarXLSX, baixarModeloXLSX } from "./tabela.js";
 import { baixarQR } from "./cracha.js";
 import { avaliarPrazo, fmtDuracao, ROTULO_NIVEL, textoPrazo, resumirPrazos } from "./prazo.js";
@@ -49,11 +50,16 @@ const badgeSituacao = (s) =>
      "Pré-inscrito": "badge-neutro", Desativado: "badge-erro" }[s] || "badge-neutro");
 let aba = "todos";
 let vista = "lista";
-const FILTROS_VAZIO = {
-  busca: "", grupo: "", categoria: "", categoriaConvidado: "", responsavel: "", estagio: "", presenca: "",
-  situacao: "", prazo: "", dataDe: "", dataAte: "",
-};
-const filtros = { ...FILTROS_VAZIO };
+// filtros de lista aceitam VÁRIOS valores (arrays; [] = sem filtro)
+const FILTROS_MULTI = ["grupo", "categoria", "categoriaConvidado", "responsavel", "estagio", "situacao", "prazo"];
+const filtrosVazio = () => ({
+  busca: "", grupo: [], categoria: [], categoriaConvidado: [], responsavel: [], estagio: [], presenca: "",
+  situacao: [], prazo: [], dataDe: "", dataAte: "",
+});
+const filtros = filtrosVazio();
+// responsável: "_nenhum_" = sem responsável; prazo: "atrasados" = amarelo + vermelho
+const casaResp = (sel, uid) => !sel.length || sel.some((v) => (v === "_nenhum_" ? !uid : uid === v));
+const casaPrazo = (sel, nivel) => !sel.length || sel.some((v) => (v === "atrasados" ? nivel === "amarelo" || nivel === "vermelho" : nivel === v));
 const selecionados = new Set();
 
 // Pipeline (Kanban) — mesmo padrão de Participantes, com o Estágio do funil
@@ -135,7 +141,7 @@ async function recarregarLista() {
 
 function preencherSelect(sel, arr, placeholder, valorAtual) {
   sel.innerHTML = `<option value="">${esc(placeholder)}</option>` +
-    arr.map((x) => `<option value="${x.id}" ${x.id === valorAtual ? "selected" : ""}>${esc(x.nome)}</option>`).join("");
+    arr.map((x) => `<option value="${x.id}" ${[].concat(valorAtual ?? []).includes(x.id) ? "selected" : ""}>${esc(x.nome)}</option>`).join("");
 }
 
 /* ---- filtros ---- */
@@ -145,21 +151,25 @@ const CAMPO_DO_FILTRO = {
   "f-responsavel": "responsavel", "f-estagio": "estagio", "f-presenca": "presenca",
   "f-situacao": "situacao", "f-prazo": "prazo", "f-data-de": "dataDe", "f-data-ate": "dataAte",
 };
+multiSelects(Object.keys(CAMPO_DO_FILTRO).filter((id) => FILTROS_MULTI.includes(CAMPO_DO_FILTRO[id])));
 Object.keys(CAMPO_DO_FILTRO).forEach((id) => {
   el(id).addEventListener("change", (e) => {
-    filtros[CAMPO_DO_FILTRO[id]] = e.target.value;
+    const k = CAMPO_DO_FILTRO[id];
+    filtros[k] = FILTROS_MULTI.includes(k) ? valoresDe(e.target) : e.target.value;
     render();
   });
 });
-function filtrosAtivos() { return Object.keys(FILTROS_VAZIO).some((k) => filtros[k]); }
+function filtrosAtivos() {
+  return Object.keys(filtrosVazio()).some((k) => (FILTROS_MULTI.includes(k) ? filtros[k].length : filtros[k]));
+}
 el("btn-toggle-filtros").onclick = () => {
   const painel = el("filtros-painel");
   painel.hidden = !painel.hidden;
   el("btn-toggle-filtros").setAttribute("aria-expanded", String(!painel.hidden));
 };
 el("btn-limpar-filtros").onclick = () => {
-  Object.assign(filtros, FILTROS_VAZIO);
-  ["busca", ...Object.keys(CAMPO_DO_FILTRO)].forEach((id) => (el(id).value = ""));
+  Object.assign(filtros, filtrosVazio());
+  ["busca", ...Object.keys(CAMPO_DO_FILTRO)].forEach((id) => (el(id).value = ""));  // nos de seleção múltipla, "" limpa as marcações
   render();
 };
 el("abas").querySelectorAll("button").forEach((b) => {
@@ -199,19 +209,15 @@ function filtrar() {
     if (aba === "ativos" && a.vai === false) return false;
     if (aba === "nao" && a.vai !== false) return false;
     // aba "todos": sem filtro por "vai"
-    if (filtros.grupo && a.grupo_id !== filtros.grupo) return false;
-    if (filtros.categoria && (a.ingresso || "").trim() !== filtros.categoria) return false;
-    if (filtros.categoriaConvidado && (a.categoria_convidado || "").trim() !== filtros.categoriaConvidado) return false;
-    if (filtros.responsavel === "_nenhum_" && a.responsavel_user_id) return false;
-    if (filtros.responsavel && filtros.responsavel !== "_nenhum_" && a.responsavel_user_id !== filtros.responsavel) return false;
-    if (filtros.estagio && a.estagio_id !== filtros.estagio) return false;
+    if (!casa(filtros.grupo, a.grupo_id)) return false;
+    if (!casa(filtros.categoria, (a.ingresso || "").trim())) return false;
+    if (!casa(filtros.categoriaConvidado, (a.categoria_convidado || "").trim())) return false;
+    if (!casaResp(filtros.responsavel, a.responsavel_user_id)) return false;
+    if (!casa(filtros.estagio, a.estagio_id)) return false;
     if (filtros.presenca === "sim" && !a.presenca) return false;
     if (filtros.presenca === "nao" && a.presenca) return false;
-    if (filtros.situacao && situacoes[a.id] !== filtros.situacao) return false;
-    if (filtros.prazo) {
-      const nivel = prazoDe(a)?.nivel;
-      if (filtros.prazo === "atrasados" ? nivel !== "amarelo" && nivel !== "vermelho" : nivel !== filtros.prazo) return false;
-    }
+    if (!casa(filtros.situacao, situacoes[a.id])) return false;
+    if (filtros.prazo.length && !casaPrazo(filtros.prazo, prazoDe(a)?.nivel)) return false;
     if (diaDe && new Date(a.created_at) < diaDe) return false;
     if (diaAte && new Date(a.created_at) > diaAte) return false;
     if (filtros.busca) {
@@ -760,7 +766,7 @@ async function excluirEstagio(et) {
     salvarOrdemPipe();
     toast("Estágio excluído.", "ok");
     estagios = await listEstagios();
-    if (filtros.estagio === et.id) filtros.estagio = "";
+    filtros.estagio = filtros.estagio.filter((id) => id !== et.id);
     preencherSelect(el("f-estagio"), estagios, "Todos os estágios", filtros.estagio);
     render();
   } catch (e) { toast(e.message, "erro"); }

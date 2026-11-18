@@ -10,12 +10,13 @@ import {
   sincParticipanteConvidado,
 } from "./supabase.js";
 import { STATUS_CONVIDADO } from "./config.js";
+import { multiSelects, valoresDe, casa } from "./multiselect.js";
 
 const _iniciando = iniciarPagina("convidados");
 const el = (id) => document.getElementById(id);
 
 let grupos = [], anfitrioes = [], lista = [], perguntas = [];
-const filtros = { busca: "", status: "", grupo: "" };
+const filtros = { busca: "", status: [], grupo: [] };   // status e grupo aceitam vários valores
 const selecionados = new Set();
 let aba = "todos";
 
@@ -46,8 +47,9 @@ async function carregar() {
 }
 
 el("busca").addEventListener("input", debounce((e) => { filtros.busca = e.target.value.toLowerCase(); render(); }, 200));
-el("f-status").addEventListener("change", (e) => { filtros.status = e.target.value; render(); });
-el("f-grupo").addEventListener("change", (e) => { filtros.grupo = e.target.value; render(); });
+multiSelects(["f-status", "f-grupo"]);
+el("f-status").addEventListener("change", (e) => { filtros.status = valoresDe(e.target); render(); });
+el("f-grupo").addEventListener("change", (e) => { filtros.grupo = valoresDe(e.target); render(); });
 el("btn-novo").innerHTML = icone("mais") + "Novo convidado";
 el("btn-novo").onclick = modalNovo;
 
@@ -57,7 +59,7 @@ el("btn-toggle-filtros").onclick = () => {
   el("btn-toggle-filtros").setAttribute("aria-expanded", String(!painel.hidden));
 };
 el("btn-limpar-filtros").onclick = () => {
-  Object.assign(filtros, { busca: "", status: "", grupo: "" });
+  Object.assign(filtros, { busca: "", status: [], grupo: [] });
   el("busca").value = ""; el("f-status").value = ""; el("f-grupo").value = "";
   render();
 };
@@ -80,14 +82,14 @@ const badgeSituacao = (s) =>
 const situacaoDoParticipante = (c) =>
   (Array.isArray(c.participante) ? c.participante[0]?.situacao : c.participante?.situacao) || null;
 
-const filtrosAtivos = () => !!(filtros.busca || filtros.status || filtros.grupo);
+const filtrosAtivos = () => !!(filtros.busca || filtros.status.length || filtros.grupo.length);
 
 function filtrar() {
   return lista.filter((c) => {
     if (aba === "pendentes" && c.status !== "Pendente") return false;
     if (aba === "analisados" && c.status === "Pendente") return false;
-    if (filtros.status && c.status !== filtros.status) return false;
-    if (filtros.grupo && c.anfitriao?.grupo_id !== filtros.grupo) return false;
+    if (!casa(filtros.status, c.status)) return false;
+    if (!casa(filtros.grupo, c.anfitriao?.grupo_id)) return false;
     if (filtros.busca) {
       const alvo = `${c.nome || ""} ${c.email || ""} ${c.empresa || ""}`.toLowerCase();
       if (!alvo.includes(filtros.busca)) return false;

@@ -632,6 +632,39 @@ table.tabela tbody tr:last-child td { border-bottom: none; }
 .menu-flutuante button.atual { color: var(--cor-laranja-forte); font-weight: 600; }
 .menu-flutuante button svg { width: 14px; height: 14px; flex-shrink: 0; }
 
+/* ---- Filtro de seleção múltipla (assets/js/multiselect.js) ---- */
+.ms { position: relative; width: 100%; min-width: 0; }
+.ms-btn {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  text-align: left; padding-right: 30px; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236c6c66' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 11px center;
+}
+.ms-btn .ms-txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.ms-btn .ms-n {
+  flex-shrink: 0; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px;
+  background: var(--cor-laranja); color: #fff; font-size: .7rem; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.ms-btn.ms-ativo { border-color: var(--cor-laranja); background-color: var(--cor-laranja-suave); }
+.ms-painel {
+  position: absolute; z-index: 96; max-width: calc(100vw - 16px);
+  background: var(--superficie); border: 1px solid var(--borda-forte);
+  border-radius: var(--raio); box-shadow: var(--sombra-lg); padding: 6px;
+  animation: modal-in .12s ease;
+}
+.ms-painel .ms-busca { height: 34px; margin-bottom: 6px; }
+.ms-lista { max-height: 260px; overflow-y: auto; }
+.ms-op {
+  display: flex; align-items: center; gap: 9px; padding: 7px 9px; border-radius: 7px;
+  font-size: .86rem; cursor: pointer; margin: 0; color: var(--texto);
+}
+.ms-op:hover { background: var(--superficie-2); }
+.ms-op[hidden] { display: none; }
+.ms-op input { width: 15px; height: 15px; margin: 0; flex-shrink: 0; accent-color: var(--cor-laranja); }
+.ms-vazio { padding: 10px; font-size: .84rem; color: var(--texto-suave); }
+.ms-rodape { display: flex; justify-content: space-between; gap: 8px; padding: 8px 4px 2px; border-top: 1px solid var(--cinza-100); margin-top: 6px; }
+
 /* ---- Tela de Check-in ---- */
 .ck-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 24px; align-items: start; }
 .ck-main { min-width: 0; }

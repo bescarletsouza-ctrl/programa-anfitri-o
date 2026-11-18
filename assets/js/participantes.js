@@ -17,6 +17,7 @@ import {
   listUltimasMovimentacoes, listMovimentacoes,
 } from "./supabase.js";
 import { STATUS_CONVIDADO } from "./config.js";
+import { multiSelects, valoresDe, casa } from "./multiselect.js";
 import { eventoNome, eventoId } from "./evento.js";
 import { imprimirCracha, imprimirCrachas } from "./cracha.js";
 import { parsearTabela, lerXlsx, baixarXLSX, baixarModeloXLSX, normalizarCab } from "./tabela.js";
@@ -141,11 +142,17 @@ function prazoDe(p) {
 let vista = "lista";
 let pagina = 1;
 const selecionados = new Set();
-const FILTROS_VAZIO = {
-  busca: "", campo: "", situacao: "", tipo: "", pagamento: "", dataDe: "", dataAte: "",
-  categoria: "", etapa: "", atividade: "", presAtv: "", presenca: "", responsavel: "", prazo: "",
-};
-const filtros = { ...FILTROS_VAZIO };
+// filtros de lista aceitam VÁRIOS valores (arrays; [] = sem filtro)
+const FILTROS_MULTI = ["situacao", "tipo", "pagamento", "categoria", "etapa", "responsavel", "prazo"];
+const filtrosVazio = () => ({
+  busca: "", campo: "", situacao: [], tipo: [], pagamento: [], dataDe: "", dataAte: "",
+  categoria: [], etapa: [], atividade: "", presAtv: "", presenca: "", responsavel: [], prazo: [],
+});
+const filtros = filtrosVazio();
+const IDS_MULTI = ["f-situacao", "f-tipo", "f-responsavel", "f-pagamento", "f-categoria", "f-etapa", "f-prazo"];
+// responsável: "_nenhum_" = sem responsável; prazo: "atrasados" = amarelo + vermelho
+const casaResp = (sel, uid) => !sel.length || sel.some((v) => (v === "_nenhum_" ? !uid : uid === v));
+const casaPrazo = (sel, nivel) => !sel.length || sel.some((v) => (v === "atrasados" ? nivel === "amarelo" || nivel === "vermelho" : nivel === v));
 
 // ordenação dos cards em cada coluna do pipeline (clique no cabeçalho da etapa)
 const ORDENACOES = [
@@ -263,6 +270,7 @@ async function carregar() {
       membrosOrg.map((m) => `<option value="${esc(m.user_id)}">${esc(m.nome || m.email)}</option>`).join("");
     el("carregando").hidden = true;
     el("conteudo-part").hidden = false;
+    multiSelects(IDS_MULTI);
     ligarEventos();
     render();
   } catch (e) {
@@ -293,18 +301,18 @@ function ligarEventos() {
   const refiltra = (fn) => (e) => { fn(e); pagina = 1; render(); };
   el("f-busca").addEventListener("input", debounce(refiltra((e) => { filtros.busca = e.target.value.toLowerCase(); }), 200));
   el("f-campo").onchange = refiltra((e) => { filtros.campo = e.target.value; });
-  el("f-situacao").onchange = refiltra((e) => { filtros.situacao = e.target.value; });
-  el("f-tipo").onchange = refiltra((e) => { filtros.tipo = e.target.value; });
-  el("f-responsavel").onchange = refiltra((e) => { filtros.responsavel = e.target.value; });
-  el("f-pagamento").onchange = refiltra((e) => { filtros.pagamento = e.target.value; });
+  el("f-situacao").onchange = refiltra((e) => { filtros.situacao = valoresDe(e.target); });
+  el("f-tipo").onchange = refiltra((e) => { filtros.tipo = valoresDe(e.target); });
+  el("f-responsavel").onchange = refiltra((e) => { filtros.responsavel = valoresDe(e.target); });
+  el("f-pagamento").onchange = refiltra((e) => { filtros.pagamento = valoresDe(e.target); });
   el("f-data-de").onchange = refiltra((e) => { filtros.dataDe = e.target.value; });
   el("f-data-ate").onchange = refiltra((e) => { filtros.dataAte = e.target.value; });
-  el("f-categoria").onchange = refiltra((e) => { filtros.categoria = e.target.value; });
-  el("f-etapa").onchange = refiltra((e) => { filtros.etapa = e.target.value; });
+  el("f-categoria").onchange = refiltra((e) => { filtros.categoria = valoresDe(e.target); });
+  el("f-etapa").onchange = refiltra((e) => { filtros.etapa = valoresDe(e.target); });
   el("f-atividade").onchange = refiltra((e) => { filtros.atividade = e.target.value; });
   el("f-pres-atv").onchange = refiltra((e) => { filtros.presAtv = e.target.value; });
   el("f-presenca").onchange = refiltra((e) => { filtros.presenca = e.target.value; });
-  el("f-prazo").onchange = refiltra((e) => { filtros.prazo = e.target.value; });
+  el("f-prazo").onchange = refiltra((e) => { filtros.prazo = valoresDe(e.target); });
 
   el("btn-toggle-filtros").onclick = () => {
     const painel = el("filtros-painel");
@@ -313,9 +321,9 @@ function ligarEventos() {
     el("btn-toggle-filtros").classList.toggle("ativo", filtrosAtivos());
   };
   el("btn-limpar-filtros").onclick = () => {
-    Object.assign(filtros, FILTROS_VAZIO);
+    Object.assign(filtros, filtrosVazio());
     ["f-busca", "f-campo", "f-situacao", "f-tipo", "f-responsavel", "f-pagamento", "f-data-de", "f-data-ate",
-     "f-categoria", "f-etapa", "f-atividade", "f-pres-atv", "f-presenca", "f-prazo"].forEach((id) => (el(id).value = ""));
+     "f-categoria", "f-etapa", "f-atividade", "f-pres-atv", "f-presenca", "f-prazo"].forEach((id) => (el(id).value = ""));  // nos de seleção múltipla, "" limpa as marcações
     pagina = 1;
     render();
   };
@@ -363,7 +371,8 @@ function render() {
 
 function filtrosAtivos() {
   return ["busca", "campo", "situacao", "tipo", "responsavel", "pagamento", "dataDe", "dataAte",
-    "categoria", "etapa", "atividade", "presAtv", "presenca", "prazo"].some((k) => filtros[k]);
+    "categoria", "etapa", "atividade", "presAtv", "presenca", "prazo"].some((k) =>
+    FILTROS_MULTI.includes(k) ? filtros[k].length : filtros[k]);
 }
 
 function filtrarLista(incluirDesativados = false) {
@@ -372,18 +381,14 @@ function filtrarLista(incluirDesativados = false) {
   return participantes.filter((p) => {
     // desativados: escondidos na Lista (a não ser que o filtro peça); no
     // Pipeline aparecem normalmente (ex.: coluna "Não vai").
-    if (!incluirDesativados && situacaoDe(p) === "Desativado" && filtros.situacao !== "Desativado") return false;
-    if (filtros.situacao && situacaoDe(p) !== filtros.situacao) return false;
-    if (filtros.tipo && p.tipo !== filtros.tipo) return false;
-    if (filtros.responsavel === "_nenhum_" && p.responsavel_user_id) return false;
-    if (filtros.responsavel && filtros.responsavel !== "_nenhum_" && p.responsavel_user_id !== filtros.responsavel) return false;
-    if (filtros.pagamento && p.pagamento !== filtros.pagamento) return false;
-    if (filtros.categoria && (p.ingresso || "").trim() !== filtros.categoria) return false;
-    if (filtros.etapa && p.etapa_id !== filtros.etapa) return false;
-    if (filtros.prazo) {
-      const nivel = prazoDe(p)?.nivel;
-      if (filtros.prazo === "atrasados" ? nivel !== "amarelo" && nivel !== "vermelho" : nivel !== filtros.prazo) return false;
-    }
+    if (!incluirDesativados && situacaoDe(p) === "Desativado" && !filtros.situacao.includes("Desativado")) return false;
+    if (!casa(filtros.situacao, situacaoDe(p))) return false;
+    if (!casa(filtros.tipo, p.tipo)) return false;
+    if (!casaResp(filtros.responsavel, p.responsavel_user_id)) return false;
+    if (!casa(filtros.pagamento, p.pagamento)) return false;
+    if (!casa(filtros.categoria, (p.ingresso || "").trim())) return false;
+    if (!casa(filtros.etapa, p.etapa_id)) return false;
+    if (filtros.prazo.length && !casaPrazo(filtros.prazo, prazoDe(p)?.nivel)) return false;
     if (filtros.presenca === "sim" && !p.presente) return false;
     if (filtros.presenca === "nao" && p.presente) return false;
     if (filtros.atividade && filtros.presAtv) {
@@ -1144,7 +1149,7 @@ async function excluirEtapa(et) {
     salvarOrdemPipe();
     toast("Etapa excluída.", "ok");
     etapas = await listEtapasParticipante();
-    if (filtros.etapa === et.id) filtros.etapa = "";
+    filtros.etapa = filtros.etapa.filter((id) => id !== et.id);
     atualizarSelectEtapas();
     render();
   } catch (e) { toast(e.message, "erro"); }
@@ -1152,7 +1157,7 @@ async function excluirEtapa(et) {
 
 function atualizarSelectEtapas() {
   el("f-etapa").innerHTML = `<option value="">Todas</option>` +
-    etapas.map((e) => `<option value="${e.id}" ${e.id === filtros.etapa ? "selected" : ""}>${esc(e.nome)}</option>`).join("");
+    etapas.map((e) => `<option value="${e.id}">${esc(e.nome)}</option>`).join("");
 }
 
 function iniciaisDe(nome) {

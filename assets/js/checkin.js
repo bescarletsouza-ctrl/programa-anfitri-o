@@ -23,7 +23,7 @@ let atividades = [];
 let termo = "";
 let alvo = "";          // "" = evento; senão id da atividade
 let filtroStat = "";    // "" | "presentes" | "ausentes"
-let filtroCat = "";     // "" | categoria de ingresso
+const filtroCat = new Set();   // categorias de ingresso marcadas (vazio = todas)
 
 const SEM_CAT = "Sem categoria";
 
@@ -127,7 +127,7 @@ function render() {
   renderTrilha(atv);
   renderCategorias();
 
-  const filtrando = termo || filtroStat || filtroCat;
+  const filtrando = termo || filtroStat || filtroCat.size;
   if (!filtrando) {
     el("resultados").innerHTML = "";
     el("dica").hidden = false;
@@ -136,7 +136,7 @@ function render() {
   }
 
   let lista = participantes.slice();
-  if (filtroCat) lista = lista.filter((p) => catDe(p) === filtroCat);
+  if (filtroCat.size) lista = lista.filter((p) => filtroCat.has(catDe(p)));
   if (filtroStat === "presentes") lista = lista.filter(estaPresente);
   if (filtroStat === "ausentes") lista = lista.filter((p) => !estaPresente(p));
   if (termo) {
@@ -237,13 +237,14 @@ function renderCategorias() {
   const box = el("ck-cats");
   if (!cats.length) { box.innerHTML = `<span class="pagina-sub" style="margin:0;font-size:.75rem">—</span>`; return; }
   box.innerHTML = cats
-    .map(([c, m]) => `<button type="button" class="ck-cat ${c === filtroCat ? "ativo" : ""}" data-cat="${esc(c)}">
+    .map(([c, m]) => `<button type="button" class="ck-cat ${filtroCat.has(c) ? "ativo" : ""}" data-cat="${esc(c)}">
       <span>${esc(c)}</span>
       <span class="ck-cat-n">${m.presentes}/${m.total}</span>
     </button>`)
     .join("");
   box.querySelectorAll("[data-cat]").forEach((b) => {
-    b.onclick = () => { filtroCat = filtroCat === b.dataset.cat ? "" : b.dataset.cat; render(); };
+    // vários chips podem ficar marcados ao mesmo tempo
+    b.onclick = () => { filtroCat.has(b.dataset.cat) ? filtroCat.delete(b.dataset.cat) : filtroCat.add(b.dataset.cat); render(); };
   });
 }
 
