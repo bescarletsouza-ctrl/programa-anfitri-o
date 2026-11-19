@@ -73,8 +73,8 @@ function render() {
     kpi(brl(faturamento), "Faturamento estimado");
 
   renderDias(ativos);
-  renderQuebra("rel-categoria", ativos, catDe);
-  renderQuebra("rel-tipo", ativos, (p) => p.tipo || "—");
+  renderQuebraConfirmados("rel-categoria", ativos, catDe);
+  renderQuebraConfirmados("rel-tipo", ativos, (p) => p.tipo || "—");
   renderQuebra("rel-situacao", participantes, situ, SITUACOES);
   renderFaturamento(ativos);
   renderQuebra("rel-faturamento-perfil", ativos, (p) => normalizarFaturamento(p.faturamento) || "Não informado");
@@ -100,6 +100,32 @@ function renderDias(dados) {
       <div class="rel-hora-barra" style="height:${Math.round((n / max) * 92)}%"></div>
       <span class="rel-hora-h">${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}</span>
     </div>`)
+    .join("");
+}
+
+// Barras com "confirmados / inscritos": a barra clara é o total da linha e a sólida, os confirmados
+// (situação do participante = Confirmado). Ordena por confirmados e, no empate, pelo total.
+function renderQuebraConfirmados(alvo, dados, chave) {
+  const mapa = new Map();
+  dados.forEach((p) => {
+    const k = chave(p);
+    const l = mapa.get(k) || { tot: 0, conf: 0 };
+    l.tot++;
+    if (situ(p) === "Confirmado") l.conf++;
+    mapa.set(k, l);
+  });
+  const linhas = [...mapa.entries()].sort((a, b) => b[1].conf - a[1].conf || b[1].tot - a[1].tot);
+  if (!linhas.length) { el(alvo).innerHTML = `<p class="pagina-sub" style="margin:0">Sem dados.</p>`; return; }
+  const maior = Math.max(1, ...linhas.map(([, l]) => l.tot));
+  el(alvo).innerHTML = linhas
+    .map(([k, l]) => `<div class="rel-barra" title="${l.conf} confirmados de ${l.tot} inscritos">
+        <span class="rel-barra-nome" title="${esc(k)}">${esc(k)}</span>
+        <span class="rel-barra-trilha rel-barra-dupla">
+          <i class="tot" style="width:${Math.round((l.tot / maior) * 100)}%"></i>
+          <i style="width:${Math.round((l.conf / maior) * 100)}%"></i>
+        </span>
+        <span class="rel-barra-valor">${l.conf}<span class="rel-barra-de"> / ${l.tot}</span></span>
+      </div>`)
     .join("");
 }
 

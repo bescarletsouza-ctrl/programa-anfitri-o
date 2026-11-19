@@ -847,6 +847,11 @@ table.tabela tbody tr:last-child td { border-bottom: none; }
 .rel-barra-nome { font-size: .82rem; color: var(--texto-suave); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rel-barra-trilha { background: var(--cinza-100); border-radius: 6px; height: 22px; overflow: hidden; }
 .rel-barra-trilha i { display: block; height: 100%; background: var(--ok-solid); border-radius: 6px; min-width: 2px; transition: width .4s ease; }
+.rel-barra-dupla { position: relative; }
+.rel-barra-dupla i { position: absolute; left: 0; top: 0; }
+.rel-barra-dupla i.tot { background: var(--ok-solid); opacity: .28; }
+.rel-barra-dupla i[style*="width:0%"] { display: none; }
+.rel-barra-de { font-weight: 500; color: var(--texto-tenue); }
 .rel-barra-valor { font-weight: 700; font-size: .84rem; font-variant-numeric: tabular-nums; min-width: 52px; text-align: right; }
 
 .rel-horas {
