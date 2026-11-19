@@ -217,7 +217,7 @@ function filtrar() {
     if (!casa(filtros.estagio, a.estagio_id)) return false;
     if (filtros.presenca === "sim" && !a.presenca) return false;
     if (filtros.presenca === "nao" && a.presenca) return false;
-    if (!casa(filtros.situacao, situacoes[a.id])) return false;
+    if (!casa(filtros.situacao, situacaoExibida(a))) return false;
     if (filtros.prazo.length && !casaPrazo(filtros.prazo, prazoDe(a)?.nivel)) return false;
     if (diaDe && new Date(a.created_at) < diaDe) return false;
     if (diaAte && new Date(a.created_at) > diaAte) return false;
@@ -229,6 +229,9 @@ function filtrar() {
   });
 }
 
+// Situação mostrada pro anfitrião: a do participante ligado; quem "não vai ao evento" não tem
+// participante, então aparece como Desativado (igual a quem não vai em Participantes).
+function situacaoExibida(a) { return situacoes[a.id] || (a.vai === false ? "Desativado" : ""); }
 function nomeGrupo(id) { return grupos.find((g) => g.id === id)?.nome; }
 function nomeEstagio(id) { return estagios.find((s) => s.id === id)?.nome || "—"; }
 
@@ -314,8 +317,9 @@ function celulaHtml(a, c) {
     case "estagio":
       return `<td class="celula-edit" data-campo="estagio" title="Alterar estágio"><span class="badge badge-neutro">${esc(nomeEstagio(a.estagio_id))}</span>${movs[a.id] ? `<span class="cel-sub">desde ${esc(formatarData(movs[a.id].em, true))}</span>` : ""}${(() => { const r = prazoDe(a); return r && (r.nivel === "amarelo" || r.nivel === "vermelho") ? `<span class="sla-tag ${r.nivel}" title="Amarelo após ${esc(fmtDuracao(r.prazo))}, vermelho após ${esc(fmtDuracao(r.critico))}">⏱ ${esc(fmtDuracao(r.horas))}</span>` : ""; })()}${lapis()}</td>`;
     case "situacao": {
-      const s = situacoes[a.id];
-      if (!s) return `<td><span class="cel-tenue" title="Só quem vai ao evento tem situação">—</span></td>`;
+      const s = situacaoExibida(a);
+      if (!s) return `<td><span class="cel-tenue" title="Anfitrião sem participante ligado">—</span></td>`;
+      if (!situacoes[a.id]) return `<td title="Não vai ao evento — marque “Vai ao evento” na gaveta para ter situação própria"><span class="badge ${badgeSituacao(s)}">${esc(s)}</span></td>`;
       return `<td class="celula-edit" data-campo="situacao" title="Alterar situação"><span class="badge ${badgeSituacao(s)}">${esc(s)}</span>${lapis()}</td>`;
     }
     case "presenca":
@@ -491,8 +495,7 @@ function cardAnf(a) {
       ${(a.ingresso || "").trim() ? `<div style="margin-top:5px"><span class="chip-cat" style="font-size:.66rem">${esc(a.ingresso.trim())}</span></div>` : ""}
       <div class="pagina-sub" style="margin:2px 0 0;font-size:.72rem">${esc(a.email || a.telefone || "")}</div>
       <div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-        ${a.vai === false ? `<span class="badge badge-neutro" style="font-size:.65rem">Não vai</span>` : ""}
-        ${situacoes[a.id] ? `<span class="badge ${badgeSituacao(situacoes[a.id])}" style="font-size:.65rem">${esc(situacoes[a.id])}</span>` : ""}
+        ${situacaoExibida(a) ? `<span class="badge ${badgeSituacao(situacaoExibida(a))}" style="font-size:.65rem">${esc(situacaoExibida(a))}</span>` : ""}
         ${a.presenca ? `<span class="badge badge-ok" style="font-size:.65rem">Presente</span>` : ""}
         <span class="pagina-sub" style="margin:0;font-size:.68rem">${formatarData(a.created_at)}</span>
       </div>
@@ -1038,7 +1041,7 @@ async function exportar(dados) {
     { chave: "telefone", rotulo: "Telefone" },
     { rotulo: "Responsável", valor: (a) => nomeMembro(a.responsavel_user_id) },
     { rotulo: "Estágio", valor: (a) => nomeEstagio(a.estagio_id) },
-    { rotulo: "Situação", valor: (a) => situacoes[a.id] || "" },
+    { rotulo: "Situação", valor: (a) => situacaoExibida(a) },
     { rotulo: "No estágio desde", valor: (a) => (movs[a.id]?.em ? formatarData(movs[a.id].em, true) : "") },
     { rotulo: "Tempo no estágio (h)", valor: (a) => { const r = prazoDe(a); return r && r.horas != null ? Math.round(r.horas * 10) / 10 : ""; } },
     { rotulo: "Prazo do estágio", valor: (a) => { const r = prazoDe(a); return r ? ROTULO_NIVEL[r.nivel] : ""; } },
@@ -1107,7 +1110,10 @@ async function abrirGavetaDetalhe(id) {
         <div id="d-historico-mov"><p class="pagina-sub" style="margin:0">Carregando…</p></div></div>
       ${situacoes[a.id] ? `<label class="campo"><span>Situação</span>
         <select class="select" id="d-situacao">
-          ${SITUACOES.map((s) => `<option ${s === situacoes[a.id] ? "selected" : ""}>${s}</option>`).join("")}</select></label>` : ""}
+          ${SITUACOES.map((s) => `<option ${s === situacoes[a.id] ? "selected" : ""}>${s}</option>`).join("")}</select></label>`
+        : a.vai === false ? `<div class="campo"><span>Situação</span>
+        <div><span class="badge ${badgeSituacao("Desativado")}">Desativado</span></div>
+        <span class="cel-tenue" style="font-size:.72rem">Não vai ao evento, por isso não está em Participantes. Marque “Vai ao evento” e salve para ele ter situação própria.</span></div>` : ""}
       <label class="campo" style="display:flex;gap:8px;align-items:center">
         <input type="checkbox" id="d-vai" ${a.vai !== false ? "checked" : ""} /> <span style="margin:0">Vai ao evento</span></label>
       <label class="campo" style="display:flex;gap:8px;align-items:center">
