@@ -140,6 +140,16 @@ export const GURU_CANCELADO = /refund|cancel|estorn|reembols|charged?back|disput
 export const GURU_PENDENTE = /pending|pendente|waiting|aguard|unpaid|billet|boleto|analys|analis/;
 export const GURU_IGNORAR = /abandon|expir|checkout|started/;
 
+// Mesmo nome? Compara sem acento/maiúscula/pontuação/espaço extra e ignora "de, da, do, das,
+// dos, e" ("João da Silva" = "joao silva"). Nome diferente de verdade ("Vanessa Pires
+// Ribeiro" x "Vanessa Gabriele Garcia Silva") dá falso.
+export function mesmoNome(a: string, b: string): boolean {
+  const n = (s: string) =>
+    norm(s).replace(/[^a-z0-9 ]/g, " ").replace(/\b(de|da|do|das|dos|e)\b/g, " ").replace(/\s+/g, " ").trim();
+  const x = n(a), y = n(b);
+  return !!x && x === y;
+}
+
 // Etapa do pipeline de Participantes por id, nome exato ou (se ninguém bater) nome
 // que contém o texto — sem diferenciar maiúscula/acento. Devolve null se não achar.
 export type EtapaPart = { id: string; nome: string; situacao_alvo?: string | null };
@@ -333,10 +343,18 @@ Deno.serve(async (req) => {
     const etapaInicial = etapaDestino?.id || etapasEv[0]?.id;
     if (etapaInicial) reg.etapa_id = etapaInicial;
 
+    // Quem já existe: mesmo e-mail E mesmo nome. E-mail igual com NOME DIFERENTE é outra
+    // pessoa (ex.: alguém comprou com o e-mail de outra) → entra como participante novo.
+    // Sem nome no payload, ou no modo "mover de etapa" (o n8n costuma mandar só o e-mail),
+    // vale só o e-mail, como sempre.
     let existente: { id: string; etapa_id: string | null } | null = null;
+    let emailJaExistiaComOutroNome = false;
     if (email) {
-      const { data } = await sb.from("participantes").select("id, etapa_id").eq("evento_id", eventoId).ilike("email", email).limit(1);
-      existente = (data?.[0] as { id: string; etapa_id: string | null }) || null;
+      const { data } = await sb.from("participantes").select("id, etapa_id, nome").eq("evento_id", eventoId).ilike("email", email).limit(20);
+      const mesmos = (data || []) as { id: string; etapa_id: string | null; nome: string }[];
+      const comparaNome = !etapaDestino && !!nome;
+      existente = comparaNome ? (mesmos.find((p) => mesmoNome(p.nome, nome)) || null) : (mesmos[0] || null);
+      emailJaExistiaComOutroNome = comparaNome && mesmos.length > 0 && !existente;
     }
 
     // Guru: estorno/cancelamento de quem nunca entrou na plataforma não cria ninguém
@@ -401,7 +419,7 @@ Deno.serve(async (req) => {
         r = await sb.from("participantes").insert(reg).select("id, codigo").single();
       }
       if (r.error) { await logar(500, false, r.error.message); return json({ erro: r.error.message }, 500); }
-      resultado = { acao: "criado", ...r.data, tipo: reg.tipo, ingresso: ingresso || null, situacao: situacaoNova, etapa: etapaDestino?.nome, etapa_ignorada: etapaIgnorada || undefined, pagamento, valor_pago: reg.valor_pago ?? null, valor_origem: valorInfo.caminho || null };
+      resultado = { acao: "criado", ...r.data, tipo: reg.tipo, ingresso: ingresso || null, situacao: situacaoNova, etapa: etapaDestino?.nome, etapa_ignorada: etapaIgnorada || undefined, email_ja_existia_com_outro_nome: emailJaExistiaComOutroNome || undefined, pagamento, valor_pago: reg.valor_pago ?? null, valor_origem: valorInfo.caminho || null };
     }
 
     await logar(200, true, undefined, resultado);
