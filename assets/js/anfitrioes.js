@@ -232,6 +232,24 @@ function filtrar() {
 // Situação mostrada pro anfitrião: a do participante ligado; quem "não vai ao evento" não tem
 // participante, então aparece como Desativado (igual a quem não vai em Participantes).
 function situacaoExibida(a) { return situacoes[a.id] || (a.vai === false ? "Desativado" : ""); }
+// Troca a situação de qualquer anfitrião. Quem já tem participante ligado: muda nele. Quem "não vai"
+// (sem participante): só a escolha "Desativado" mantém como está; qualquer outra situação faz o
+// anfitrião passar a ir ao evento — o participante é criado e recebe a situação escolhida.
+async function trocarSituacao(a, situacao) {
+  if (a.participante_id) {
+    await definirSituacaoDoAnfitriao(a, situacao);
+    situacoes[a.id] = situacao;
+    return;
+  }
+  if (a.vai === false && situacao === "Desativado") return;
+  const atualizado = await salvar("anfitrioes", { id: a.id, vai: true });
+  await sincAnfitriaoParticipante(atualizado);
+  await recarregarLista();
+  const fresco = lista.find((x) => x.id === a.id);
+  if (!fresco?.participante_id) throw new Error("Não foi possível criar o participante deste anfitrião.");
+  await definirSituacaoDoAnfitriao(fresco, situacao);
+  situacoes[a.id] = situacao;
+}
 function nomeGrupo(id) { return grupos.find((g) => g.id === id)?.nome; }
 function nomeEstagio(id) { return estagios.find((s) => s.id === id)?.nome || "—"; }
 
@@ -318,8 +336,7 @@ function celulaHtml(a, c) {
       return `<td class="celula-edit" data-campo="estagio" title="Alterar estágio"><span class="badge badge-neutro">${esc(nomeEstagio(a.estagio_id))}</span>${movs[a.id] ? `<span class="cel-sub">desde ${esc(formatarData(movs[a.id].em, true))}</span>` : ""}${(() => { const r = prazoDe(a); return r && (r.nivel === "amarelo" || r.nivel === "vermelho") ? `<span class="sla-tag ${r.nivel}" title="Amarelo após ${esc(fmtDuracao(r.prazo))}, vermelho após ${esc(fmtDuracao(r.critico))}">⏱ ${esc(fmtDuracao(r.horas))}</span>` : ""; })()}${lapis()}</td>`;
     case "situacao": {
       const s = situacaoExibida(a);
-      if (!s) return `<td><span class="cel-tenue" title="Anfitrião sem participante ligado">—</span></td>`;
-      if (!situacoes[a.id]) return `<td title="Não vai ao evento — marque “Vai ao evento” na gaveta para ter situação própria"><span class="badge ${badgeSituacao(s)}">${esc(s)}</span></td>`;
+      if (!s) return `<td class="celula-edit" data-campo="situacao" title="Alterar situação"><span class="cel-tenue">—</span>${lapis()}</td>`;
       return `<td class="celula-edit" data-campo="situacao" title="Alterar situação"><span class="badge ${badgeSituacao(s)}">${esc(s)}</span>${lapis()}</td>`;
     }
     case "presenca":
@@ -352,7 +369,7 @@ async function editarCelula(id, campo, td) {
     atualValor = a.estagio_id || "";
   } else if (campo === "situacao") {
     itens = SITUACOES.map((s) => ({ valor: s, rotulo: s }));
-    atualValor = situacoes[a.id] || "";
+    atualValor = situacaoExibida(a);
   } else if (campo === "presenca") {
     itens = [{ valor: "sim", rotulo: "Sim" }, { valor: "nao", rotulo: "Não" }];
     atualValor = a.presenca ? "sim" : "nao";
@@ -390,8 +407,7 @@ async function editarCelula(id, campo, td) {
       const novaSit = await aplicarSituacaoDoEstagio(a, escolha || null);
       if (novaSit) toast(`${a.nome}: situação → ${novaSit}.`, "ok");
     } else if (campo === "situacao") {
-      await definirSituacaoDoAnfitriao(a, escolha);
-      situacoes[id] = escolha;
+      await trocarSituacao(a, escolha);
     } else if (campo === "presenca") {
       const atualizado = await salvar("anfitrioes", { id, presenca: escolha === "sim" });
       Object.assign(a, atualizado);
@@ -1108,12 +1124,13 @@ async function abrirGavetaDetalhe(id) {
           ${estagios.map((s) => `<option value="${s.id}" ${s.id === a.estagio_id ? "selected" : ""}>${esc(s.nome)}</option>`).join("")}</select></label>
       <div class="campo"><span>Movimentações no funil</span>
         <div id="d-historico-mov"><p class="pagina-sub" style="margin:0">Carregando…</p></div></div>
-      ${situacoes[a.id] ? `<label class="campo"><span>Situação</span>
+      <label class="campo"><span>Situação</span>
         <select class="select" id="d-situacao">
-          ${SITUACOES.map((s) => `<option ${s === situacoes[a.id] ? "selected" : ""}>${s}</option>`).join("")}</select></label>`
-        : a.vai === false ? `<div class="campo"><span>Situação</span>
-        <div><span class="badge ${badgeSituacao("Desativado")}">Desativado</span></div>
-        <span class="cel-tenue" style="font-size:.72rem">Não vai ao evento, por isso não está em Participantes. Marque “Vai ao evento” e salve para ele ter situação própria.</span></div>` : ""}
+          ${situacaoExibida(a) ? "" : `<option value="" selected>—</option>`}
+          ${SITUACOES.map((s) => `<option ${s === situacaoExibida(a) ? "selected" : ""}>${s}</option>`).join("")}</select>
+        ${a.participante_id ? "" : `<span class="cel-tenue" style="font-size:.72rem">${a.vai === false
+          ? "Não vai ao evento, por isso não está em Participantes. Escolher outra situação (e salvar) o coloca no evento e em Participantes."
+          : "Ainda sem participante ligado. Escolher uma situação (e salvar) cria o participante."}</span>`}</label>
       <label class="campo" style="display:flex;gap:8px;align-items:center">
         <input type="checkbox" id="d-vai" ${a.vai !== false ? "checked" : ""} /> <span style="margin:0">Vai ao evento</span></label>
       <label class="campo" style="display:flex;gap:8px;align-items:center">
@@ -1172,6 +1189,11 @@ async function abrirGavetaDetalhe(id) {
         return;
       }
       const catConv = g.querySelector("#d-categoria-convidado").value.trim() || null;
+      // situação escolhida à mão manda. Quem estava sem participante ("não vai") e ganha uma situação
+      // diferente de Desativado passa a ir ao evento — assim o participante é criado.
+      const sitEscolhida = g.querySelector("#d-situacao")?.value;
+      const mudouSituacao = !!sitEscolhida && sitEscolhida !== situacaoExibida(a);
+      const entraNoEvento = mudouSituacao && !a.participante_id && sitEscolhida !== "Desativado";
       const atualizado = await salvar("anfitrioes", {
         id: a.id,
         email: emailNovo || null,
@@ -1181,7 +1203,7 @@ async function abrirGavetaDetalhe(id) {
         ingresso: g.querySelector("#d-ingresso").value || null,
         categoria_convidado: catConv,
         estagio_id: g.querySelector("#d-estagio").value || null,
-        vai: g.querySelector("#d-vai").checked,
+        vai: g.querySelector("#d-vai").checked || entraNoEvento,
         presenca: g.querySelector("#d-presenca").checked,
       });
       if (catConv !== (a.categoria_convidado || null)) {
@@ -1191,13 +1213,11 @@ async function abrirGavetaDetalhe(id) {
         await reSincResponsavelAnfitriao(a.id, atualizado.responsavel_user_id).catch(() => {});
       }
       await sincAnfitriaoParticipante(atualizado).catch((e) => console.warn(e));
-      // situação escolhida à mão manda; senão, mudar de estágio aplica o alvo dele
-      const sitEscolhida = g.querySelector("#d-situacao")?.value;
-      const sitAntes = situacoes[a.id];
+      // sem situação escolhida à mão, mudar de estágio aplica o alvo dele
       const mudouEstagio = (a.estagio_id || null) !== (atualizado.estagio_id || null);
       await recarregarLista();
       const fresco = lista.find((x) => x.id === a.id) || atualizado;
-      if (sitEscolhida && sitEscolhida !== sitAntes) {
+      if (mudouSituacao && fresco.participante_id) {
         await definirSituacaoDoAnfitriao(fresco, sitEscolhida).catch((e) => console.warn(e));
         situacoes[a.id] = sitEscolhida;
       } else if (mudouEstagio) {
