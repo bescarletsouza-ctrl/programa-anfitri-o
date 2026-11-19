@@ -1089,7 +1089,8 @@ async function abrirGavetaDetalhe(id) {
       <h4>Gestão</h4>
       <label class="campo"><span>Responsável</span>
         <select class="select" id="d-resp"><option value="">—</option>
-          ${membrosOrg.map((m) => `<option value="${esc(m.user_id)}" ${m.user_id === a.responsavel_user_id ? "selected" : ""}>${esc(m.nome || m.email)}</option>`).join("")}</select></label>
+          ${membrosOrg.map((m) => `<option value="${esc(m.user_id)}" ${m.user_id === a.responsavel_user_id ? "selected" : ""}>${esc(m.nome || m.email)}</option>`).join("")}
+          ${a.responsavel_user_id && !membrosOrg.some((m) => m.user_id === a.responsavel_user_id) ? `<option value="${esc(a.responsavel_user_id)}" selected>Responsável atual</option>` : ""}</select></label>
       <label class="campo"><span>Tipo</span>
         <select class="select" id="d-grupo"><option value="">—</option>
           ${grupos.map((g) => `<option value="${g.id}" ${g.id === a.grupo_id ? "selected" : ""}>${esc(g.nome)}</option>`).join("")}</select></label>

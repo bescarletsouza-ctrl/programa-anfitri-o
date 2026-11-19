@@ -1264,7 +1264,8 @@ function abrirForm(p) {
         ${tiposIngresso.length ? "" : `<span class="cel-tenue" style="font-size:.72rem">Cadastre os tipos em “Tipos de ingresso”.</span>`}</label>
       <label class="campo"><span>Responsável</span>
         <select class="select" name="responsavel_user_id"><option value="">—</option>
-          ${membrosOrg.map((m) => `<option value="${esc(m.user_id)}" ${m.user_id === respPadrao ? "selected" : ""}>${esc(m.nome || m.email)}</option>`).join("")}</select>
+          ${membrosOrg.map((m) => `<option value="${esc(m.user_id)}" ${m.user_id === respPadrao ? "selected" : ""}>${esc(m.nome || m.email)}</option>`).join("")}
+          ${respPadrao && !membrosOrg.some((m) => m.user_id === respPadrao) ? `<option value="${esc(respPadrao)}" selected>Responsável atual</option>` : ""}</select>
         <span class="cel-tenue" style="font-size:.72rem">Preenchido sozinho pela Categoria ou pelo Tipo, se tiverem responsável.</span></label>
       <label class="campo"><span>Situação *</span>
         <select class="select" name="situacao">${SITUACOES.map((s) => `<option ${s === (p?.situacao || "Confirmado") ? "selected" : ""}>${s}</option>`).join("")}</select></label>

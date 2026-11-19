@@ -56,19 +56,28 @@ Deno.serve(async (req) => {
     const sb = svc();
     const u = await caller(req);
     if (!u) return json({ erro: "Não autenticado." }, 401);
-    if (!(await podeGerir(sb, u.id, org_id))) return json({ erro: "Sem permissão nesta organização." }, 403);
+    const gestor = await podeGerir(sb, u.id, org_id);
+    // Listar é permitido a QUALQUER membro da organização (as telas precisam dos nomes dos
+    // responsáveis); o agente recebe só nome/e-mail/perfil. Criar, editar, trocar senha e
+    // remover continuam só pro admin.
+    if (!gestor) {
+      const { data: meu } = acao === "listar"
+        ? await sb.from("org_membros").select("id").eq("org_id", org_id).eq("user_id", u.id).maybeSingle()
+        : { data: null };
+      if (!meu) return json({ erro: "Sem permissão nesta organização." }, 403);
+    }
 
     if (acao === "listar") {
       const { data: membros } = await sb.from("org_membros").select("*").eq("org_id", org_id);
       const ids = (membros || []).map((m) => m.user_id);
-      const { data: users } = await sb.auth.admin.listUsers({ perPage: 1000 });
+      const { data: users } = gestor ? await sb.auth.admin.listUsers({ perPage: 1000 }) : { data: null };
       const porId = new Map((users?.users || []).map((x) => [x.id, x]));
       return json({
         membros: (membros || [])
           .map((m) => ({
             id: m.id, user_id: m.user_id, email: m.email || porId.get(m.user_id)?.email,
-            nome: m.nome, telefone: m.telefone || null, papel: m.papel,
-            ultimo_login: porId.get(m.user_id)?.last_sign_in_at || null,
+            nome: m.nome, papel: m.papel,
+            ...(gestor ? { telefone: m.telefone || null, ultimo_login: porId.get(m.user_id)?.last_sign_in_at || null } : {}),
           }))
           .filter((m) => ids.includes(m.user_id))
           .sort((a, b) => (a.email || "").localeCompare(b.email || "")),
