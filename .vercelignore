@@ -6,3 +6,6 @@
 supabase/
 docs/
 README.md
+
+# App Android de impressão: código fonte não vai pro site (nem o .aar da Brother)
+android-impressao/

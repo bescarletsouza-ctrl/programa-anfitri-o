@@ -6,3 +6,12 @@ desktop.ini
 # Editores
 .vscode/
 .idea/
+
+# App Android de impressão
+android-impressao/app/libs/*.aar
+android-impressao/.gradle/
+android-impressao/build/
+android-impressao/app/build/
+android-impressao/local.properties
+android-impressao/.idea/
+*.iml

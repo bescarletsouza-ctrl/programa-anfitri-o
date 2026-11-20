@@ -9,7 +9,10 @@ import {
   buscarParticipantePorQR, registrarCheckin, getEvento, salvarEventoPorId,
 } from "./supabase.js";
 import { eventoId, definirEvento } from "./evento.js";
-import { imprimirCracha, CRACHA_PADRAO, TAMANHOS_CRACHA, snapTamanho, limparConfigCracha } from "./cracha.js";
+import {
+  imprimirCracha, CRACHA_PADRAO, TAMANHOS_CRACHA, snapTamanho, limparConfigCracha,
+  usarAppImpressao, definirUsarAppImpressao,
+} from "./cracha.js";
 
 const el = (id) => document.getElementById(id);
 const AVATAR = `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="8.5" r="4"/><path d="M4 21a8 8 0 0 1 16 0z"/></svg>`;
@@ -100,6 +103,8 @@ window.addEventListener("popstate", () => {
   el("menu-sair").onclick = () => { fecharMenu(); sair(); };
   el("config-voltar").onclick = fecharConfig;
   el("cfg-salvar").onclick = salvarConfig;
+  el("cfg-app-print").checked = usarAppImpressao();
+  el("cfg-app-print").onchange = (e) => definirUsarAppImpressao(e.target.checked);
   el("btn-tema").onclick = alternarTema;
   el("menu-tema").onclick = alternarTema;
   aplicarTema(temaSalvo() || "dark");

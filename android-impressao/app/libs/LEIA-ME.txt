@@ -1,0 +1,1 @@
+# Coloque aqui o BrotherPrintLibrary.aar (baixado da Brother). Veja ../README.md
