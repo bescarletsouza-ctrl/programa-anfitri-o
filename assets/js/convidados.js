@@ -7,8 +7,9 @@ import {
 } from "./ui.js";
 import {
   listGrupos, listAnfitrioes, listConvidados, listFormPerguntas, salvar, remover,
-  sincParticipanteConvidado,
+  sincParticipanteConvidado, listObservacoesDoTipo,
 } from "./supabase.js";
+import { baixarXLSX } from "./tabela.js";
 import { STATUS_CONVIDADO } from "./config.js";
 import { multiSelects, valoresDe, casa } from "./multiselect.js";
 import { montarObservacoes } from "./observacoes.js";
@@ -53,6 +54,8 @@ el("f-status").addEventListener("change", (e) => { filtros.status = valoresDe(e.
 el("f-grupo").addEventListener("change", (e) => { filtros.grupo = valoresDe(e.target); render(); });
 el("btn-novo").innerHTML = icone("mais") + "Novo convidado";
 el("btn-novo").onclick = modalNovo;
+el("btn-exportar").innerHTML = icone("baixar") + "Exportar Excel";
+el("btn-exportar").onclick = exportarConvidados;
 
 el("btn-toggle-filtros").onclick = () => {
   const painel = el("filtros-painel");
@@ -185,6 +188,68 @@ async function acaoEmMassa(acao) {
     lista = await listConvidados();
     render();
   } catch (e) { toast(e.message, "erro"); }
+}
+
+/* ---- Exportar ---- */
+// Exporta o que está na tela (ou só os selecionados): tudo que o painel mostra — contato, empresa,
+// anfitrião, categoria liberada, status, situação, data, observações — mais CADA resposta do formulário.
+async function exportarConvidados() {
+  const linhas = selecionados.size ? lista.filter((c) => selecionados.has(c.id)) : filtrar();
+  if (!linhas.length) { toast("Nada para exportar.", "erro"); return; }
+  const btn = el("btn-exportar");
+  btn.disabled = true;
+  try {
+    const obs = await listObservacoesDoTipo("convidado").catch(() => []);
+    const obsPorConvidado = new Map();
+    obs.forEach((o) => {
+      const l = obsPorConvidado.get(o.registro_id) || [];
+      l.push(`${o.autor_nome || "—"} (${formatarData(o.created_at, true)}): ${o.texto}`);
+      obsPorConvidado.set(o.registro_id, l);
+    });
+
+    const rotuloDe = (chave, padrao) => perguntas.find((p) => p.chave === chave)?.rotulo || padrao;
+    const texto = (v) => (v == null ? "" : Array.isArray(v) ? v.join(", ") : typeof v === "object" ? JSON.stringify(v) : String(v));
+
+    const colunas = [
+      { rotulo: "Nome", valor: (c) => c.nome || "" },
+      { rotulo: "E-mail", valor: (c) => c.email || "" },
+      { rotulo: "Telefone", valor: (c) => c.telefone || "" },
+      { rotulo: "Convidado por", valor: (c) => c.anfitriao?.nome || "" },
+      { rotulo: "Tipo do anfitrião", valor: (c) => grupos.find((g) => g.id === c.anfitriao?.grupo_id)?.nome || "" },
+      { rotulo: "Categoria liberada", valor: (c) => c.anfitriao?.categoria_convidado || "" },
+      { rotulo: "Status do convite", valor: (c) => c.status || "" },
+      { rotulo: "Situação do participante", valor: (c) => situacaoDoParticipante(c) || "" },
+      { rotulo: "Recebido em", valor: (c) => formatarData(c.created_at, true) },
+      // campos de sistema (colunas próprias), com o rótulo da pergunta de verdade deste evento
+      ...CAMPOS_SISTEMA.map((cs) => ({
+        rotulo: rotuloDe(cs.chave, { empresa: "Empresa", cnpj: "CNPJ", faturamento: "Faturamento mensal", funcionarios: "Nº de funcionários", site: "Site" }[cs.chave]),
+        valor: (c) => texto(c[cs.coluna]),
+      })),
+    ];
+    // respostas das perguntas personalizadas, na ordem do formulário
+    perguntas.filter((p) => !p.sistema).forEach((p) =>
+      colunas.push({ rotulo: p.rotulo || p.chave, valor: (c) => texto(c.respostas?.[p.chave]) }));
+    // respostas de perguntas que já não existem mais no formulário (não perde nada)
+    const conhecidas = new Set(perguntas.map((p) => p.chave));
+    const orfas = [...new Set(linhas.flatMap((c) => Object.keys(c.respostas || {})))].filter((k) => !conhecidas.has(k));
+    orfas.forEach((k) => colunas.push({ rotulo: k, valor: (c) => texto(c.respostas?.[k]) }));
+    colunas.push({ rotulo: "Observações", valor: (c) => (obsPorConvidado.get(c.id) || []).join("\n") });
+
+    // rótulos repetidos (ex.: pergunta "Empresa" e coluna de sistema) ganham sufixo pra não se sobrescreverem
+    const usados = new Map();
+    colunas.forEach((col) => {
+      const n = (usados.get(col.rotulo) || 0) + 1;
+      usados.set(col.rotulo, n);
+      if (n > 1) col.rotulo = `${col.rotulo} (${n})`;
+    });
+
+    await baixarXLSX("convidados.xlsx", linhas, colunas);
+    toast(`${linhas.length} convidado${linhas.length === 1 ? "" : "s"} exportado${linhas.length === 1 ? "" : "s"}.`, "ok");
+  } catch (e) {
+    toast(e.message || "Não foi possível exportar.", "erro");
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 /* ---- Novo convidado (manual) ---- */

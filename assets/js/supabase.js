@@ -388,7 +388,13 @@ export const listObservacoes = (tipo, registroId) =>
   supabase.from("observacoes").select("*").eq("registro_tipo", tipo).eq("registro_id", registroId)
     .order("created_at", { ascending: false }).then(ok);
 
-export const automacaoPrevia = (id) => supabase.rpc("automacao_preview", { p_id: id }).then(ok);
+// Todas as observações de um tipo de registro no evento (pra exportação), da mais antiga pra mais nova.
+export const listObservacoesDoTipo = (tipo, eid) =>
+  supabase.from("observacoes").select("registro_id, texto, autor_nome, created_at")
+    .eq("evento_id", ev(eid)).eq("registro_tipo", tipo)
+    .order("created_at", { ascending: true }).limit(10000).then(ok);
+
+export const automacaoPrevia =(id) => supabase.rpc("automacao_preview", { p_id: id }).then(ok);
 export const automacaoAplicarExistentes = (id) => supabase.rpc("automacao_aplicar_existentes", { p_id: id }).then(ok);
 
 export const listAutomacaoExecucoes = (automacaoId, limite = 15) =>
