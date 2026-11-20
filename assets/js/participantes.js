@@ -336,7 +336,7 @@ function ligarEventos() {
   el("btn-importar").innerHTML = icone("subir") + "Importar Excel";
   el("btn-importar").onclick = modalImportar;
   el("btn-exportar").innerHTML = icone("baixar") + "Exportar Excel";
-  el("btn-exportar").onclick = () => exportar(filtrarLista());
+  el("btn-exportar").onclick = exportarLista;
   el("btn-email").innerHTML = icone("inbox") + "Enviar e-mail";
   el("btn-email").onclick = () => abrirEmailPara(filtrarLista());
   el("btn-colunas").innerHTML = icone("filtro") + "Colunas";
@@ -1745,6 +1745,26 @@ function modalImportar() {
 }
 
 /* ---- Exportar ---- */
+// Exporta a lista com os filtros atuais. A Lista esconde os Desativados por padrão; se houver algum
+// que os filtros deixariam de fora só por isso, pergunta se entra no arquivo.
+async function exportarLista() {
+  const visiveis = filtrarLista();
+  const mostrados = new Set(visiveis.map((p) => p.id));
+  const ocultos = filtrarLista(true).filter((p) => !mostrados.has(p.id));
+  if (!ocultos.length) return exportar(visiveis);
+  abrirModal({
+    titulo: "Exportar Excel",
+    textoConfirmar: "Exportar",
+    corpoHtml: `<p style="margin:0 0 12px">${visiveis.length} participante${visiveis.length === 1 ? "" : "s"} na lista atual.</p>
+      <label style="display:flex;gap:8px;align-items:center">
+        <input type="checkbox" name="incluir" /> <span>Incluir também os <b>${ocultos.length}</b> desativado${ocultos.length === 1 ? "" : "s"}</span></label>`,
+    onConfirmar: async (form) => {
+      const incluir = form.querySelector('[name="incluir"]').checked;
+      await exportar(incluir ? ordenarLista([...visiveis, ...ocultos]) : visiveis);
+    },
+  });
+}
+
 async function exportar(dados) {
   if (!dados.length) { toast("Nada para exportar.", "erro"); return; }
   await baixarXLSX("participantes.xlsx", dados, [
