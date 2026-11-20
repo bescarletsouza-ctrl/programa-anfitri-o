@@ -14,6 +14,9 @@ import android.widget.ScrollView
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
+import com.brother.sdk.lmprinter.Channel
+import com.brother.sdk.lmprinter.NetworkSearchOption
+import com.brother.sdk.lmprinter.PrinterSearcher
 import kotlin.concurrent.thread
 
 /** Tela de configuração: IP da impressora, tipo de etiqueta e impressão de teste. */
@@ -52,8 +55,9 @@ class MainActivity : Activity() {
             setSingleLine()
         }
         coluna.addView(campoIp)
+        coluna.addView(Button(this).apply { text = "Buscar impressora na rede"; setOnClickListener { buscarImpressora() } })
         coluna.addView(TextView(this).apply {
-            text = "A impressora e este celular precisam estar na mesma rede Wi-Fi. Pra descobrir o IP: segure o botão de corte da QL-810W por ~1 s pra imprimir a página de configuração e procure \"IP Address\"."
+            text = "A impressora e este celular precisam estar na mesma rede Wi-Fi. Se a busca não achar, digite o IP: segure o botão de corte da QL-810W por ~1 s pra imprimir a página de configuração e procure \"IP Address\"."
             textSize = 12f
         })
 
@@ -86,6 +90,35 @@ class MainActivity : Activity() {
         })
 
         setContentView(ScrollView(this).apply { addView(coluna) })
+    }
+
+    private var buscando = false
+
+    /** Procura impressoras Brother na rede Wi-Fi (até 15 s) e preenche o IP da primeira QL encontrada. */
+    private fun buscarImpressora() {
+        if (buscando) return
+        buscando = true
+        resultado.text = "Procurando impressoras na rede (até 15 s)…"
+        thread {
+            var achada: Channel? = null
+            val res = PrinterSearcher.startNetworkSearch(applicationContext, NetworkSearchOption(15.0, false)) { canal ->
+                val modelo = canal.extraInfo[Channel.ExtraInfoKey.ModelName] ?: ""
+                if (achada == null && modelo.contains("QL", ignoreCase = true)) {
+                    achada = canal
+                    PrinterSearcher.cancelNetworkSearch()   // achou a QL: não precisa esperar o fim
+                }
+            }
+            buscando = false
+            val canal = achada
+            runOnUiThread {
+                if (canal != null) {
+                    campoIp.setText(canal.channelInfo)
+                    resultado.text = "Encontrei ${canal.extraInfo[Channel.ExtraInfoKey.ModelName]} em ${canal.channelInfo}. Toque em Salvar."
+                } else {
+                    resultado.text = "Não encontrei nenhuma QL na rede (${res.error.code}). Confira o Wi-Fi ou digite o IP."
+                }
+            }
+        }
     }
 
     private fun salvar() {

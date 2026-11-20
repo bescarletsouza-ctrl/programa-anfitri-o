@@ -29,7 +29,7 @@ check-in (TWA/PWA)  ──intent://print?d=…──▶  We.events Impressão  �
 
 ## Configurar no celular
 
-1. **IP da impressora**: segure o botão de corte da QL-810W por ~1 s pra imprimir a página de configuração e leia
+1. **IP da impressora**: toque em *Buscar impressora na rede*. Se não achar, segure o botão de corte da QL-810W por ~1 s pra imprimir a página de configuração e leia
    o *IP Address*. (Dica: no roteador, reserve esse IP pra impressora não mudar.)
 2. **Etiqueta**: escolha o que está na impressora (rolo contínuo 62 mm é o mais simples).
 3. **Imprimir teste** — tem que sair uma etiqueta com nome, categoria e QR.
@@ -56,4 +56,4 @@ Chrome do celular.
 - `PrintActivity` (filtro `weevents-print://print`) decodifica, `BadgeRenderer` desenha o bitmap
   (texto no canto superior esquerdo, QR no inferior direito, tudo preto e branco),
   `BrotherPrinter` abre o canal Wi-Fi e chama `printImage` do SDK.
-- Fica de fora da v1: busca automática da impressora na rede (hoje é o IP digitado) e Bluetooth.
+- Fica de fora da v1: Bluetooth e USB (só Wi-Fi). A busca na rede usa `PrinterSearcher.startNetworkSearch`; se não achar, digite o IP.
