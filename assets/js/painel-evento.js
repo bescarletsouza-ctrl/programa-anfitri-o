@@ -65,20 +65,22 @@ function render() {
   const kpi = (valor, rotulo) =>
     `<div class="card"><div class="kpi"><span class="valor">${valor}</span><span class="rotulo">${esc(rotulo)}</span></div></div>`;
   el("kpis").innerHTML =
-    kpi(ativos.length, "Inscritos") +
+    kpi(participantes.length, "Inscritos") +
     kpi(conf, "Confirmados") +
     kpi(pendentes, "Pendentes / pré-inscritos") +
     kpi(fila, "Fila de espera") +
     kpi(naoVao, "Não vão") +
     kpi(brl(faturamento), "Faturamento estimado");
 
-  renderDias(ativos);
-  renderQuebraConfirmados("rel-categoria", ativos, catDe);
-  renderQuebraConfirmados("rel-tipo", ativos, (p) => p.tipo || "—");
+  // Os gráficos contam TODOS os inscritos (inclusive Desativado), pra bater com o card Inscritos.
+  // Só o faturamento fica de fora quem não vai.
+  renderDias(participantes);
+  renderQuebraConfirmados("rel-categoria", participantes, catDe);
+  renderQuebraConfirmados("rel-tipo", participantes, (p) => p.tipo || "—");
   renderQuebra("rel-situacao", participantes, situ, SITUACOES);
   renderFaturamento(ativos);
-  renderQuebra("rel-faturamento-perfil", ativos, (p) => normalizarFaturamento(p.faturamento) || "Não informado");
-  renderCamposPersonalizados(ativos);
+  renderQuebra("rel-faturamento-perfil", participantes, (p) => normalizarFaturamento(p.faturamento) || "Não informado");
+  renderCamposPersonalizados(participantes);
 }
 
 function renderDias(dados) {
