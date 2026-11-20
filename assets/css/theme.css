@@ -582,6 +582,9 @@ table.tabela tbody tr:last-child td { border-bottom: none; }
 
 /* ---- Lista de participantes (extras) ---- */
 .tabela-part thead th { position: sticky; top: 0; z-index: 3; }
+.tabela-part thead th.th-ord { cursor: pointer; user-select: none; white-space: nowrap; }
+.tabela-part thead th.th-ord:hover { color: var(--texto); }
+.tabela-part thead th.th-ord .ind-ordem { color: var(--cor-laranja); font-size: .68rem; }
 .tabela-part td.col-check, .tabela-part th.col-check { width: 34px; padding-right: 0; }
 .tabela-part input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-color: var(--cor-laranja); }
 .tabela-part tbody tr.sel { background: var(--cor-laranja-suave); }

@@ -346,12 +346,81 @@ function ligarEventos() {
   });
 }
 
+/* ---- ordenação da lista: clique no título da coluna (▲ crescente → ▼ decrescente → sem ordem) ---- */
+let ordemLista = { col: "", dir: 1 };
+try {
+  const o = JSON.parse(localStorage.getItem("part_ordem") || "null");
+  if (o && typeof o.col === "string" && (o.dir === 1 || o.dir === -1)) ordemLista = o;
+} catch {}
+const salvarOrdemLista = () => { try { localStorage.setItem("part_ordem", JSON.stringify(ordemLista)); } catch {} };
+
+// valor usado pra ordenar cada coluna; null/"" vão sempre pro fim
+function chaveOrdem(p, c) {
+  if (c.startsWith("campo_")) {
+    const v = p.campos_extra?.[c.slice(6)];
+    return Array.isArray(v) ? v.join(", ") : (v ?? "");
+  }
+  switch (c) {
+    case "nome": return p.nome || "";
+    case "codigo": return p.codigo || "";
+    case "tipo": return rotuloTipo(p) || "";
+    case "categoria": return (p.ingresso || "").trim();
+    case "responsavel": return nomeMembro(p.responsavel_user_id) || "";
+    case "situacao": return situacaoDe(p);
+    case "statusConvite": return p.convidado_id ? (p.convidado?.status || "Pendente") : "";
+    case "pagamento": return p.pagamento || "";
+    case "valorpago": return p.valor_pago != null ? Number(p.valor_pago) : null;
+    case "faturamento": return p.faturamento || "";
+    case "empresa": return p.empresa || "";
+    case "telefone": return p.telefone || "";
+    case "etapa": {
+      const i = etapas.findIndex((e) => e.id === p.etapa_id);
+      return i < 0 ? null : i; // na ordem do funil
+    }
+    case "presenca": return p.presente ? 1 : 0;
+    case "cadastro": return p.created_at ? new Date(p.created_at).getTime() : null;
+    case "origem": return p.evento_origem_nome || "";
+    default: return "";
+  }
+}
+function ordenarLista(dados) {
+  if (!ordemLista.col) return dados;
+  const { col, dir } = ordemLista;
+  const vazio = (v) => v === null || v === undefined || v === "";
+  return [...dados].sort((a, b) => {
+    const x = chaveOrdem(a, col), y = chaveOrdem(b, col);
+    if (vazio(x) && vazio(y)) return 0;
+    if (vazio(x)) return 1;
+    if (vazio(y)) return -1;
+    const r = typeof x === "number" && typeof y === "number"
+      ? x - y
+      : String(x).localeCompare(String(y), "pt-BR", { numeric: true, sensitivity: "base" });
+    return r * dir;
+  });
+}
+function cabecalhoOrdenavel(chave, rotulo) {
+  const ativa = ordemLista.col === chave;
+  const seta = ativa ? (ordemLista.dir === 1 ? " ▲" : " ▼") : "";
+  return `<th class="th-ord${ativa ? " ativa" : ""}" data-ord="${esc(chave)}" title="Ordenar por ${esc(rotulo)}">${esc(rotulo)}<span class="ind-ordem">${seta}</span></th>`;
+}
+
 function renderCabecalho() {
   el("thead-part").innerHTML =
     `<th class="col-check"><input type="checkbox" id="check-todos" aria-label="Selecionar todos" /></th>
-     <th>Nome</th>
-     ${colunas.map((c) => `<th>${esc(COLUNAS[c])}</th>`).join("")}
+     ${cabecalhoOrdenavel("nome", "Nome")}
+     ${colunas.map((c) => cabecalhoOrdenavel(c, COLUNAS[c])).join("")}
      <th></th>`;
+  el("thead-part").querySelectorAll("[data-ord]").forEach((th) => {
+    th.onclick = () => {
+      const c = th.dataset.ord;
+      if (ordemLista.col !== c) ordemLista = { col: c, dir: 1 };
+      else if (ordemLista.dir === 1) ordemLista = { col: c, dir: -1 };
+      else ordemLista = { col: "", dir: 1 };
+      salvarOrdemLista();
+      pagina = 1;
+      render();
+    };
+  });
   el("check-todos").onchange = (e) => {
     const dados = filtrarLista();
     if (e.target.checked) dados.forEach((p) => selecionados.add(p.id));
@@ -379,7 +448,7 @@ function filtrosAtivos() {
 function filtrarLista(incluirDesativados = false) {
   const diaDe = filtros.dataDe ? new Date(filtros.dataDe + "T00:00:00") : null;
   const diaAte = filtros.dataAte ? new Date(filtros.dataAte + "T23:59:59") : null;
-  return participantes.filter((p) => {
+  const res = participantes.filter((p) => {
     // desativados: escondidos na Lista (a não ser que o filtro peça); no
     // Pipeline aparecem normalmente (ex.: coluna "Não vai").
     if (!incluirDesativados && situacaoDe(p) === "Desativado" && !filtros.situacao.includes("Desativado")) return false;
@@ -408,6 +477,8 @@ function filtrarLista(incluirDesativados = false) {
     }
     return true;
   });
+  // a ordem escolhida no cabeçalho vale pra Lista (e pra exportação/e-mail dela); o Pipeline tem a própria
+  return incluirDesativados ? res : ordenarLista(res);
 }
 
 function abrirEmailPara(dados) {
@@ -420,9 +491,9 @@ function renderLista() {
   renderCabecalho();
   const dados = filtrarLista();
   const presentes = dados.filter((p) => p.presente).length;
-  const totalAtivos = participantes.filter(ativo).length;
+  // total = todos os inscritos, inclusive Desativado (a lista só esconde os desativados por padrão)
   el("contador").textContent =
-    `${dados.length} de ${totalAtivos} participantes · ${presentes} presente${presentes === 1 ? "" : "s"}`;
+    `${dados.length} de ${participantes.length} participantes · ${presentes} presente${presentes === 1 ? "" : "s"}`;
   el("btn-toggle-filtros").classList.toggle("ativo", filtrosAtivos());
 
   el("wrap").hidden = dados.length === 0;
