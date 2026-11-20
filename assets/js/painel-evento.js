@@ -62,14 +62,17 @@ function render() {
   const fila = participantes.filter((p) => situ(p) === "Fila de espera").length;
   const faturamento = ativos.reduce((s, p) => s + precoDaCategoria(catDe(p)) * (Number(p.quantidade) || 1), 0);
 
-  const kpi = (valor, rotulo) =>
-    `<div class="card"><div class="kpi"><span class="valor">${valor}</span><span class="rotulo">${esc(rotulo)}</span></div></div>`;
+  // % sobre o total de inscritos (o card Inscritos é o topo do funil)
+  const total = participantes.length;
+  const pct = (n) => (total ? `${(Math.round((n / total) * 1000) / 10).toLocaleString("pt-BR")}%` : "0%");
+  const kpi = (valor, rotulo, n) =>
+    `<div class="card"><div class="kpi"><span class="valor">${valor}</span><span class="rotulo">${esc(rotulo)}</span>${n === undefined ? "" : `<span class="pct" title="${pct(n)} do total de inscritos">${pct(n)} dos inscritos</span>`}</div></div>`;
   el("kpis").innerHTML =
-    kpi(participantes.length, "Inscritos") +
-    kpi(conf, "Confirmados") +
-    kpi(pendentes, "Pendentes / pré-inscritos") +
+    kpi(total, "Inscritos") +
+    kpi(conf, "Confirmados", conf) +
+    kpi(pendentes, "Pendentes / pré-inscritos", pendentes) +
     kpi(fila, "Fila de espera") +
-    kpi(naoVao, "Não vão") +
+    kpi(naoVao, "Não vão", naoVao) +
     kpi(brl(faturamento), "Faturamento estimado");
 
   // Os gráficos contam TODOS os inscritos (inclusive Desativado), pra bater com o card Inscritos.

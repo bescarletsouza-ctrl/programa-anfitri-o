@@ -446,6 +446,7 @@ table.tabela tbody tr:last-child td { border-bottom: none; }
 /* ---- KPI ---- */
 .kpi { display: flex; flex-direction: column; gap: 3px; }
 .kpi .valor { font-size: 1.8rem; font-weight: 700; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.kpi .pct { font-size: .78rem; font-weight: 600; color: var(--texto-suave); font-variant-numeric: tabular-nums; }
 .kpi .rotulo { font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; color: var(--texto-tenue); font-weight: 600; }
 
 /* ---- Funil ---- */
