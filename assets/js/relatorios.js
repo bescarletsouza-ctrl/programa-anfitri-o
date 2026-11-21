@@ -118,14 +118,13 @@ function renderPontos() {
   const unicos = checkinsPorPonto(diaPonto);
   const linhas = pontos.map((p) => ({ nome: p.nome, n: unicos.get(p.id)?.size || 0, ativo: p.ativo }));
   const max = Math.max(1, ...linhas.map((l) => l.n));
-  const total = linhas.reduce((s, l) => s + l.n, 0);
+  // sem linha de "Total": a mesma pessoa pode passar em vários pontos, então somar os pontos repetiria gente
   el("rel-pontos").innerHTML = linhas
     .map((l) => `<div class="rel-barra">
         <span class="rel-barra-nome" title="${esc(l.nome)}">${esc(l.nome)}${l.ativo ? "" : " (inativo)"}</span>
         <span class="rel-barra-trilha"><i style="width:${Math.round((l.n / max) * 100)}%"></i></span>
         <span class="rel-barra-valor">${l.n}</span>
-      </div>`).join("") +
-    `<div class="rel-barra" style="margin-top:6px"><span class="rel-barra-nome"><b>Total</b></span><span></span><span class="rel-barra-valor">${total}</span></div>`;
+      </div>`).join("");
 }
 
 function renderAtividades() {
