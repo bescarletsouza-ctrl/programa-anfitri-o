@@ -19,8 +19,8 @@ import com.brother.sdk.lmprinter.NetworkSearchOption
 import com.brother.sdk.lmprinter.PrinterSearcher
 import kotlin.concurrent.thread
 
-/** Tela de configuração: IP da impressora, tipo de etiqueta e impressão de teste. */
-class MainActivity : Activity() {
+/** Tela de configuração da impressora (aberta pelo menu do check-in): IP, tipo de etiqueta e impressão de teste. */
+class ConfigActivity : Activity() {
     private lateinit var prefs: Prefs
     private lateinit var campoIp: EditText
     private lateinit var seletor: Spinner
@@ -74,7 +74,7 @@ class MainActivity : Activity() {
         cortar = CheckBox(this).apply { text = "Cortar a etiqueta depois de cada impressão"; isChecked = prefs.cortar }
         coluna.addView(cortar)
 
-        val btnSalvar = Button(this).apply { text = "Salvar"; setOnClickListener { salvar(); Toast.makeText(this@MainActivity, "Salvo.", Toast.LENGTH_SHORT).show() } }
+        val btnSalvar = Button(this).apply { text = "Salvar"; setOnClickListener { salvar(); Toast.makeText(this@ConfigActivity, "Salvo.", Toast.LENGTH_SHORT).show() } }
         val btnTeste = Button(this).apply { text = "Imprimir teste"; setOnClickListener { imprimirTeste() } }
         coluna.addView(btnSalvar)
         coluna.addView(btnTeste)
@@ -84,10 +84,11 @@ class MainActivity : Activity() {
 
         coluna.addView(titulo("Como usar"))
         coluna.addView(TextView(this).apply {
-            text = "No app de check-in: menu ▸ Impressora e etiqueta ▸ ligue \"Imprimir pelo app da impressora Brother\". " +
-                "Pronto: o botão \"Check-in + imprimir crachá\" passa a mandar direto pra cá."
+            text = "Não há mais nada a ligar: com a impressora configurada aqui, os botões \"Check-in + imprimir crachá\" e " +
+                "\"Reimprimir crachá\" do check-in já imprimem direto na Brother."
             textSize = 13f
         })
+        coluna.addView(Button(this).apply { text = "Voltar ao check-in"; setOnClickListener { finish() } })
 
         setContentView(ScrollView(this).apply { addView(coluna) })
     }

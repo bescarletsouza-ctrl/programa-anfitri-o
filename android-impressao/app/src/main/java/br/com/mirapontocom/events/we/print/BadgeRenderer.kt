@@ -36,7 +36,12 @@ object BadgeRenderer {
     fun parse(d: String): List<Cracha> {
         var b64 = d.trim()
         while (b64.length % 4 != 0) b64 += "="
-        val json = JSONObject(String(Base64.decode(b64, Base64.URL_SAFE), Charsets.UTF_8))
+        return parseJson(String(Base64.decode(b64, Base64.URL_SAFE), Charsets.UTF_8))
+    }
+
+    /** Mesmo formato, já como texto JSON: {"v":1,"c":[{w,h,qr,l:[{k,t,s}]}]} (é o que a ponte do WebView recebe). */
+    fun parseJson(texto: String): List<Cracha> {
+        val json = JSONObject(texto)
         val arr = json.getJSONArray("c")
         return (0 until arr.length()).map { i ->
             val o = arr.getJSONObject(i)

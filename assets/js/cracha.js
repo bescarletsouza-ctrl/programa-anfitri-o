@@ -142,14 +142,11 @@ async function carregarConfig() {
 }
 export function limparConfigCracha() { eventoCache = null; }
 
-/* ---- Impressão pelo app Android "We.events Impressão" (Brother QL) -------------------------------
-   O navegador não consegue mandar direto pra impressora; então, quando este aparelho tem o app
-   instalado e a opção ligada (Check-in → Impressora e etiqueta), o crachá vira um link que abre o
-   app. Ele desenha a etiqueta igual ao layout daqui e imprime pelo SDK da Brother. */
-export const APP_IMPRESSAO = { pacote: "br.com.mirapontocom.events.we.print", esquema: "weevents-print", apk: "/downloads/we-events-impressao.apk" };
-
-export const usarAppImpressao = () => { try { return localStorage.getItem("ck_imprimir_app") === "1"; } catch { return false; } };
-export const definirUsarAppImpressao = (on) => { try { on ? localStorage.setItem("ck_imprimir_app", "1") : localStorage.removeItem("ck_imprimir_app"); } catch {} };
+/* ---- Impressão pelo app Android "We.events Check-in" (Brother QL) ----------------------------------
+   O navegador não consegue mandar direto pra impressora. Dentro do app Android (que embute esta
+   página num WebView) existe window.WeEventsApp: o crachá vai pra ele, que desenha a etiqueta
+   igual ao layout daqui e imprime pelo SDK da Brother. Fora do app (PC, navegador) nada muda. */
+export const appNativo = () => typeof window !== "undefined" && !!window.WeEventsApp && typeof window.WeEventsApp.imprimir === "function";
 
 // Dados de UM crachá já resolvidos (o app só desenha): w/h em mm, qr = texto do QR (vazio = sem QR),
 // l = linhas na ordem do layout ({k: campo, t: texto, s: tamanho em px CSS}).
@@ -174,15 +171,6 @@ export function dadosCrachaApp(participante, nomeEvento = "", config = CRACHA_PA
   };
 }
 
-// intent:// com o pacote do app (sem lista de escolha); sem o app instalado, cai no download do APK.
-export function linkAppImpressao(crachas) {
-  const bytes = new TextEncoder().encode(JSON.stringify({ v: 1, c: crachas }));
-  let bin = ""; bytes.forEach((b) => { bin += String.fromCharCode(b); });
-  const d = btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-  const fallback = encodeURIComponent(location.origin + APP_IMPRESSAO.apk);
-  return `intent://print?d=${d}#Intent;scheme=${APP_IMPRESSAO.esquema};package=${APP_IMPRESSAO.pacote};S.browser_fallback_url=${fallback};end`;
-}
-
 export const imprimirCracha = (participante, nomeEvento = "") =>
   imprimirCrachas([participante], nomeEvento);
 
@@ -195,8 +183,8 @@ export async function imprimirCrachas(participantes, nomeEvento = "") {
   const ev = await carregarConfig();
   const config = ev?.cracha_config || CRACHA_PADRAO;
   const nome = nomeEvento || ev?.nome || "";
-  if (usarAppImpressao()) {
-    location.href = linkAppImpressao(lista.map((p) => dadosCrachaApp(p, nome, config)));
+  if (appNativo()) {
+    window.WeEventsApp.imprimir(JSON.stringify({ v: 1, c: lista.map((p) => dadosCrachaApp(p, nome, config)) }));
     return;
   }
   const box = garantirCaixa();

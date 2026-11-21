@@ -1,41 +1,37 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Impressão por Wi-Fi: só precisa de rede -->
+    <!-- Check-in (página do site) + impressão por Wi-Fi -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <!-- leitor de QR do crachá -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
         android:allowBackup="false"
         android:icon="@drawable/ic_launcher"
-        android:label="We.events Impressão"
+        android:label="We.events Check-in"
         android:theme="@style/Theme.App">
 
-        <!-- Configuração (IP da impressora, tamanho da etiqueta) e impressão de teste -->
+        <!-- O app: check-in (WebView) com impressão direta na Brother -->
         <activity
-            android:name=".MainActivity"
-            android:exported="true">
+            android:name=".CheckinActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout"
+            android:exported="true"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.App.Checkin"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
-        <!-- Recebe o crachá do check-in (link weevents-print://print?d=...) e imprime -->
+        <!-- Configuração da impressora (IP, etiqueta, teste), aberta pelo menu do check-in -->
         <activity
-            android:name=".PrintActivity"
-            android:exported="true"
-            android:excludeFromRecents="true"
-            android:launchMode="singleTop"
-            android:taskAffinity=""
-            android:theme="@style/Theme.App.Dialog">
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:host="print" android:scheme="weevents-print" />
-            </intent-filter>
-        </activity>
+            android:name=".ConfigActivity"
+            android:exported="false" />
     </application>
 </manifest>

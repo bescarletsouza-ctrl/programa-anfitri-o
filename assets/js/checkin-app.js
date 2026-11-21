@@ -11,7 +11,7 @@ import {
 import { eventoId, definirEvento } from "./evento.js";
 import {
   imprimirCracha, CRACHA_PADRAO, TAMANHOS_CRACHA, snapTamanho, limparConfigCracha,
-  usarAppImpressao, definirUsarAppImpressao,
+  appNativo,
 } from "./cracha.js";
 
 const el = (id) => document.getElementById(id);
@@ -103,8 +103,10 @@ window.addEventListener("popstate", () => {
   el("menu-sair").onclick = () => { fecharMenu(); sair(); };
   el("config-voltar").onclick = fecharConfig;
   el("cfg-salvar").onclick = salvarConfig;
-  el("cfg-app-print").checked = usarAppImpressao();
-  el("cfg-app-print").onchange = (e) => definirUsarAppImpressao(e.target.checked);
+  if (appNativo()) {
+    el("cfg-app-nativo").hidden = false;
+    el("cfg-app-abrir").onclick = () => window.WeEventsApp.abrirConfig();
+  }
   el("btn-tema").onclick = alternarTema;
   el("menu-tema").onclick = alternarTema;
   aplicarTema(temaSalvo() || "dark");

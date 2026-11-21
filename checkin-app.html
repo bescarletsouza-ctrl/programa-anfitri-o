@@ -174,10 +174,11 @@
       <label class="ck-check-row"><input type="checkbox" id="cfg-qr" /> Mostrar QR Code</label>
       <div id="cfg-linhas" style="margin-top:6px"></div>
       <button class="ck-btn ck-btn-primario" id="cfg-salvar" style="margin-top:18px">Salvar</button>
-      <div style="margin-top:22px;padding-top:14px;border-top:1px solid rgba(128,128,128,.25)">
-        <label class="ck-check-row"><input type="checkbox" id="cfg-app-print" /> Imprimir pelo app da impressora Brother (neste aparelho)</label>
-        <p class="pagina-sub-ck" style="margin-top:6px">Precisa do app <b>We.events Impressão</b> instalado e configurado neste celular. Com isso ligado, o crachá vai direto pra Brother, sem abrir a caixa de impressão. Vale só para este aparelho.
-          <a id="cfg-app-baixar" href="/downloads/we-events-impressao.apk" style="color:inherit;text-decoration:underline">Baixar o app</a></p>
+      <!-- só aparece dentro do app Android (WebView), que imprime direto na Brother -->
+      <div id="cfg-app-nativo" hidden style="margin-top:22px;padding-top:14px;border-top:1px solid rgba(128,128,128,.25)">
+        <strong>Impressora Brother (Wi-Fi)</strong>
+        <p class="pagina-sub-ck" style="margin:6px 0 10px">Neste app o crachá vai direto pra Brother QL-810W, sem abrir a caixa de impressão. Informe o IP da impressora e o tipo de etiqueta.</p>
+        <button class="ck-btn" id="cfg-app-abrir" type="button">Configurar impressora</button>
       </div>
       <p class="pagina-sub-ck">A impressão abre a caixa de diálogo do navegador — a impressora em si você escolhe lá, na hora de imprimir. Aqui você define o tamanho da etiqueta e quais dados aparecem nela.</p>
     </div>

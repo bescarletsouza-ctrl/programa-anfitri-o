@@ -2,4 +2,10 @@
 <resources>
     <style name="Theme.App" parent="android:Theme.Material.Light.NoActionBar" />
     <style name="Theme.App.Dialog" parent="android:Theme.Material.Light.Dialog" />
+    <!-- Check-in: fundo escuro, igual ao da página -->
+    <style name="Theme.App.Checkin" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#0c0c0d</item>
+        <item name="android:statusBarColor">#0c0c0d</item>
+        <item name="android:navigationBarColor">#0c0c0d</item>
+    </style>
 </resources>
