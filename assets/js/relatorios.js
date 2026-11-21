@@ -73,10 +73,8 @@ const hora = (iso) => {
 const hoje0 = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
 const nomeAtividade = (id) => (id && atividades.find((a) => a.id === id)?.nome) || "Credenciamento";
 const nomePonto = (id) => pontos.find((p) => p.id === id)?.nome || "Ponto removido";
-const diaSP = (iso) => {
-  try { return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso)); }
-  catch { return ""; }
-};
+const FMT_DIA = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" });
+const diaSP = (iso) => { try { return FMT_DIA.format(new Date(iso)); } catch { return ""; } };
 const dataBR = (aaaammdd) => { const [a, m, d] = aaaammdd.split("-"); return `${d}/${m}/${a}`; };
 
 function render() {

@@ -6,7 +6,7 @@
 import { iniciarPagina, esc, icone, toast, confirmar, abrirModal, abrirGaveta, debounce, formatarData } from "./ui.js";
 import {
   listAtividades, listCheckins, listParticipantes, salvar, remover,
-  registrarCheckin, inserirLote, removerCheckinsAtividade, listInscritosAtividades,
+  registrarCheckin, inserirLote, removerCheckinsAtividade, listInscritosAtividades, removerInscritosAtividade,
 } from "./supabase.js";
 import { parsearTabela, lerXlsx, baixarXLSX } from "./tabela.js";
 
@@ -16,6 +16,7 @@ const el = (id) => document.getElementById(id);
 let atividades = [];
 let checkins = [];
 let participantes = [];
+let inscritos = [];   // lista de inscritos por atividade (0048)
 
 _iniciando.then((ctx) => { if (ctx) carregar(ctx); });
 el("btn-atualizar").onclick = () => carregar();
@@ -23,10 +24,11 @@ el("nova-atividade").onclick = () => editar(null);
 
 async function carregar() {
   try {
-    [atividades, checkins, participantes] = await Promise.all([
+    [atividades, checkins, participantes, inscritos] = await Promise.all([
       listAtividades(),
       listCheckins().catch(() => []),
       listParticipantes().catch(() => []),
+      listInscritosAtividades().catch(() => []),
     ]);
     participantes = participantes.filter((p) => p.situacao !== "Desativado");
     el("carregando").hidden = true;
@@ -81,6 +83,36 @@ function credenciadosDe(atvId) {
     }));
 }
 
+// INSCRITOS da atividade = lista de inscritos + quem já tem entrada/saída registrada nela. SAIR não tira ninguém
+// da lista: saída é só a saída do espaço. Estado: "dentro" (no local agora) · "saiu" · "nao" (ainda não entrou).
+function inscritosDe(atvId) {
+  const dentro = new Map(credenciadosDe(atvId).map((c) => [c.pid, c]));
+  const ids = new Set(inscritos.filter((i) => i.atividade_id === atvId).map((i) => i.participante_id));
+  const teveEntrada = new Set();
+  let ultimaSaida = new Map();
+  for (const c of checkins) {   // vem em ordem decrescente de data
+    if (c.atividade_id !== atvId) continue;
+    ids.add(c.participante_id);
+    if (c.acao === "entrada") teveEntrada.add(c.participante_id);
+    else if (!ultimaSaida.has(c.participante_id)) ultimaSaida.set(c.participante_id, c.at);
+  }
+  return [...ids].map((pid) => {
+    const p = participantes.find((x) => x.id === pid);
+    const c = checkins.find((x) => x.atividade_id === atvId && x.participante_id === pid)?.participante || {};
+    const nome = p?.nome || c.nome;
+    if (!nome) return null;   // cadastro desativado/removido
+    const d = dentro.get(pid);
+    return {
+      pid, nome,
+      categoria: p?.ingresso || p?.tipo || c.ingresso || c.tipo || "",
+      email: p?.email || c.email || "", empresa: p?.empresa || c.empresa || "", codigo: p?.codigo || c.codigo || "",
+      desde: d?.desde || null,
+      estado: d ? "dentro" : teveEntrada.has(pid) ? "saiu" : "nao",
+      saiu: ultimaSaida.get(pid) || null,
+    };
+  }).filter(Boolean);
+}
+
 const categoriasUsadas = () => {
   const s = new Set();
   participantes.forEach((p) => { const c = (p.ingresso || "").trim(); if (c) s.add(c); });
@@ -103,6 +135,7 @@ function render() {
 
 function cardHtml(atv) {
   const cred = credenciadosDe(atv.id).length;
+  const nInscritos = inscritosDe(atv.id).length;
   const temVagas = Number.isFinite(atv.vagas) && atv.vagas > 0;
   const pct = temVagas ? Math.min(100, Math.round((cred / atv.vagas) * 100)) : 0;
   const lotada = temVagas && cred >= atv.vagas;
@@ -122,7 +155,8 @@ function cardHtml(atv) {
     <div class="atv-vagas">
       <div class="checkin-num" style="font-size:.86rem">
         <b style="font-size:1.3rem">${cred}</b>
-        <span>${temVagas ? `de ${atv.vagas} vagas` : "credenciado(s)"}</span>
+        <span>${temVagas ? `no local · vagas: ${atv.vagas}` : "no local agora"}</span>
+        <span class="chip-cat">${nInscritos} inscrito(s)</span>
         ${lotada ? `<span class="chip-cat" style="background:var(--erro-bg);color:var(--erro)">Lotada</span>` : ""}
       </div>
       ${temVagas ? `<div class="checkin-barra" style="margin-top:6px"><i style="width:${pct}%;background:${lotada ? "var(--erro)" : "var(--ok-solid)"}"></i></div>` : ""}
@@ -133,7 +167,7 @@ function cardHtml(atv) {
         : `<span class="cel-tenue" style="font-size:.78rem">Todas as categorias podem entrar</span>`}
     </div>
     <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
-      <button class="btn btn-secundario btn-sm" data-credenciados>Ver credenciados</button>
+      <button class="btn btn-secundario btn-sm" data-credenciados>Ver inscritos</button>
       <button class="btn btn-primario btn-sm" data-importar>+ Adicionar participantes</button>
     </div>
   </div>`;
@@ -207,7 +241,7 @@ function abrirGavetaAtv(atv, modo) {
   abrirGaveta(
     `${esc(atv.nome)}`,
     `<div class="toggle-abas" style="margin-bottom:14px">
-       <button type="button" data-aba="lista" class="${modo === "lista" ? "ativo" : ""}">Credenciados</button>
+       <button type="button" data-aba="lista" class="${modo === "lista" ? "ativo" : ""}">Inscritos</button>
        <button type="button" data-aba="add" class="${modo === "add" ? "ativo" : ""}">Adicionar</button>
      </div>
      <input class="input" id="ga-busca" placeholder="Buscar…" style="margin-bottom:12px" autocomplete="off" />
@@ -237,16 +271,22 @@ const selecionadosLista = new Set();
 function renderLista() {
   const alvo = document.getElementById("ga-corpo");
   if (!alvo || !gavetaAtv) return;
-  const todos = credenciadosDe(gavetaAtv.id);
+  const todos = inscritosDe(gavetaAtv.id);
   let linhas = todos;
   if (gavetaBusca) linhas = linhas.filter((l) => `${l.nome} ${l.categoria} ${l.email} ${l.codigo}`.toLowerCase().includes(gavetaBusca));
   linhas.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
 
   if (!linhas.length) {
-    alvo.innerHTML = `<div id="ga-bar"></div><p class="pagina-sub" style="margin:0">${gavetaBusca ? "Ninguém encontrado." : "Ninguém credenciado nesta atividade ainda."}</p>`;
+    alvo.innerHTML = `<div id="ga-bar"></div><p class="pagina-sub" style="margin:0">${gavetaBusca ? "Ninguém encontrado." : "Ninguém inscrito nesta atividade ainda."}</p>`;
     sincBarraLista(todos);
     return;
   }
+
+  const situacao = (l) => l.estado === "dentro"
+    ? `<span class="checkin-ok">✓ no local desde ${esc(hora(l.desde)) || "hoje"}</span>`
+    : l.estado === "saiu"
+      ? `<span class="cel-tenue">saiu às ${esc(hora(l.saiu))}</span>`
+      : `<span class="cel-tenue">ainda não entrou</span>`;
 
   alvo.innerHTML = `<div id="ga-bar"></div>` + linhas
     .map((l) => `<label class="checkin-item" data-pid="${l.pid}" style="padding:10px 12px;cursor:pointer">
@@ -257,12 +297,12 @@ function renderLista() {
           <span class="checkin-meta">
             ${l.categoria ? `<span class="chip-cat">${esc(l.categoria)}</span>` : ""}
             <span class="chip-codigo">${esc(l.codigo || "—")}</span>
-            <span class="checkin-ok">✓ desde ${esc(hora(l.desde)) || "hoje"}</span>
+            ${situacao(l)}
           </span>
         </span>
       </div>
       <div class="checkin-item-acao">
-        <button class="btn btn-fantasma btn-sm" data-saida>Registrar saída</button>
+        ${l.estado === "dentro" ? `<button class="btn btn-fantasma btn-sm" data-saida>Registrar saída</button>` : ""}
       </div>
     </label>`)
     .join("");
@@ -272,14 +312,11 @@ function renderLista() {
       e.target.checked ? selecionadosLista.add(row.dataset.pid) : selecionadosLista.delete(row.dataset.pid);
       sincBarraLista(todos);
     };
-    row.querySelector("[data-saida]").onclick = (e) => {
-      e.preventDefault();
-      registrarSaida(row.dataset.pid, row.querySelector("[data-saida]"));
-    };
+    const bs = row.querySelector("[data-saida]");
+    if (bs) bs.onclick = (e) => { e.preventDefault(); registrarSaida(row.dataset.pid, bs); };
   });
   sincBarraLista(todos);
 }
-
 // só reconstrói a barra de ações (não re-renderiza a lista inteira a cada clique)
 function sincBarraLista(todos) {
   const bar = document.getElementById("ga-bar");
@@ -290,7 +327,7 @@ function sincBarraLista(todos) {
     <button class="btn btn-secundario btn-sm" id="ga-exportar" ${todos.length ? "" : "disabled"}>${icone("baixar")} Exportar Excel</button>
     ${sel.length
       ? `<span class="barra-acoes-cont">${sel.length} selecionado(s)</span>
-         <button class="btn btn-perigo btn-sm" id="ga-remover">Remover da atividade</button>
+         <button class="btn btn-perigo btn-sm" id="ga-remover">Remover dos inscritos</button>
          <button class="btn btn-fantasma btn-sm" id="ga-limpar-sel">Limpar</button>`
       : ""}`;
   bar.querySelector("#ga-exportar").onclick = () => exportarCredenciados(todos);
@@ -306,13 +343,14 @@ function sincBarraLista(todos) {
 
 async function exportarCredenciados(linhas) {
   if (!linhas.length) { toast("Nada para exportar.", "erro"); return; }
-  const nomeArq = "atividade-" + (gavetaAtv.nome || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") + ".xlsx";
+  const nomeArq = "inscritos-" + (gavetaAtv.nome || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") + ".xlsx";
   await baixarXLSX(nomeArq || "atividade.xlsx", linhas, [
     { rotulo: "Nome", valor: (l) => l.nome },
     { rotulo: "Categoria", valor: (l) => l.categoria },
     { rotulo: "Código", valor: (l) => l.codigo },
     { rotulo: "E-mail", valor: (l) => l.email },
     { rotulo: "Empresa", valor: (l) => l.empresa },
+    { rotulo: "Situação", valor: (l) => (l.estado === "dentro" ? "No local" : l.estado === "saiu" ? "Saiu" : "Ainda não entrou") },
     { rotulo: "Entrada em", valor: (l) => (l.desde ? `${formatarData(l.desde)} ${hora(l.desde)}` : "") },
   ]);
   toast("Arquivo gerado.", "ok");
@@ -320,11 +358,13 @@ async function exportarCredenciados(linhas) {
 
 async function removerDaAtividade(pids) {
   if (!pids.length) return;
-  if (!confirmar(`Remover ${pids.length} participante(s) da atividade "${gavetaAtv.nome}"? O histórico de check-in deles nesta atividade será apagado.`)) return;
+  if (!confirmar(`Remover ${pids.length} participante(s) da lista de inscritos da atividade "${gavetaAtv.nome}"? A inscrição e o histórico de entrada/saída deles nesta atividade serão apagados.`)) return;
   try {
     await removerCheckinsAtividade(gavetaAtv.id, pids);
+    await removerInscritosAtividade(gavetaAtv.id, pids).catch(() => {});
     selecionadosLista.clear();
     checkins = await listCheckins().catch(() => checkins);
+    inscritos = await listInscritosAtividades().catch(() => inscritos);
     renderGavetaCorpo();
     render();
     toast(`${pids.length} removido(s) da atividade.`, "ok");
@@ -336,7 +376,7 @@ async function removerDaAtividade(pids) {
 function renderAdd() {
   const alvo = document.getElementById("ga-corpo");
   if (!alvo || !gavetaAtv) return;
-  const dentro = new Set(credenciadosDe(gavetaAtv.id).map((l) => l.pid));
+  const dentro = new Set(inscritosDe(gavetaAtv.id).map((l) => l.pid));
   const cats = (gavetaAtv.categorias || []).filter(Boolean);
   let fora = participantes.filter((p) => !dentro.has(p.id));
   if (gavetaBusca) {
@@ -356,7 +396,7 @@ function renderAdd() {
       <button type="button" class="btn btn-secundario btn-sm" id="ga-importar">${icone("subir")} Importar lista (Excel)</button>
     </div>
     ${atalhos}
-    <div class="pagina-sub" style="margin:0 0 8px">${fora.length} fora da atividade${fora.length > lista.length ? ` · refine a busca (mostrando ${lista.length})` : ""}</div>
+    <div class="pagina-sub" style="margin:0 0 8px">${fora.length} ainda não inscrito(s)${fora.length > lista.length ? ` · refine a busca (mostrando ${lista.length})` : ""}</div>
     <div id="ga-add-lista">
       ${lista.map((p) => `<label class="checkin-item" style="padding:9px 12px;cursor:pointer">
         <div class="checkin-item-info" style="flex-direction:row;align-items:center;gap:10px">
@@ -369,7 +409,7 @@ function renderAdd() {
             </span>
           </span>
         </div>
-      </label>`).join("") || `<p class="pagina-sub" style="margin:0">Todo mundo já está na atividade.</p>`}
+      </label>`).join("") || `<p class="pagina-sub" style="margin:0">Todo mundo já está inscrito na atividade.</p>`}
     </div>
     <button class="btn btn-primario" id="ga-add-btn" style="margin-top:14px;width:100%">Adicionar selecionados</button>`;
 
@@ -462,8 +502,9 @@ function modalImportarAtv() {
         await inscreverNaPlataforma(gavetaAtv.id, idsEntrada);
       }
 
-      [atividades, checkins, participantes] = await Promise.all([
+      [atividades, checkins, participantes, inscritos] = await Promise.all([
         listAtividades(), listCheckins().catch(() => checkins), listParticipantes().catch(() => participantes),
+        listInscritosAtividades().catch(() => inscritos),
       ]);
       gavetaModo = "lista";
       const g = document.getElementById("gaveta");
@@ -509,6 +550,7 @@ async function adicionarSelecionados() {
     await inscreverNaPlataforma(gavetaAtv.id, ids);
     selecionadosAdd.clear();
     checkins = await listCheckins().catch(() => checkins);
+    inscritos = await listInscritosAtividades().catch(() => inscritos);
     gavetaModo = "lista";
     const g = document.getElementById("gaveta");
     g?.querySelectorAll("[data-aba]").forEach((x) => x.classList.toggle("ativo", x.dataset.aba === "lista"));

@@ -479,3 +479,5 @@ body.ck-app {
 .ck-inscricao small { font-weight: 600; font-size: .8rem; opacity: .85; }
 .ck-inscricao.sim { background: #dcfce7; color: #166534; border: 2px solid #16a34a; }
 .ck-inscricao.nao { background: #fee2e2; color: #991b1b; border: 2px solid #dc2626; }
+.ck-insc-saiu { color: #a16207; font-weight: 700; font-size: .78rem; flex-shrink: 0; }
+:root[data-theme="light"] .ck-insc-saiu { color: #a16207; }

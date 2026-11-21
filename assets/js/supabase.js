@@ -556,6 +556,14 @@ export const inscricaoDaAtividade = (atividadeId, participanteId) =>
     .eq("atividade_id", atividadeId).eq("participante_id", participanteId).limit(1)
     .then(ok).then((rows) => rows[0] || null);
 
+// tira pessoas da lista de inscritos da atividade (usado por "Remover dos inscritos" na plataforma)
+export const removerInscritosAtividade = async (atividadeId, participanteIds) => {
+  if (!participanteIds?.length) return;
+  const { error } = await supabase.from("atividade_inscritos").delete()
+    .eq("atividade_id", atividadeId).in("participante_id", participanteIds);
+  if (error) throw error;
+};
+
 export const inscreverNaAtividade =(atividadeId, participanteId, operador) =>
   salvar("atividade_inscritos", { atividade_id: atividadeId, participante_id: participanteId, operador: operador || null });
 

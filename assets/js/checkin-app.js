@@ -327,11 +327,8 @@ async function carregarPontos() {
     if (!pontosIndisponivel) toast("Falha ao carregar os pontos de controle.", "erro");
   }
 }
-const diaSP = (iso) => {
-  try { return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso)); }
-  catch { return ""; }
-};
-const hojeSP = () => diaSP(new Date().toISOString());
+const FMT_DIA = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" });
+const diaSP = (iso) => { try { return FMT_DIA.format(new Date(iso)); } catch { return ""; } };const hojeSP = () => diaSP(new Date().toISOString());
 // saldo de cada pessoa no ponto NO DIA: entradas − saídas (> 0 = está dentro). Só conta hoje.
 function saldosDoPonto(pontoId, dia = hojeSP()) {
   const m = new Map();
@@ -346,12 +343,8 @@ const quantosDentro = (pontoId) => [...saldosDoPonto(pontoId).values()].filter((
 // check-ins ÚNICOS do dia no ponto: cada pessoa conta uma vez, mesmo que bipe de novo
 const checkinsUnicosHoje = (pontoId) =>
   new Set(acessos.filter((a) => a.ponto_id === pontoId && a.acao === "entrada" && diaSP(a.at) === hojeSP()).map((a) => a.participante_id)).size;
-const fmtDataHora = (iso) => {
-  try {
-    return new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
-  } catch { return ""; }
-};
-
+const FMT_DATAHORA = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+const fmtDataHora = (iso) => { try { return FMT_DATAHORA.format(new Date(iso)); } catch { return ""; } };
 function renderAcesso() {
   const ativos = pontos.filter((p) => p.ativo);
   const sel = el("ac-ponto");
@@ -448,10 +441,26 @@ function atvSelecionada() {
   const lista = atividadesDoDia(lembrado("ck_atv_dia"));
   return lista.find((a) => a.id === id) || lista[0] || null;
 }
-function inscritosDe(atvId) { return inscritos.filter((i) => i.atividade_id === atvId); }
-const estaInscrito = (pid, atvId) => inscritos.some((i) => i.participante_id === pid && i.atividade_id === atvId);
-const atividadesDe = (pid) => inscritos.filter((i) => i.participante_id === pid)
-  .map((i) => atividades.find((a) => a.id === i.atividade_id)?.nome).filter(Boolean);
+// Inscritos de uma atividade = a lista de inscritos + quem já tem entrada/saída registrada nela (adicionado pela
+// plataforma ou antes de existir a lista). SAIR da atividade não tira ninguém da lista: saída é só saída do espaço.
+function inscritosDe(atvId) {
+  const linhas = inscritos.filter((i) => i.atividade_id === atvId);
+  const ids = new Set(linhas.map((i) => i.participante_id));
+  checkins.forEach((c) => {
+    if (c.atividade_id !== atvId || ids.has(c.participante_id)) return;
+    ids.add(c.participante_id);
+    linhas.push({ id: null, atividade_id: atvId, participante_id: c.participante_id, implicita: true });
+  });
+  return linhas;
+}
+const estaInscrito = (pid, atvId) =>
+  inscritos.some((i) => i.participante_id === pid && i.atividade_id === atvId)
+  || checkins.some((c) => c.participante_id === pid && c.atividade_id === atvId);
+const atividadesDe = (pid) => atividades.filter((a) => estaInscrito(pid, a.id)).map((a) => a.nome);
+// última saída da pessoa na atividade (pra mostrar "Saiu às 14:10" sem tirá-la da lista)
+const ultimaSaidaAtv = (pid, atvId) =>
+  checkins.filter((c) => c.participante_id === pid && c.atividade_id === atvId && c.acao === "saida")
+    .sort((a, b) => new Date(b.at) - new Date(a.at))[0] || null;
 // texto pesquisável: nome, contato, código, empresa e qualquer campo personalizado (onde o CPF costuma ficar)
 const blobPessoa = (p) => [p.nome, p.email, p.telefone, p.codigo, p.empresa, p.cpf,
   ...Object.values(p.campos_extra || {}).flat()].filter((x) => x != null).join(" ").toLowerCase();
@@ -548,11 +557,12 @@ function renderInscritos(atv) {
   el("atv-insc-lista").innerHTML = lista.length
     ? lista.map(({ i, p }) => {
         const dentro = !!saldoAtividade(p.id, atv.id);
-        return `<div class="ck-insc-item" data-iid="${i.id}"><div>
+        const saiu = !dentro ? ultimaSaidaAtv(p.id, atv.id) : null;
+        return `<div class="ck-insc-item" data-iid="${i.id || ""}"><div>
             <strong>${esc(p.nome)}</strong>
             <span>${esc(p.telefone || "sem telefone")} · ${esc((p.ingresso || p.tipo || "sem categoria"))}</span></div>
-          ${dentro ? `<span class="ck-insc-ok">✓ No local</span>` : ""}
-          ${pode ? (inscritoRemovendo === i.id
+          ${dentro ? `<span class="ck-insc-ok">✓ No local</span>` : saiu ? `<span class="ck-insc-saiu">Saiu às ${esc(horaCurta(saiu.at))}</span>` : ""}
+          ${pode && i.id ? (inscritoRemovendo === i.id
             ? `<button class="ck-mini perigo" data-remover-ok>Remover</button><button class="ck-mini" data-remover-nao>Não</button>`
             : `<button class="ck-mini" data-remover>Remover</button>`) : ""}</div>`;
       }).join("")
@@ -613,8 +623,9 @@ async function processarNaAtividade(p) {
   const acao = atvAcao;
   if (!atv || !acao) return abrirSheet(p);
   const dentro = !!saldoAtividade(p.id, atv.id);
-  const avisar = (texto) => { navigator.vibrate?.([80, 60, 80]); telaSucesso(p, null, { texto, aviso: true }); setTimeout(retomar, 1500); };
-  if (p.acesso_bloqueado) return avisar("Acesso bloqueado");
+  // amarelo = já está / não consta (atenção, nada gravado); vermelho = barrado (bloqueado, não inscrito)
+  const avisar = (texto, tom = "atencao") => { navigator.vibrate?.([80, 60, 80]); telaSucesso(p, null, { texto, tom }); setTimeout(retomar, 1500); };
+  if (p.acesso_bloqueado) return avisar("Acesso bloqueado", "erro");
   try {
     if (acao === "inscrever") {
       if (estaInscrito(p.id, atv.id)) return avisar(`Já está inscrito(a) em ${atv.nome}`);
@@ -637,7 +648,7 @@ async function processarNaAtividade(p) {
     }
     // entrada: só entra quem está INSCRITO na atividade (vermelho, sem opção de credenciar); o inscrito é destacado
     if (dentro) return avisar(`Já está na atividade ${atv.nome}`);
-    if (!(await garantirInscricao(p, atv))) return avisar(`NÃO INSCRITO na atividade ${atv.nome}`);
+    if (!(await garantirInscricao(p, atv))) return avisar(`NÃO INSCRITO na atividade ${atv.nome}`, "erro");
     const cat = (p.ingresso || p.tipo || "").trim();
     const foraDaCategoria = atv.categorias?.length && !atv.categorias.includes(cat);
     const lotada = atv.vagas && credenciadosNaAtv(atv.id).length >= atv.vagas;
@@ -790,11 +801,8 @@ async function carregarDados() {
 }
 
 /* ---- helpers de presença --------------------------------------------- */
-const horaCurta = (iso) => {
-  try { return new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }).format(new Date(iso)); }
-  catch { return ""; }
-};
-
+const FMT_HORA = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+const horaCurta = (iso) => { try { return FMT_HORA.format(new Date(iso)); } catch { return ""; } };
 function saldoAtividade(pid, atvId) {
   const linhas = checkins
     .filter((c) => c.participante_id === pid && c.atividade_id === atvId)
@@ -843,12 +851,37 @@ async function pararCamera() {
   try { await scanner.stop(); } catch {}
   camAtiva = false;
 }
-async function pausar() { try { await scanner?.pause(true); } catch {} }
-async function retomar() { travado = false; try { await scanner?.resume(); } catch { abrirCamera(); } }
+// A câmera fica SEMPRE ligada: pausar/retomar o vídeo travava a próxima leitura no WebView do Android.
+// Enquanto há resultado/folha na tela, as leituras são só ignoradas (travado).
+let ultimaLeitura = { texto: "", ate: 0 };
+let travadoVigia = 0;
+async function pausar() { /* câmera segue ligada */ }
+async function retomar() {
+  ultimaLeitura.ate = Date.now() + 2500;   // o mesmo QR ainda na frente da câmera não vale como leitura nova
+  travado = false;
+  if (!camAtiva && el("app").hidden === false) abrirCamera();
+}
+// se por qualquer motivo a leitura ficar travada sem nada na tela, destrava sozinha (~6 s)
+setInterval(() => {
+  const algoNaTela = !el("sheet").hidden || !el("tela-busca").hidden || !!document.querySelector(".ck-sucesso");
+  if (travado && el("app").hidden === false && !algoNaTela) { if (++travadoVigia >= 3) { travadoVigia = 0; retomar(); } }
+  else travadoVigia = 0;
+}, 2000);
 
 async function onScan(texto) {
   if (travado) return;
+  if (texto === ultimaLeitura.texto && Date.now() < ultimaLeitura.ate) return;
   travado = true;
+  ultimaLeitura = { texto, ate: Infinity };
+  try {
+    await tratarLeitura(texto);
+  } catch (e) {
+    console.warn(e);
+    toast("Não consegui processar a leitura. Tente de novo.", "erro");
+    retomar();
+  }
+}
+async function tratarLeitura(texto) {
   navigator.vibrate?.(60);
   await pausar();
   el("mira-txt").textContent = "Buscando…";
