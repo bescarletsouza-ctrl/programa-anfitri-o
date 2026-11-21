@@ -3,11 +3,11 @@
 // evento → escolher tipo (evento geral / atividade) → escanear o QR do crachá,
 // credenciar e imprimir a credencial. Página independente (sem sidebar).
 // =============================================================================
-import { esc, toast } from "./ui.js";
+import { esc, toast, debounce } from "./ui.js";
 import {
   supabase, listEventos, listParticipantes, listCheckins, listAtividades,
   buscarParticipantePorQR, registrarCheckin, getEvento, salvarEventoPorId,
-  meusAcessosEventos, eventosDoNivel,
+  meusAcessosEventos, eventosDoNivel, listPontos, listAcessosPontos, registrarAcessoPonto, salvar, remover,
 } from "./supabase.js";
 import { eventoId, definirEvento } from "./evento.js";
 import {
@@ -20,7 +20,7 @@ const AVATAR = `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 const ICONE_SOL = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`;
 const ICONE_LUA = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
 
-const TELAS = ["tela-abrir", "tela-login", "tela-eventos", "tela-modo", "app", "tela-busca"];
+const TELAS = ["tela-abrir", "tela-login", "tela-eventos", "tela-shell", "app", "tela-busca"];
 let scanner = null;
 let camAtiva = false;
 
@@ -32,6 +32,11 @@ let modo = "";            // "" = evento geral; senão id da atividade
 let participantes = [];
 let checkins = [];
 let travado = false;
+let pontos = [];            // pontos de controle do evento (0047)
+let acessos = [];           // entradas/saídas nos pontos (mais recentes primeiro)
+let pontosIndisponivel = false;
+let pontoModo = null;       // {id, nome, acao} enquanto o scanner lê pra um ponto de controle
+let aba = "part";
 
 /* ---- navegação entre telas ------------------------------------------- */
 async function mostrarTela(alvo) {
@@ -49,7 +54,8 @@ async function mostrarTela(alvo) {
    tela) — reempilhando se ainda não chegou na raiz, pra funcionar em
    vários toques seguidos. Na raiz, o próximo "voltar" sai do app normal. */
 function overlayAberto() {
-  return !el("menu").hidden || !el("sheet").hidden || !el("tela-busca").hidden || !el("tela-config").hidden;
+  return !el("menu").hidden || !el("sheet").hidden || !el("tela-busca").hidden || !el("tela-config").hidden
+    || !el("tela-pontos").hidden || !el("tela-registro").hidden;
 }
 function noTopo() {
   const telaRaiz = !el("tela-eventos").hidden || !el("tela-login").hidden || !el("tela-abrir").hidden;
@@ -66,9 +72,11 @@ function voltarUmNivel() {
   if (!el("menu").hidden) return fecharMenu();
   if (!el("sheet").hidden) return fecharSheet();
   if (!el("tela-config").hidden) return fecharConfig();
+  if (!el("tela-pontos").hidden) return fecharPontos();
+  if (!el("tela-registro").hidden) return fecharRegistro();
   if (!el("tela-busca").hidden) return fecharBusca();
-  if (!el("app").hidden) return mostrarTela("tela-modo");
-  if (!el("tela-modo").hidden) return mostrarTela("tela-eventos");
+  if (!el("app").hidden) return voltarAoShell();
+  if (!el("tela-shell").hidden) return mostrarTela("tela-eventos");
 }
 window.addEventListener("popstate", () => {
   voltarUmNivel();
@@ -80,27 +88,44 @@ window.addEventListener("popstate", () => {
 (async function boot() {
   el("form-login").addEventListener("submit", entrar);
   el("btn-sair").onclick = sair;
-  el("modo-voltar").onclick = () => mostrarTela("tela-eventos");
-  el("btn-trocar").onclick = () => mostrarTela("tela-modo");
+  el("btn-trocar").onclick = voltarAoShell;
   el("btn-buscar").onclick = abrirBusca;
   el("btn-manual-2").onclick = abrirBusca;
   el("btn-cam-manual").onclick = abrirBusca;
   el("busca-voltar").onclick = fecharBusca;
   el("fab-scanner").onclick = irParaScanner;
   el("btn-cam-retry").onclick = abrirCamera;
-  el("modo-evento-btn").onclick = () => escolherModo("");
-  el("modo-atividade-btn").onclick = mostrarAtividades;
-  el("hub-lista-btn").onclick = abrirListaDoHub;
-  el("hub-config-btn").onclick = abrirConfig;
   let deb;
   el("in-busca").addEventListener("input", () => { clearTimeout(deb); deb = setTimeout(renderBusca, 150); });
 
+  // shell: abas, lista, controle de acesso, configurações, pontos, registro
+  el("shell-menu").onclick = abrirMenu;
+  el("shell-atualizar").onclick = recarregarTudo;
+  document.querySelectorAll(".ck-tabbar [data-tab]").forEach((b) => { b.onclick = () => irParaAba(b.dataset.tab); });
+  el("part-busca").addEventListener("input", debounce(renderParticipantes, 150));
+  el("part-fab").onclick = iniciarScanEvento;
+  el("ac-ler").onclick = iniciarScanPonto;
+  el("ac-ponto").onchange = () => { guardar("ck_ponto", el("ac-ponto").value); renderAcesso(); };
+  el("ac-acao").onchange = () => guardar("ck_acao", el("ac-acao").value);
+  el("cfg-operador-salvar").onclick = () => { guardar("ck_operador", el("cfg-operador").value.trim()); toast("Operador salvo.", "ok"); };
+  el("cfg-item-pontos").onclick = abrirPontos;
+  el("cfg-item-impressora").onclick = abrirConfig;
+  el("cfg-item-tema").onclick = alternarTema;
+  el("pontos-voltar").onclick = fecharPontos;
+  el("ponto-add").onclick = adicionarPonto;
+  el("ponto-novo").addEventListener("keydown", (e) => { if (e.key === "Enter") adicionarPonto(); });
+  el("registro-voltar").onclick = fecharRegistro;
+  el("registro-filtro-btn").onclick = () => { el("registro-filtros").hidden = !el("registro-filtros").hidden; };
+  ["rf-tempo", "rf-acao"].forEach((id) => { el(id).onchange = renderRegistro; });
+  el("rf-operador").addEventListener("input", debounce(renderRegistro, 200));
   el("btn-menu").onclick = abrirMenu;
   el("menu-fundo").onclick = fecharMenu;
-  el("menu-scanner").onclick = () => { fecharMenu(); fecharBusca(); fecharConfig(); };
-  el("menu-lista").onclick = () => { fecharMenu(); abrirBusca(); };
-  el("menu-trocar").onclick = () => { fecharMenu(); mostrarTela("tela-modo"); };
-  el("menu-config").onclick = () => { fecharMenu(); abrirConfig(); };
+  el("menu-controle").onclick = () => abrirAba("acesso");
+  el("menu-lista").onclick = () => abrirAba("part");
+  el("menu-atv").onclick = () => abrirAba("atv");
+  el("menu-config").onclick = () => abrirAba("cfg");
+  el("menu-registro").onclick = () => { fecharMenu(); abrirRegistro(); };
+  el("menu-trocar").onclick = () => { fecharMenu(); fecharOverlays(); mostrarTela("tela-eventos"); };
   el("menu-sair").onclick = () => { fecharMenu(); sair(); };
   el("config-voltar").onclick = fecharConfig;
   el("cfg-salvar").onclick = salvarConfig;
@@ -185,46 +210,342 @@ async function apósLogin() {
 
 const dataBR = (iso) => { try { return new Intl.DateTimeFormat("pt-BR").format(new Date(iso + "T12:00")); } catch { return iso; } };
 
-/* ---- evento + modo ------------------------------------------------ */
+/* ---- evento + shell ------------------------------------------------ */
+const guardar = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+const lembrado = (k) => { try { return localStorage.getItem(k) || ""; } catch { return ""; } };
+const operador = () => lembrado("ck_operador") || (sessao?.user?.email || "").split("@")[0];
+
 async function escolherEvento(id) {
   evento = eventos.find((e) => e.id === id);
   if (!evento) return;
   definirEvento(evento.id, evento.nome);
-  el("modo-evento").textContent = evento.nome;
-  el("modo-atividades").hidden = true;
-  await mostrarTela("tela-modo");
-  atividades = await listAtividades().catch(() => []);
-  el("modo-atividade-btn").hidden = false;
-  if (!atividades.length) {
-    el("modo-atividade-btn").querySelector("span:last-child span").textContent = "Nenhuma atividade cadastrada neste evento";
-  }
+  document.title = `Check-in — ${evento.nome || "We.events"}`;
+  el("shell-evento").textContent = evento.nome || "";
+  modo = ""; pontoModo = null;
+  el("part-lista").innerHTML = `<p class="ck-busca-vazio">Carregando…</p>`;
+  await mostrarTela("tela-shell");
+  irParaAba("part");
+  await recarregarTudo(true);
 }
 
-function mostrarAtividades() {
-  if (!atividades.length) { escolherModo(""); return; }
-  el("modo-atividades").hidden = false;
-  el("modo-atividades-lista").innerHTML = atividades.map((a) => `
-    <button class="ck-lista-item" data-atv="${a.id}">
-      <span class="ck-lista-item-txt">
-        <strong>${esc(a.nome)}</strong>
-        <span>${[a.dia ? dataBR(a.dia) : "", [a.inicio, a.fim].filter(Boolean).join("–")].filter(Boolean).join(" · ") || "—"}</span>
-      </span>
-      <span class="ck-chevron">›</span>
-    </button>`).join("");
-  el("modo-atividades-lista").querySelectorAll("[data-atv]").forEach((b) => {
-    b.onclick = () => escolherModo(b.dataset.atv);
+async function recarregarTudo(silencioso) {
+  const [, , atvs] = await Promise.all([carregarDados(), carregarPontos(), listAtividades().catch(() => [])]);
+  atividades = atvs;
+  renderTudo();
+  if (silencioso !== true) toast("Dados atualizados.", "ok");
+}
+
+function renderTudo() { renderParticipantes(); renderAcesso(); renderAtividades(); renderConfig(); }
+
+const TITULOS_ABA = { part: "Lista de participantes", acesso: "Controle de acesso", atv: "Atividades", cfg: "Configurações" };
+function irParaAba(tab) {
+  aba = tab;
+  ["part", "acesso", "atv", "cfg"].forEach((t) => { el("pane-" + t).hidden = t !== tab; });
+  document.querySelectorAll(".ck-tabbar [data-tab]").forEach((b) => b.classList.toggle("ativa", b.dataset.tab === tab));
+  el("shell-titulo").textContent = TITULOS_ABA[tab];
+  if (tab === "part") renderParticipantes();
+  if (tab === "acesso") renderAcesso();
+  if (tab === "atv") renderAtividades();
+  if (tab === "cfg") renderConfig();
+}
+
+function fecharOverlays() {
+  ["tela-busca", "tela-config", "tela-pontos", "tela-registro"].forEach((id) => { el(id).hidden = true; });
+  if (!el("menu").hidden) fecharMenu();
+  if (!el("sheet").hidden) fecharSheet(true);
+}
+// de qualquer lugar (menu, scanner, telas por cima): volta pro shell, já na aba pedida
+async function abrirAba(tab) {
+  modo = ""; pontoModo = null;
+  fecharOverlays();
+  await mostrarTela("tela-shell");
+  irParaAba(tab);
+}
+async function voltarAoShell() {
+  modo = ""; pontoModo = null;
+  fecharOverlays();
+  await mostrarTela("tela-shell");
+  irParaAba(aba);
+}
+
+/* ---- aba 1: lista de participantes ----------------------------------- */
+function htmlItemParticipante(p, atv) {
+  const entrada = atv ? saldoAtividade(p.id, atv.id) : entradaEvento(p);
+  const confirmado = (p.situacao || "Confirmado") === "Confirmado";
+  return `<button class="ck-busca-item" data-id="${p.id}">
+    <span class="ck-avatar sm">${AVATAR}</span>
+    <span class="ck-busca-item-txt">
+      <strong>${esc(p.nome)}</strong>
+      <span>${esc(p.ingresso || p.tipo || "")}</span>
+      <span class="ck-busca-sit ${confirmado ? "ok" : "alerta"}">${esc(p.situacao || "Confirmado")}</span>
+    </span>
+    ${entrada ? `<span class="ck-tag-ok">✓</span>` : ""}
+  </button>`;
+}
+function renderParticipantes() {
+  const t = el("part-busca").value.trim().toLowerCase();
+  const base = t
+    ? participantes.filter((p) => `${p.nome} ${p.email || ""} ${p.telefone || ""} ${p.codigo || ""} ${p.empresa || ""}`.toLowerCase().includes(t))
+    : [...participantes].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+  const achados = base.slice(0, t ? 40 : 300);
+  el("part-lista").innerHTML = achados.length
+    ? achados.map((p) => htmlItemParticipante(p, null)).join("")
+    : `<p class="ck-busca-vazio">${t ? "Ninguém encontrado." : "Nenhum participante neste evento."}</p>`;
+  el("part-lista").querySelectorAll("[data-id]").forEach((b) => {
+    b.onclick = () => abrirSheet(participantes.find((x) => x.id === b.dataset.id));
   });
-  el("modo-atividades").scrollIntoView({ block: "nearest" });
+}
+async function iniciarScanEvento() {
+  modo = ""; pontoModo = null;
+  el("topo-evento").textContent = evento?.nome || "Evento";
+  el("topo-ctx").textContent = "◎ Evento geral";
+  await mostrarTela("app");
+}
+
+/* ---- aba 2: controle de acesso (pontos de controle) ------------------- */
+async function carregarPontos() {
+  try {
+    [pontos, acessos] = await Promise.all([listPontos(), listAcessosPontos()]);
+    pontosIndisponivel = false;
+  } catch (e) {
+    pontos = []; acessos = [];
+    pontosIndisponivel = /pontos_controle|acessos_pontos|does not exist|schema cache/i.test(e.message || "");
+    if (!pontosIndisponivel) toast("Falha ao carregar os pontos de controle.", "erro");
+  }
+}
+// saldo de cada pessoa no ponto: entradas − saídas (> 0 = está dentro)
+function saldosDoPonto(pontoId) {
+  const m = new Map();
+  acessos.forEach((a) => {
+    if (a.ponto_id !== pontoId) return;
+    m.set(a.participante_id, (m.get(a.participante_id) || 0) + (a.acao === "entrada" ? 1 : -1));
+  });
+  return m;
+}
+const estaDentro = (pid, pontoId) => (saldosDoPonto(pontoId).get(pid) || 0) > 0;
+const quantosDentro = (pontoId) => [...saldosDoPonto(pontoId).values()].filter((n) => n > 0).length;
+
+const fmtDataHora = (iso) => {
+  try {
+    return new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
+  } catch { return ""; }
+};
+
+function renderAcesso() {
+  const ativos = pontos.filter((p) => p.ativo);
+  const sel = el("ac-ponto");
+  const lembrar = lembrado("ck_ponto");
+  sel.innerHTML = ativos.length
+    ? ativos.map((p) => `<option value="${p.id}" ${p.id === lembrar ? "selected" : ""}>${esc(p.nome)}</option>`).join("")
+    : `<option value="">Sem pontos</option>`;
+  el("ac-acao").value = lembrado("ck_acao") || "entrada";
+  el("ac-ler").disabled = !ativos.length;
+
+  if (pontosIndisponivel) {
+    el("ac-resumo").innerHTML = `<p class="pagina-sub-ck" style="grid-column:1/-1;margin:0">Falta ativar o controle de acesso: rode a migração <code>0047_pontos_de_controle.sql</code> no SQL Editor.</p>`;
+    el("ac-recentes").innerHTML = "";
+    return;
+  }
+  if (!ativos.length) {
+    el("ac-resumo").innerHTML = `<p class="pagina-sub-ck" style="grid-column:1/-1;margin:0">Nenhum ponto de controle. Cadastre em <b>Configurações ▸ Pontos de controle</b> (ex.: Plenária, Foyer).</p>`;
+    el("ac-recentes").innerHTML = "";
+    return;
+  }
+  const atual = sel.value;
+  const entradas = acessos.filter((a) => a.ponto_id === atual && a.acao === "entrada").length;
+  el("ac-resumo").innerHTML = `<div><b>${quantosDentro(atual)}</b><span>dentro agora</span></div><div><b>${entradas}</b><span>entradas registradas</span></div>`;
+  const nomePonto = (id) => pontos.find((p) => p.id === id)?.nome || "—";
+  const recentes = acessos.filter((a) => a.ponto_id === atual).slice(0, 8);
+  el("ac-recentes").innerHTML = recentes.length
+    ? recentes.map((a) => `<div class="ck-reg-item"><div><strong>${esc(a.participante?.nome || "—")}</strong><span>${esc(nomePonto(a.ponto_id))} · ${esc(fmtDataHora(a.at))}</span></div>
+        <span class="ck-reg-acao ${a.acao}">${a.acao === "entrada" ? "Entrada" : "Saída"}</span></div>`).join("")
+    : `<p class="ck-busca-vazio" style="padding:18px">Nenhum registro neste ponto ainda.</p>`;
+}
+
+async function iniciarScanPonto() {
+  const pt = pontos.find((p) => p.id === el("ac-ponto").value);
+  if (!pt) { toast("Cadastre um ponto de controle em Configurações.", "erro"); return; }
+  const acaoSel = el("ac-acao").value;
+  modo = "";
+  pontoModo = { id: pt.id, nome: pt.nome, acao: acaoSel };
+  el("topo-evento").textContent = evento?.nome || "Evento";
+  el("topo-ctx").textContent = `◎ ${pt.nome} · ${acaoSel === "entrada" ? "Entrada" : "Saída"}`;
+  await mostrarTela("app");
+}
+
+// lê o QR no scanner (ou escolhe pelo nome) com um ponto de controle ativo
+async function registrarNoPonto(p) {
+  const pt = pontoModo;
+  if (!pt) return;
+  const dentro = estaDentro(p.id, pt.id);
+  let aviso = "";
+  if ((p.situacao || "Confirmado") === "Desativado") aviso = "Participante desativado";
+  else if (pt.acao === "entrada" && dentro) aviso = `Já consta dentro de ${pt.nome}`;
+  else if (pt.acao === "saida" && !dentro) aviso = `Não consta dentro de ${pt.nome}`;
+  if (aviso) {
+    navigator.vibrate?.([80, 60, 80]);
+    telaSucesso(p, null, { texto: aviso, aviso: true });
+    setTimeout(retomar, 1500);
+    return;
+  }
+  try {
+    const r = await registrarAcessoPonto(pt.id, p.id, pt.acao, operador());
+    acessos.unshift({ ...r, participante: { nome: p.nome, ingresso: p.ingresso, tipo: p.tipo, codigo: p.codigo } });
+    telaSucesso(p, null, { texto: pt.acao === "entrada" ? `entrada em ${pt.nome}` : `saída de ${pt.nome}` });
+  } catch (e) {
+    toast(e.message || "Falha ao registrar.", "erro");
+  }
+  setTimeout(retomar, 1100);
+}
+
+/* ---- aba 3: atividades (mantém o fluxo atual até a próxima etapa) ---- */
+function renderAtividades() {
+  el("atv-lista").innerHTML = atividades.length
+    ? atividades.map((a) => `
+      <button class="ck-lista-item" data-atv="${a.id}">
+        <span class="ck-lista-item-txt">
+          <strong>${esc(a.nome)}</strong>
+          <span>${[a.dia ? dataBR(a.dia) : "", [a.inicio, a.fim].filter(Boolean).join("–")].filter(Boolean).join(" · ") || "—"}</span>
+        </span>
+        <span class="ck-chevron">›</span>
+      </button>`).join("")
+    : `<p class="ck-lista-vazio">Nenhuma atividade cadastrada neste evento.</p>`;
+  el("atv-lista").querySelectorAll("[data-atv]").forEach((b) => { b.onclick = () => escolherModo(b.dataset.atv); });
 }
 
 async function escolherModo(m) {
   modo = m;
+  pontoModo = null;
   const atv = atvAtual();
   el("topo-evento").textContent = evento.nome || "Evento";
   el("topo-ctx").textContent = atv ? `▤ ${atv.nome}` : "◎ Evento geral";
   document.title = `Check-in — ${evento.nome || "We.events"}`;
   await carregarDados();
   await mostrarTela("app");
+}
+
+/* ---- aba 4: configurações ------------------------------------------- */
+function renderConfig() {
+  el("cfg-usuario").textContent = sessao?.user?.email || "";
+  el("cfg-evento").textContent = evento?.nome || "";
+  el("cfg-operador").value = lembrado("ck_operador") || (sessao?.user?.email || "").split("@")[0];
+  el("cfg-tema-txt").textContent = document.documentElement.dataset.theme === "light" ? "Tema escuro" : "Tema claro";
+}
+
+/* ---- pontos de controle (cadastro) ----------------------------------- */
+let pontoEditando = null, pontoExcluindo = null;
+function abrirPontos() {
+  pontoEditando = null; pontoExcluindo = null;
+  el("tela-pontos").hidden = false;
+  renderPontos();
+  garantirHistorico();
+}
+function fecharPontos() {
+  el("tela-pontos").hidden = true;
+  renderAcesso();
+  renderConfig();
+}
+function renderPontos() {
+  if (pontosIndisponivel) {
+    el("pontos-lista").innerHTML = `<p class="pagina-sub-ck">Rode a migração <code>0047_pontos_de_controle.sql</code> no SQL Editor para ativar os pontos de controle.</p>`;
+    return;
+  }
+  el("pontos-lista").innerHTML = pontos.length
+    ? pontos.map((p) => {
+        if (pontoEditando === p.id) {
+          return `<div class="ck-ponto" data-id="${p.id}"><input class="ck-input" data-nome value="${esc(p.nome)}" />
+            <button class="ck-mini" data-salvar>Salvar</button><button class="ck-mini" data-cancelar>Cancelar</button></div>`;
+        }
+        if (pontoExcluindo === p.id) {
+          return `<div class="ck-ponto" data-id="${p.id}"><strong>Excluir “${esc(p.nome)}”? Os registros de acesso dele também somem.</strong>
+            <button class="ck-mini perigo" data-confirmar>Excluir</button><button class="ck-mini" data-cancelar>Não</button></div>`;
+        }
+        return `<div class="ck-ponto" data-id="${p.id}"><strong class="${p.ativo ? "" : "inativo"}">${esc(p.nome)}</strong>
+          <button class="ck-mini" data-editar>Renomear</button>
+          <button class="ck-mini" data-ativo>${p.ativo ? "Desativar" : "Ativar"}</button>
+          <button class="ck-mini perigo" data-excluir>Excluir</button></div>`;
+      }).join("")
+    : `<p class="ck-busca-vazio">Nenhum ponto ainda. Adicione o primeiro acima.</p>`;
+  el("pontos-lista").querySelectorAll("[data-id]").forEach((row) => {
+    const id = row.dataset.id;
+    const on = (sel, fn) => { const b = row.querySelector(sel); if (b) b.onclick = fn; };
+    on("[data-editar]", () => { pontoEditando = id; pontoExcluindo = null; renderPontos(); });
+    on("[data-excluir]", () => { pontoExcluindo = id; pontoEditando = null; renderPontos(); });
+    on("[data-cancelar]", () => { pontoEditando = null; pontoExcluindo = null; renderPontos(); });
+    on("[data-salvar]", async () => {
+      const nome = row.querySelector("[data-nome]").value.trim();
+      if (!nome) return toast("Dê um nome ao ponto.", "erro");
+      await alterarPonto(id, { nome });
+      pontoEditando = null; renderPontos();
+    });
+    on("[data-ativo]", async () => { const p = pontos.find((x) => x.id === id); await alterarPonto(id, { ativo: !p.ativo }); renderPontos(); });
+    on("[data-confirmar]", async () => {
+      try {
+        await remover("pontos_controle", id);
+        pontos = pontos.filter((p) => p.id !== id);
+        acessos = acessos.filter((a) => a.ponto_id !== id);
+        if (lembrado("ck_ponto") === id) guardar("ck_ponto", "");
+        pontoExcluindo = null; renderPontos();
+        toast("Ponto excluído.", "ok");
+      } catch (e) { toast(e.message || "Não foi possível excluir.", "erro"); }
+    });
+  });
+}
+async function alterarPonto(id, patch) {
+  try {
+    const novo = await salvar("pontos_controle", { id, ...patch });
+    Object.assign(pontos.find((p) => p.id === id) || {}, novo);
+  } catch (e) { toast(e.message || "Não foi possível salvar.", "erro"); }
+}
+async function adicionarPonto() {
+  const nome = el("ponto-novo").value.trim();
+  if (!nome) return toast("Dê um nome ao ponto.", "erro");
+  if (pontos.some((p) => p.nome.toLowerCase() === nome.toLowerCase())) return toast("Já existe um ponto com esse nome.", "erro");
+  try {
+    const ordem = pontos.reduce((m, p) => Math.max(m, p.ordem || 0), 0) + 1;
+    const novo = await salvar("pontos_controle", { nome, ordem, ativo: true });
+    pontos.push(novo);
+    el("ponto-novo").value = "";
+    renderPontos();
+  } catch (e) {
+    toast(/pontos_controle|does not exist|schema cache/i.test(e.message || "") ? "Rode a migração 0047 no SQL Editor." : (e.message || "Não foi possível salvar."), "erro");
+  }
+}
+
+/* ---- registro de acesso (menu) --------------------------------------- */
+let registroPonto = "";   // "" = todos os pontos
+function abrirRegistro() {
+  registroPonto = "";
+  el("tela-registro").hidden = false;
+  renderRegistro();
+  garantirHistorico();
+}
+function fecharRegistro() { el("tela-registro").hidden = true; }
+function renderRegistro() {
+  const comRegistro = new Set(acessos.map((a) => a.ponto_id));
+  const lista = pontos.filter((p) => p.ativo || comRegistro.has(p.id));
+  el("registro-chips").innerHTML =
+    [`<button class="ck-chip ${registroPonto === "" ? "ativo" : ""}" data-p="">Todos</button>`]
+      .concat(lista.map((p) => `<button class="ck-chip ${registroPonto === p.id ? "ativo" : ""}" data-p="${p.id}">${esc(p.nome)}</button>`)).join("");
+  el("registro-chips").querySelectorAll("[data-p]").forEach((b) => { b.onclick = () => { registroPonto = b.dataset.p; renderRegistro(); }; });
+
+  const min = Number(el("rf-tempo").value) || 0;
+  const desde = min ? Date.now() - min * 60000 : 0;
+  const acaoF = el("rf-acao").value;
+  const op = el("rf-operador").value.trim().toLowerCase();
+  const nomePonto = (id) => pontos.find((p) => p.id === id)?.nome || "—";
+  const filtrado = acessos.filter((a) =>
+    (!registroPonto || a.ponto_id === registroPonto)
+    && (!desde || new Date(a.at).getTime() >= desde)
+    && (!acaoF || a.acao === acaoF)
+    && (!op || (a.operador || "").toLowerCase().includes(op)));
+  el("registro-lista").innerHTML = filtrado.length
+    ? filtrado.slice(0, 300).map((a) => `<div class="ck-reg-item"><span class="ck-avatar sm">${AVATAR}</span>
+        <div><strong>${esc(a.participante?.nome || "—")}</strong>
+          <span>${esc(nomePonto(a.ponto_id))} · ${esc(fmtDataHora(a.at))}</span>
+          ${a.operador ? `<span>operador: ${esc(a.operador)}</span>` : ""}</div>
+        <span class="ck-reg-acao ${a.acao}">${a.acao === "entrada" ? "Entrada" : "Saída"}</span></div>`).join("")
+    : `<p class="ck-busca-vazio">${pontosIndisponivel ? "Rode a migração 0047 para ativar o controle de acesso." : "Nenhum registro com esses filtros."}</p>`;
 }
 
 const atvAtual = () => atividades.find((a) => a.id === modo) || null;
@@ -307,6 +628,7 @@ async function onScan(texto) {
   if (!p) { try { p = await buscarParticipantePorQR(texto); } catch {} }
   el("mira-txt").textContent = "Aponte para o QR Code do crachá";
   if (!p) return abrirSheetErro(texto);
+  if (pontoModo) return registrarNoPonto(p);
   abrirSheet(p);
 }
 
@@ -419,16 +741,18 @@ async function acao(tipo, p, btn) {
     if (tipo === "credenciar") imprimirCracha(p, evento.nome || "");
     fecharSheet();
     telaSucesso(p, atvId ? atv.nome : null);
+    if (!el("tela-shell").hidden) renderParticipantes();
   } catch (e) {
     btn.disabled = false; btn.textContent = antes;
     toast(e.message || "Falha ao registrar.", "erro");
   }
 }
 
-function telaSucesso(p, atvNome) {
+function telaSucesso(p, atvNome, opts = {}) {
   const d = document.createElement("div");
-  d.className = "ck-sucesso";
-  d.innerHTML = `<div class="ck-sucesso-check">✓</div><strong>${esc(p.nome)}</strong><span>${atvNome ? "credenciado(a) em " + esc(atvNome) : "credenciado(a)"}</span>`;
+  d.className = "ck-sucesso" + (opts.aviso ? " aviso" : "");
+  const texto = opts.texto || (atvNome ? "credenciado(a) em " + atvNome : "credenciado(a)");
+  d.innerHTML = `<div class="ck-sucesso-check">${opts.aviso ? "!" : "✓"}</div><strong>${esc(p.nome)}</strong><span>${esc(texto)}</span>`;
   document.body.appendChild(d);
   void d.offsetHeight;
   setTimeout(() => d.classList.add("aberto"), 10);
@@ -438,13 +762,6 @@ function telaSucesso(p, atvNome) {
 }
 
 /* ---- lista de participantes / busca manual ------------------------ */
-// aberta direto do menu principal (tela-modo), sem passar pelo scanner —
-// evento geral por padrão (mesmos dados de "Controle de acesso").
-async function abrirListaDoHub() {
-  modo = "";
-  await carregarDados();
-  abrirBusca();
-}
 function abrirBusca() {
   pausar();
   el("tela-busca").hidden = false;
@@ -472,22 +789,14 @@ function renderBusca() {
     : [...participantes].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
   const achados = base.slice(0, t ? 30 : 300);
   el("busca-lista").innerHTML = achados.length
-    ? achados.map((p) => {
-        const entrada = atv ? saldoAtividade(p.id, atv.id) : entradaEvento(p);
-        const confirmado = (p.situacao || "Confirmado") === "Confirmado";
-        return `<button class="ck-busca-item" data-id="${p.id}">
-          <span class="ck-avatar sm">${AVATAR}</span>
-          <span class="ck-busca-item-txt">
-            <strong>${esc(p.nome)}</strong>
-            <span>${esc(p.ingresso || p.tipo || "")}</span>
-            <span class="ck-busca-sit ${confirmado ? "ok" : "alerta"}">${esc(p.situacao || "Confirmado")}</span>
-          </span>
-          ${entrada ? `<span class="ck-tag-ok">✓</span>` : ""}
-        </button>`;
-      }).join("")
+    ? achados.map((p) => htmlItemParticipante(p, atv)).join("")
     : `<p class="ck-busca-vazio">${t ? "Ninguém encontrado." : "Nenhum participante neste evento."}</p>`;
   el("busca-lista").querySelectorAll("[data-id]").forEach((b) => {
-    b.onclick = () => { el("tela-busca").hidden = true; abrirSheet(participantes.find((x) => x.id === b.dataset.id)); };
+    b.onclick = () => {
+      el("tela-busca").hidden = true;
+      const escolhido = participantes.find((x) => x.id === b.dataset.id);
+      if (pontoModo) registrarNoPonto(escolhido); else abrirSheet(escolhido);
+    };
   });
 }
 

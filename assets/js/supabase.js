@@ -32,7 +32,7 @@ const TABELAS_EVENTO = new Set([
   "grupos", "responsaveis", "estagios", "anfitrioes", "convidados",
   "form_perguntas", "marcos", "etapas_participante", "participantes", "checkins",
   "atividades", "tipos_ingresso", "integracoes", "webhook_entregas",
-  "campos_personalizados", "automacoes", "observacoes",
+  "campos_personalizados", "automacoes", "observacoes", "pontos_controle", "acessos_pontos",
 ]);
 
 // eid: id explícito (páginas públicas). Sem argumento → evento atual do admin.
@@ -532,6 +532,20 @@ export const listCheckins = (eid) =>
 // Grava a linha no log. Modo evento (sem atividadeId): atualiza também o estado
 // atual do participante (presente / checkin_at). Modo atividade: só o log — a
 // presença na atividade é derivada das entradas/saídas.
+/* ---- Pontos de controle de acesso (0047) --------------------------------- */
+export const listPontos = (eid) =>
+  supabase.from("pontos_controle").select("*").eq("evento_id", ev(eid))
+    .order("ordem").order("created_at").then(ok);
+
+// mais recentes primeiro; 5000 cobre um evento grande inteiro
+export const listAcessosPontos = (eid) =>
+  supabase.from("acessos_pontos")
+    .select("*, participante:participantes(nome, ingresso, tipo, codigo)")
+    .eq("evento_id", ev(eid)).order("at", { ascending: false }).limit(5000).then(ok);
+
+export const registrarAcessoPonto = (pontoId, participanteId, acao, operador) =>
+  salvar("acessos_pontos", { ponto_id: pontoId, participante_id: participanteId, acao, operador: operador || null });
+
 export async function registrarCheckin(participanteId, acao = "entrada", origem = "checkin", atividadeId = null) {
   const linha = { participante_id: participanteId, acao, origem };
   if (atividadeId) linha.atividade_id = atividadeId;

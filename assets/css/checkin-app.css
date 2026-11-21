@@ -311,3 +311,89 @@ body.ck-app {
 .ck-linha-cfg .ck-check-row { margin: 0; flex: 1; }
 .ck-linha-cfg .ck-select { width: 126px; flex-shrink: 0; height: 40px; }
 .pagina-sub-ck { font-size: .82rem; color: var(--ck-texto-tenue); line-height: 1.55; margin: 16px 0 0; }
+
+/* =============================================================================
+   Shell do evento (abas em baixo + cabeçalho) — controle de acesso, lista,
+   atividades, configurações; registro de acesso; pontos de controle.
+   ========================================================================== */
+.ck-shell { z-index: 21; }
+.ck-shell-topo {
+  display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+  padding: calc(env(safe-area-inset-top) + 14px) 16px 14px;
+  border-bottom: 1px solid var(--ck-borda);
+}
+.ck-shell-titulo { flex: 1; min-width: 0; text-align: center; }
+.ck-shell-titulo strong { display: block; font-size: 1.08rem; letter-spacing: -.01em; }
+.ck-shell-corpo { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; }
+.ck-pane { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; }
+.ck-pane[hidden] { display: none; }
+.ck-pane-busca { padding: 12px 14px 4px; flex-shrink: 0; }
+.ck-pane-corpo { flex: 1; overflow-y: auto; padding: 16px 18px 28px; }
+.ck-fab-shell { bottom: 18px; }
+
+.ck-tabbar {
+  display: flex; flex-shrink: 0; background: #ff5200;
+  padding: 0 6px calc(env(safe-area-inset-bottom) + 2px);
+}
+:root:not([data-theme="light"]) .ck-tabbar { background: #6d28d9; }
+.ck-tabbar button {
+  flex: 1; height: 58px; display: grid; place-items: center; background: none; border: none;
+  color: rgba(255,255,255,.62); cursor: pointer;
+}
+.ck-tabbar button svg { width: 26px; height: 26px; }
+.ck-tabbar button.ativa { color: #fff; }
+.ck-tabbar button:active { background: rgba(255,255,255,.12); }
+
+/* controle de acesso */
+.ck-linha2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ck-resumo { margin: 14px 0 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ck-resumo div { background: var(--ck-superficie); border: 1px solid var(--ck-borda-forte); border-radius: 14px; padding: 12px 14px; }
+.ck-resumo b { display: block; font-size: 1.7rem; letter-spacing: -.02em; }
+.ck-resumo span { font-size: .78rem; color: var(--ck-texto-suave); }
+.ck-ler-grande {
+  width: 100%; min-height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  border-radius: 18px; border: 2px solid #16a34a; background: rgba(22,163,74,.14); color: #22c55e;
+  font: inherit; font-weight: 650; font-size: 1.1rem; cursor: pointer;
+}
+.ck-ler-grande svg { width: 42px; height: 42px; }
+.ck-ler-grande:active { background: rgba(22,163,74,.24); }
+.ck-ler-grande[disabled] { opacity: .45; }
+.ck-reg-item { display: flex; align-items: center; gap: 12px; padding: 11px 4px; border-bottom: 1px solid var(--ck-borda-sutil); }
+.ck-reg-item > div { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.ck-reg-item strong { font-size: .95rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ck-reg-item span { font-size: .78rem; color: var(--ck-texto-suave); }
+.ck-reg-acao { flex-shrink: 0; font-size: .8rem; font-weight: 700; }
+.ck-reg-acao.entrada { color: #22c55e; }
+.ck-reg-acao.saida { color: #f87171; }
+
+/* configurações */
+.ck-cfg-cab { display: grid; gap: 3px; margin-bottom: 18px; }
+.ck-cfg-cab strong { font-size: 1.05rem; }
+.ck-cfg-cab span { font-size: .84rem; color: var(--ck-texto-suave); }
+.ck-cfg-lista { margin-top: 22px; display: grid; gap: 10px; }
+.ck-cfg-item {
+  display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left;
+  padding: 17px 18px; border-radius: 14px; background: var(--ck-superficie); border: 1px solid var(--ck-borda-forte);
+  color: var(--ck-texto); font: inherit; font-size: 1rem; cursor: pointer;
+}
+.ck-cfg-item:active { background: var(--ck-superficie-hover); }
+
+/* pontos de controle */
+.ck-linha-add { display: flex; gap: 10px; margin-bottom: 14px; }
+.ck-linha-add .ck-input { flex: 1; }
+.ck-linha-add .ck-btn { width: auto; padding: 0 18px; flex-shrink: 0; }
+.ck-ponto { display: flex; align-items: center; gap: 10px; padding: 12px 4px; border-bottom: 1px solid var(--ck-borda-sutil); }
+.ck-ponto .ck-input { flex: 1; min-width: 0; height: 42px; }
+.ck-ponto strong { flex: 1; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ck-ponto strong.inativo { opacity: .45; text-decoration: line-through; }
+.ck-mini { flex-shrink: 0; border: none; background: var(--ck-borda); color: var(--ck-texto); border-radius: 10px; height: 38px; padding: 0 12px; font: inherit; font-size: .82rem; font-weight: 600; cursor: pointer; }
+.ck-mini.perigo { color: #f87171; }
+
+/* registro de acesso */
+.ck-chips { display: flex; gap: 8px; overflow-x: auto; padding: 12px 14px 4px; flex-shrink: 0; }
+.ck-chip { flex-shrink: 0; border: none; border-radius: 12px; padding: 11px 18px; background: var(--ck-superficie); color: var(--ck-texto-suave); font: inherit; font-weight: 600; font-size: .92rem; cursor: pointer; border: 1px solid var(--ck-borda-forte); }
+.ck-chip.ativo { color: var(--ck-laranja); border-color: var(--ck-laranja); }
+.ck-filtros { padding: 12px 18px 0; flex-shrink: 0; border-bottom: 1px solid var(--ck-borda); }
+.ck-filtros[hidden] { display: none; }
+.ck-tabbar, :root:not([data-theme="light"]) .ck-tabbar { background: var(--marca-grad, #7c3aed); }
+.ck-sucesso.aviso { background: rgba(185,28,28,.96); }
