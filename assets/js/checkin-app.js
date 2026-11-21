@@ -125,8 +125,8 @@ window.addEventListener("popstate", () => {
   document.querySelectorAll(".ck-subtabs [data-sub]").forEach((b) => { b.onclick = () => { atvSub = b.dataset.sub; renderAtividades(); atualizarAtividadesDoBanco(); }; });
   el("atv-entrada").onclick = () => iniciarScanAtividade("entrada");
   el("atv-saida").onclick = () => iniciarScanAtividade("saida");
-  el("atv-add-qr").onclick = () => comSenhaAdd(() => iniciarScanAtividade("inscrever"));
-  el("atv-add-qr-checkin").onclick = () => comSenhaAdd(() => iniciarScanAtividade("inscrever_entrada"));
+  el("atv-add-qr").onclick = () => iniciarScanAtividade("inscrever");
+  el("atv-add-qr-checkin").onclick = () => iniciarScanAtividade("inscrever_entrada");
   el("atv-busca").addEventListener("input", debounce(() => { const a = atvSelecionada(); if (a) renderInscritos(a); }, 200));
   el("cfg-item-addpart").onclick = aoTocarAddPart;
   el("cfg-item-offline").onclick = abrirOffline;
@@ -686,6 +686,8 @@ async function registrarNoPonto(p) {
 /* ---- aba 3: controle de acesso às atividades -------------------------- */
 // Neste aparelho, pode adicionar pessoas às atividades? (Configurações) — padrão: sim
 const podeAdicionarAtv = () => lembrado("ck_atv_add") !== "0";
+// inscrever/adicionar pessoas numa atividade só depois de liberar em Configurações ▸ Adicionar participantes (senha do evento)
+const podeInscrever = () => podeAdicionarAtv() && addPartLiberado();
 let atvSub = "cred";           // "cred" | "insc"
 let inscritoRemovendo = null;  // id da linha pedindo confirmação de remoção
 
@@ -789,8 +791,9 @@ function renderAtividades() {
 }
 
 function renderInscritos(atv) {
-  const pode = podeAdicionarAtv();
-  el("atv-add-botoes").hidden = !pode;
+  const pode = podeAdicionarAtv();       // remover da lista
+  const podeAdd = podeInscrever();       // adicionar/inscrever (precisa da liberação com senha)
+  el("atv-add-botoes").hidden = !podeAdd;
   if (inscritosIndisponivel) {
     el("atv-insc-titulo").textContent = "Inscritos";
     el("atv-insc-lista").innerHTML = `<p class="pagina-sub-ck">Falta ativar a lista de inscritos: rode a migração <code>0048_atividade_inscritos.sql</code> no SQL Editor.</p>`;
@@ -814,17 +817,15 @@ function renderInscritos(atv) {
               <span>${esc(p.telefone || "sem telefone")} · ${esc((p.ingresso || p.tipo || "sem categoria"))}</span>
               <span>${atvs.length ? "Inscrito em: " + esc(atvs.join(", ")) : "Sem atividades"}</span></div>
             ${ja ? `<span class="ck-insc-ok">✓ Inscrito</span>`
-                 : pode ? `<button class="ck-mini" data-inscrever>Inscrever</button>` : ""}</div>`;
+                 : podeAdd ? `<button class="ck-mini" data-inscrever>Inscrever</button>` : ""}</div>`;
         }).join("")
       : `<p class="ck-busca-vazio">Ninguém encontrado.</p>`;
     el("atv-insc-lista").querySelectorAll("[data-inscrever]").forEach((b) => {
       b.onclick = async () => {
         const pid = b.closest("[data-pid]").dataset.pid;
-        comSenhaAdd(async () => {
-          b.disabled = true;
-          await inscrever(participantes.find((x) => x.id === pid), atv);
-          renderAtividades();
-        });
+        b.disabled = true;
+        await inscrever(participantes.find((x) => x.id === pid), atv);
+        renderAtividades();
       };
     });
     return;
@@ -846,7 +847,7 @@ function renderInscritos(atv) {
             ? `<button class="ck-mini perigo" data-remover-ok>Remover</button><button class="ck-mini" data-remover-nao>Não</button>`
             : `<button class="ck-mini" data-remover>Remover</button>`) : ""}</div>`;
       }).join("")
-    : `<p class="ck-busca-vazio">Ninguém inscrito ainda. Use os botões acima ou a pesquisa.</p>`;
+    : `<p class="ck-busca-vazio">Ninguém inscrito ainda.${podeAdd ? " Use os botões acima ou a pesquisa." : " Para adicionar pessoas, libere em Configurações ▸ Adicionar participantes."}</p>`;
   el("atv-insc-lista").querySelectorAll("[data-pid]").forEach((row) => {
     const pid = row.dataset.pid;
     const on = (sel, fn) => { const b = row.querySelector(sel); if (b) b.onclick = fn; };
@@ -870,7 +871,7 @@ function renderInscritos(atv) {
 async function inscrever(p, atv) {
   if (!p || !atv) return false;
   if (estaInscrito(p.id, atv.id)) return false;
-  if (!addPartLiberado()) { toast("Adicionar pessoas à atividade precisa da senha do evento.", "erro"); return false; }
+  if (!podeInscrever()) { toast("Libere em Configurações ▸ Adicionar participantes para inscrever pessoas.", "erro"); return false; }
   try {
     const op = novaOp("inscrever", { atv: atv.id, pid: p.id, operador: operador(), nome: p.nome });
     await comOffline(op);
@@ -976,13 +977,7 @@ function aoTocarAddPart() {
   abrirDesbloqueio();
 }
 
-// roda `fn` já com a senha liberada; se ainda está travado, pede a senha e depois continua
-function comSenhaAdd(fn) {
-  if (addPartLiberado()) return fn();
-  abrirDesbloqueio(fn);
-}
-
-function abrirDesbloqueio(aoLiberar) {
+function abrirDesbloqueio() {
   const sheet = el("sheet");
   sheet.classList.remove("ficha");
   if (!evento?.senha_adicionar_hash) {
@@ -1013,7 +1008,6 @@ function abrirDesbloqueio(aoLiberar) {
     fecharSheet();
     toast("Adicionar participantes liberado neste aparelho.", "ok");
     renderAddPart();
-    if (typeof aoLiberar === "function") setTimeout(aoLiberar, 320);   // espera a folha fechar e segue com o que a pessoa queria fazer
   };
   el("sn-ok").onclick = tentar;
   el("sn-cancelar").onclick = () => fecharSheet();
@@ -1459,7 +1453,7 @@ async function abrirSheet(p) {
         <button class="ck-btn ck-btn-primario" data-acao="atv">Credenciar na atividade</button>
         <button class="ck-btn ck-btn-fantasma" data-acao="fechar">Cancelar</button>
       ` : `
-        ${!inscrito && !bloqueado && podeAdicionarAtv() ? `<button class="ck-btn ck-btn-secundario" data-acao="inscrever-atv">Inscrever nesta atividade</button>` : ""}
+        ${!inscrito && !bloqueado && podeInscrever() ? `<button class="ck-btn ck-btn-secundario" data-acao="inscrever-atv">Inscrever nesta atividade</button>` : ""}
         <button class="ck-btn ck-btn-fantasma" data-acao="fechar">Fechar</button>
       `}
     </div>`;
@@ -1506,7 +1500,6 @@ async function acao(tipo, p, btn) {
   if (tipo === "bloquear" || tipo === "liberar") { btn.disabled = true; return definirBloqueio(p, tipo === "bloquear"); }
   if (p.acesso_bloqueado) { toast("Acesso bloqueado. Libere o acesso para continuar.", "erro"); return; }
   if (tipo === "inscrever-atv") {
-    if (!addPartLiberado()) { abrirDesbloqueio(() => acao(tipo, p, btn)); return; }
     btn.disabled = true;
     if (await inscrever(p, atv)) { renderAtividades(); abrirSheet(p); } else btn.disabled = false;
     return;
