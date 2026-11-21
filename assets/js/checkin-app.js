@@ -666,10 +666,13 @@ async function processarNaAtividade(p) {
       telaSucesso(p, null, { texto: `Saída de ${atv.nome}` });
       return setTimeout(retomar, 1100);
     }
-    if (dentro) return avisar(`Já está na atividade ${atv.nome}`);
-    if (acao === "inscrever_entrada" && !estaInscrito(p.id, atv.id) && !(await inscrever(p, atv))) return setTimeout(retomar, 800);
-    // ENTRADA: sempre a mesma tela verde de confirmação — nome, categoria e as observações (inscrito ou não,
-    // categoria não liberada, lotada). Nada de folha de decisão.
+    if (dentro) return avisar(`Já está na atividade ${atv.nome}`);   // AMARELO
+    if (acao === "inscrever_entrada") {
+      if (!estaInscrito(p.id, atv.id) && !(await inscrever(p, atv))) return setTimeout(retomar, 800);   // "Adicionar + check-in" inscreve e dá a entrada
+    } else if (!(await garantirInscricao(p, atv))) {
+      return avisar(`NÃO INSCRITO na atividade ${atv.nome} — acesso não liberado`, "erro");   // VERMELHO: não entra, nada é gravado
+    }
+    // INSCRITO → tela VERDE de confirmação: nome, categoria e as observações (inscrito, categoria não liberada, lotada)
     const notas = await notasDaEntrada(p, atv);
     await registrarAcessoAtv(p, atv, "entrada");
     telaSucesso(p, null, { texto: `Entrada em ${atv.nome}`, notas, duracao: 2200 });
