@@ -540,7 +540,7 @@ export const listPontos = (eid) =>
 // mais recentes primeiro; 5000 cobre um evento grande inteiro
 export const listAcessosPontos = (eid) =>
   supabase.from("acessos_pontos")
-    .select("*, participante:participantes(nome, ingresso, tipo, codigo)")
+    .select("*, participante:participantes(nome, ingresso, tipo, codigo, email, empresa)")
     .eq("evento_id", ev(eid)).order("at", { ascending: false }).limit(5000).then(ok);
 
 export const registrarAcessoPonto = (pontoId, participanteId, acao, operador) =>

@@ -3,7 +3,7 @@
 // por hora e lista dos últimos check-ins. Tudo client-side, sem lib de gráfico.
 // =============================================================================
 import { iniciarPagina, esc, debounce, formatarData, toast, normalizarFaturamento } from "./ui.js";
-import { listParticipantes, listCheckins, listAtividades, listTiposIngresso } from "./supabase.js";
+import { listParticipantes, listCheckins, listAtividades, listTiposIngresso, listPontos, listAcessosPontos } from "./supabase.js";
 import { baixarXLSX } from "./tabela.js";
 
 const _iniciando = iniciarPagina("relatorios");
@@ -13,6 +13,9 @@ let participantes = [];
 let checkins = [];
 let atividades = [];
 let tipos = [];
+let pontos = [];          // pontos de controle (0047)
+let acessosPontos = [];   // entradas/saídas nos pontos (check-in = controle de acesso)
+let diaPonto = null;      // null = ainda não escolhido; "" = todos os dias; senão AAAA-MM-DD
 let buscaLog = "";
 let modoFaturamentoPerfil = "inscritos";
 
@@ -46,8 +49,9 @@ setInterval(() => { if (!document.hidden) carregar(); }, 30000);
 
 async function carregar() {
   try {
-    [participantes, checkins, atividades, tipos] = await Promise.all([
+    [participantes, checkins, atividades, tipos, pontos, acessosPontos] = await Promise.all([
       listParticipantes(), listCheckins(), listAtividades().catch(() => []), listTiposIngresso().catch(() => []),
+      listPontos().catch(() => []), listAcessosPontos().catch(() => []),   // sem a migração 0047 simplesmente não aparece
     ]);
     participantes = participantes.filter((p) => p.situacao !== "Desativado");
     el("carregando").hidden = true;
@@ -67,17 +71,63 @@ const hora = (iso) => {
   } catch { return ""; }
 };
 const hoje0 = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
-const nomeAtividade = (id) => (id && atividades.find((a) => a.id === id)?.nome) || "Evento";
+const nomeAtividade = (id) => (id && atividades.find((a) => a.id === id)?.nome) || "Credenciamento";
+const nomePonto = (id) => pontos.find((p) => p.id === id)?.nome || "Ponto removido";
+const diaSP = (iso) => {
+  try { return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso)); }
+  catch { return ""; }
+};
+const dataBR = (aaaammdd) => { const [a, m, d] = aaaammdd.split("-"); return `${d}/${m}/${a}`; };
 
 function render() {
   renderKpis();
   renderDias();
   renderHoras();
+  renderPontos();
   renderQuebra("rel-ingresso", (p) => p.ingresso || "Sem categoria");
   renderQuebra("rel-tipo", (p) => p.tipo || "—");
   renderFaturamentoPerfil();
   renderAtividades();
   renderLog();
+}
+
+// Check-ins por ponto de controle: ÚNICOS por dia — cada pessoa conta 1 vez por ponto/dia, mesmo bipada várias vezes.
+// dia = "" soma os dias (cada dia com suas pessoas únicas).
+function checkinsPorPonto(dia) {
+  const unicos = new Map();   // ponto_id → Set("dia|participante")
+  acessosPontos.forEach((a) => {
+    if (a.acao !== "entrada") return;
+    const d = diaSP(a.at);
+    if (dia && d !== dia) return;
+    const s = unicos.get(a.ponto_id) || new Set();
+    s.add(`${d}|${a.participante_id}`);
+    unicos.set(a.ponto_id, s);
+  });
+  return unicos;
+}
+
+function renderPontos() {
+  const sec = el("sec-pontos");
+  if (!pontos.length) { sec.hidden = true; return; }
+  sec.hidden = false;
+  const dias = [...new Set(acessosPontos.filter((a) => a.acao === "entrada").map((a) => diaSP(a.at)))].sort().reverse();
+  if (diaPonto === null) diaPonto = dias.includes(diaSP(new Date().toISOString())) ? diaSP(new Date().toISOString()) : "";
+  if (diaPonto && !dias.includes(diaPonto)) diaPonto = "";
+  el("rel-pontos-dia").innerHTML = `<option value="">Todos os dias</option>` +
+    dias.map((d) => `<option value="${d}" ${d === diaPonto ? "selected" : ""}>${dataBR(d)}</option>`).join("");
+  el("rel-pontos-dia").onchange = (e) => { diaPonto = e.target.value; renderPontos(); };
+
+  const unicos = checkinsPorPonto(diaPonto);
+  const linhas = pontos.map((p) => ({ nome: p.nome, n: unicos.get(p.id)?.size || 0, ativo: p.ativo }));
+  const max = Math.max(1, ...linhas.map((l) => l.n));
+  const total = linhas.reduce((s, l) => s + l.n, 0);
+  el("rel-pontos").innerHTML = linhas
+    .map((l) => `<div class="rel-barra">
+        <span class="rel-barra-nome" title="${esc(l.nome)}">${esc(l.nome)}${l.ativo ? "" : " (inativo)"}</span>
+        <span class="rel-barra-trilha"><i style="width:${Math.round((l.n / max) * 100)}%"></i></span>
+        <span class="rel-barra-valor">${l.n}</span>
+      </div>`).join("") +
+    `<div class="rel-barra" style="margin-top:6px"><span class="rel-barra-nome"><b>Total</b></span><span></span><span class="rel-barra-valor">${total}</span></div>`;
 }
 
 function renderAtividades() {
@@ -123,7 +173,7 @@ function renderKpis() {
   el("kpis").innerHTML =
     kpi(total, "Participantes") +
     kpi(presentes, "Presentes agora") +
-    kpi(hoje, "Check-ins hoje") +
+    kpi(hoje, "Credenciados hoje") +
     (temPreco ? kpi(brl(faturamentoInscrito), "Faturamento inscrito") + kpi(brl(faturamentoPresente), "Faturamento presente") : "") +
     kpi(ultimaHora, "Na última hora") +
     kpi(taxa + "%", "Taxa de presença");
@@ -132,7 +182,7 @@ function renderKpis() {
 function renderDias() {
   const entradas = checkins.filter((c) => c.acao === "entrada");
   if (!entradas.length) {
-    el("rel-dias").innerHTML = `<p class="pagina-sub" style="margin:auto">Nenhum check-in registrado ainda.</p>`;
+    el("rel-dias").innerHTML = `<p class="pagina-sub" style="margin:auto">Nenhum credenciamento registrado ainda.</p>`;
     return;
   }
   const hoje = hoje0();
@@ -150,7 +200,7 @@ function renderDias() {
   });
   const max = Math.max(1, ...dias.map((x) => x.n));
   el("rel-dias").innerHTML = dias
-    .map(({ d, n }) => `<div class="rel-hora" title="${n} check-in(s) em ${formatarData(d.toISOString())}">
+    .map(({ d, n }) => `<div class="rel-hora" title="${n} credenciamento(s) em ${formatarData(d.toISOString())}">
       <span class="rel-hora-n">${n || ""}</span>
       <div class="rel-hora-barra" style="height:${Math.round((n / max) * 92)}%"></div>
       <span class="rel-hora-h">${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}</span>
@@ -176,7 +226,7 @@ function renderHoras() {
   let barras = "";
   for (let h = ini; h <= fim; h++) {
     const n = porHora[h];
-    barras += `<div class="rel-hora" title="${n} check-in(s) às ${h}h">
+    barras += `<div class="rel-hora" title="${n} credenciamento(s) às ${h}h">
       <span class="rel-hora-n">${n || ""}</span>
       <div class="rel-hora-barra" style="height:${Math.round((n / max) * 92)}%"></div>
       <span class="rel-hora-h">${h}h</span>
@@ -237,11 +287,25 @@ function renderFaturamentoPerfil() {
     .join("");
 }
 
+// uma lista só, do mais novo pro mais antigo: credenciamento do evento, atividades e pontos de controle
+function registrosUnificados() {
+  const doEvento = checkins.map((c) => ({
+    acao: c.acao, p: c.participante || {}, at: c.at,
+    onde: nomeAtividade(c.atividade_id), operador: "",
+  }));
+  const dosPontos = acessosPontos.map((a) => ({
+    acao: a.acao, p: a.participante || {}, at: a.at,
+    onde: `Ponto: ${nomePonto(a.ponto_id)}`, operador: a.operador || "",
+  }));
+  return [...doEvento, ...dosPontos].sort((x, y) => new Date(y.at) - new Date(x.at));
+}
+
 function logFiltrado() {
-  if (!buscaLog) return checkins;
-  return checkins.filter((c) => {
-    const p = c.participante || {};
-    return `${p.nome || ""} ${p.email || ""} ${p.codigo || ""} ${p.empresa || ""}`.toLowerCase().includes(buscaLog);
+  const todos = registrosUnificados();
+  if (!buscaLog) return todos;
+  return todos.filter((r) => {
+    const p = r.p;
+    return `${p.nome || ""} ${p.email || ""} ${p.codigo || ""} ${p.empresa || ""} ${r.onde}`.toLowerCase().includes(buscaLog);
   });
 }
 
@@ -251,33 +315,32 @@ function renderLog() {
   el("vazio-log").hidden = dados.length !== 0;
   if (!dados.length) return;
   el("linhas-log").innerHTML = dados
-    .map((c) => {
-      const p = c.participante || {};
-      const ent = c.acao === "entrada";
+    .map((r) => {
+      const p = r.p;
+      const ent = r.acao === "entrada";
       return `<tr>
         <td><span class="badge ${ent ? "badge-ok" : "badge-erro"}">${ent ? "Entrada" : "Saída"}</span></td>
         <td><strong>${esc(p.nome || "—")}</strong>${p.tipo ? ` <span class="cel-tenue">· ${esc(p.tipo)}</span>` : ""}</td>
         <td>${esc(p.ingresso || "—")}</td>
-        <td>${esc(nomeAtividade(c.atividade_id))}</td>
-        <td>${formatarData(c.at)} ${esc(hora(c.at))}</td>
+        <td>${esc(r.onde)}</td>
+        <td>${formatarData(r.at)} ${esc(hora(r.at))}</td>
       </tr>`;
     })
     .join("");
 }
-
 async function exportar() {
   const dados = logFiltrado();
   if (!dados.length) { toast("Nada para exportar.", "erro"); return; }
-  await baixarXLSX("checkins.xlsx", dados, [
-    { rotulo: "Ação", valor: (c) => (c.acao === "entrada" ? "Entrada" : "Saída") },
-    { rotulo: "Participante", valor: (c) => c.participante?.nome || "" },
-    { rotulo: "Categoria", valor: (c) => c.participante?.ingresso || "" },
-    { rotulo: "Tipo", valor: (c) => c.participante?.tipo || "" },
-    { rotulo: "Atividade", valor: (c) => nomeAtividade(c.atividade_id) },
-    { rotulo: "E-mail", valor: (c) => c.participante?.email || "" },
-    { rotulo: "Código", valor: (c) => c.participante?.codigo || "" },
-    { rotulo: "Data", valor: (c) => formatarData(c.at) },
-    { rotulo: "Hora", valor: (c) => hora(c.at) },
-  ]);
-  toast("Arquivo gerado.", "ok");
+  await baixarXLSX("registros-de-acesso.xlsx", dados, [
+    { rotulo: "Ação", valor: (r) => (r.acao === "entrada" ? "Entrada" : "Saída") },
+    { rotulo: "Participante", valor: (r) => r.p.nome || "" },
+    { rotulo: "Categoria", valor: (r) => r.p.ingresso || "" },
+    { rotulo: "Tipo", valor: (r) => r.p.tipo || "" },
+    { rotulo: "Onde", valor: (r) => r.onde },
+    { rotulo: "Operador", valor: (r) => r.operador },
+    { rotulo: "E-mail", valor: (r) => r.p.email || "" },
+    { rotulo: "Código", valor: (r) => r.p.codigo || "" },
+    { rotulo: "Data", valor: (r) => formatarData(r.at) },
+    { rotulo: "Hora", valor: (r) => hora(r.at) },
+  ]);  toast("Arquivo gerado.", "ok");
 }

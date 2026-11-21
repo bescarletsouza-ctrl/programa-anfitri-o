@@ -19,7 +19,7 @@
     <div class="barra-topo">
       <div>
         <h1 class="pagina-titulo">Relatórios de credenciamento</h1>
-        <p class="pagina-sub">Presença e check-ins do evento em tempo real.</p>
+        <p class="pagina-sub">Credenciamento (presença) e check-ins por ponto de controle do evento, em tempo real.</p>
       </div>
       <button class="btn btn-secundario" id="btn-atualizar">Atualizar</button>
     </div>
@@ -30,12 +30,12 @@
       <div class="grid grid-4" id="kpis" style="margin-bottom:26px"></div>
 
       <div class="rel-secao">
-        <h2>Check-ins por dia</h2>
+        <h2>Credenciamentos por dia</h2>
         <div class="rel-horas" id="rel-dias"></div>
       </div>
 
       <details class="rel-accordion">
-        <summary>Check-ins por hora <span class="rel-secao-sub">(hoje)</span></summary>
+        <summary>Credenciamentos por hora <span class="rel-secao-sub">(hoje)</span></summary>
         <div class="rel-horas" id="rel-horas" style="margin-top:12px"></div>
       </details>
 
@@ -61,6 +61,15 @@
         <div id="rel-faturamento-perfil"></div>
       </div>
 
+      <div class="rel-secao" id="sec-pontos" hidden>
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:2px">
+          <h2 style="margin:0">Check-ins por ponto de controle <span class="rel-secao-sub">(únicos por dia)</span></h2>
+          <select class="select" id="rel-pontos-dia" style="width:auto" aria-label="Dia"></select>
+        </div>
+        <div id="rel-pontos"></div>
+        <p class="pagina-sub" style="margin:10px 0 0;font-size:.78rem">Cada pessoa conta uma vez por ponto em cada dia, mesmo que passe o QR mais de uma vez. Só entra no check-in quem já foi credenciado.</p>
+      </div>
+
       <div class="rel-secao" id="sec-atividades" hidden>
         <h2>Presença por atividade</h2>
         <div id="rel-atividades"></div>
@@ -68,7 +77,7 @@
 
       <div class="rel-secao">
         <div class="barra-topo">
-          <h2 style="margin:0">Últimos check-ins</h2>
+          <h2 style="margin:0">Últimos registros</h2>
           <div style="display:flex;gap:8px">
             <input class="input" id="busca-log" placeholder="Buscar participante…" style="min-width:220px" />
             <button class="btn btn-secundario btn-sm" id="btn-exportar">Exportar Excel</button>
@@ -76,11 +85,11 @@
         </div>
         <div class="tabela-wrap" id="wrap-log" hidden>
           <table class="tabela">
-            <thead><tr><th>Ação</th><th>Participante</th><th>Categoria</th><th>Atividade</th><th>Horário</th></tr></thead>
+            <thead><tr><th>Ação</th><th>Participante</th><th>Categoria</th><th>Onde</th><th>Horário</th></tr></thead>
             <tbody id="linhas-log"></tbody>
           </table>
         </div>
-        <div id="vazio-log" class="vazio">Nenhum check-in registrado ainda.</div>
+        <div id="vazio-log" class="vazio">Nenhum registro ainda.</div>
       </div>
     </div>
   </main>

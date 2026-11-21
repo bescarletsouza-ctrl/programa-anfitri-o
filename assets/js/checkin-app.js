@@ -312,7 +312,7 @@ function renderParticipantes() {
 async function iniciarScanEvento() {
   limparModo();
   el("topo-evento").textContent = evento?.nome || "Evento";
-  el("topo-ctx").textContent = "◎ Evento geral";
+  el("topo-ctx").textContent = "◎ Credenciamento";
   await mostrarTela("app");
 }
 
@@ -327,18 +327,25 @@ async function carregarPontos() {
     if (!pontosIndisponivel) toast("Falha ao carregar os pontos de controle.", "erro");
   }
 }
-// saldo de cada pessoa no ponto: entradas − saídas (> 0 = está dentro)
-function saldosDoPonto(pontoId) {
+const diaSP = (iso) => {
+  try { return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso)); }
+  catch { return ""; }
+};
+const hojeSP = () => diaSP(new Date().toISOString());
+// saldo de cada pessoa no ponto NO DIA: entradas − saídas (> 0 = está dentro). Só conta hoje.
+function saldosDoPonto(pontoId, dia = hojeSP()) {
   const m = new Map();
   acessos.forEach((a) => {
-    if (a.ponto_id !== pontoId) return;
+    if (a.ponto_id !== pontoId || diaSP(a.at) !== dia) return;
     m.set(a.participante_id, (m.get(a.participante_id) || 0) + (a.acao === "entrada" ? 1 : -1));
   });
   return m;
 }
 const estaDentro = (pid, pontoId) => (saldosDoPonto(pontoId).get(pid) || 0) > 0;
 const quantosDentro = (pontoId) => [...saldosDoPonto(pontoId).values()].filter((n) => n > 0).length;
-
+// check-ins ÚNICOS do dia no ponto: cada pessoa conta uma vez, mesmo que bipe de novo
+const checkinsUnicosHoje = (pontoId) =>
+  new Set(acessos.filter((a) => a.ponto_id === pontoId && a.acao === "entrada" && diaSP(a.at) === hojeSP()).map((a) => a.participante_id)).size;
 const fmtDataHora = (iso) => {
   try {
     return new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
@@ -365,8 +372,7 @@ function renderAcesso() {
     return;
   }
   const atual = sel.value;
-  const entradas = acessos.filter((a) => a.ponto_id === atual && a.acao === "entrada").length;
-  el("ac-resumo").innerHTML = `<div><b>${quantosDentro(atual)}</b><span>dentro agora</span></div><div><b>${entradas}</b><span>entradas registradas</span></div>`;
+  el("ac-resumo").innerHTML = `<div><b>${quantosDentro(atual)}</b><span>dentro agora</span></div><div><b>${checkinsUnicosHoje(atual)}</b><span>check-ins únicos hoje</span></div>`;
   const nomePonto = (id) => pontos.find((p) => p.id === id)?.nome || "—";
   const recentes = acessos.filter((a) => a.ponto_id === atual).slice(0, 8);
   el("ac-recentes").innerHTML = recentes.length
@@ -387,31 +393,38 @@ async function iniciarScanPonto() {
 }
 
 // lê o QR no scanner (ou escolhe pelo nome) com um ponto de controle ativo
+function resultadoPonto(p, tom, texto) {
+  if (tom !== "ok") navigator.vibrate?.([80, 60, 80]);
+  telaSucesso(p, null, { tom, texto });
+  setTimeout(retomar, tom === "ok" ? 1100 : 1600);
+}
+
+// Regras (a entrada num ponto é o CHECK-IN = controle de acesso; precisa ter sido credenciado antes):
+//   verde    → entrada/saída registrada
+//   vermelho → fora da lista, desativado, acesso bloqueado ou NÃO CREDENCIADO
+//   amarelo  → já entrou (ou, na saída, não consta dentro) — nada é gravado, a contagem não duplica
 async function registrarNoPonto(p) {
   const pt = pontoModo;
   if (!pt) return;
+  if (p.acesso_bloqueado) return resultadoPonto(p, "erro", "Acesso bloqueado");
+  if ((p.situacao || "Confirmado") === "Desativado") return resultadoPonto(p, "erro", "Participante desativado");
   const dentro = estaDentro(p.id, pt.id);
-  let aviso = "";
-  if (p.acesso_bloqueado) aviso = "Acesso bloqueado";
-  else if ((p.situacao || "Confirmado") === "Desativado") aviso = "Participante desativado";
-  else if (pt.acao === "entrada" && dentro) aviso = `Já consta dentro de ${pt.nome}`;
-  else if (pt.acao === "saida" && !dentro) aviso = `Não consta dentro de ${pt.nome}`;
-  if (aviso) {
-    navigator.vibrate?.([80, 60, 80]);
-    telaSucesso(p, null, { texto: aviso, aviso: true });
-    setTimeout(retomar, 1500);
-    return;
+  if (pt.acao === "entrada") {
+    const credenciado = !!p.presente || !!entradaEvento(p);
+    if (!credenciado) return resultadoPonto(p, "erro", "Não foi credenciado");
+    if (dentro) return resultadoPonto(p, "atencao", `Já entrou em ${pt.nome}`);
+  } else if (!dentro) {
+    return resultadoPonto(p, "atencao", `Não consta dentro de ${pt.nome}`);
   }
   try {
     const r = await registrarAcessoPonto(pt.id, p.id, pt.acao, operador());
     acessos.unshift({ ...r, participante: { nome: p.nome, ingresso: p.ingresso, tipo: p.tipo, codigo: p.codigo } });
-    telaSucesso(p, null, { texto: pt.acao === "entrada" ? `entrada em ${pt.nome}` : `saída de ${pt.nome}` });
+    resultadoPonto(p, "ok", pt.acao === "entrada" ? `Check-in em ${pt.nome}` : `Saída de ${pt.nome}`);
   } catch (e) {
     toast(e.message || "Falha ao registrar.", "erro");
+    setTimeout(retomar, 1100);
   }
-  setTimeout(retomar, 1100);
 }
-
 /* ---- aba 3: controle de acesso às atividades -------------------------- */
 // Neste aparelho, pode adicionar pessoas às atividades? (Configurações) — padrão: sim
 const podeAdicionarAtv = () => lembrado("ck_atv_add") !== "0";
@@ -839,8 +852,12 @@ async function onScan(texto) {
   await pausar();
   el("mira-txt").textContent = "Buscando…";
   let p = participantes.find((x) => x.codigo && texto.includes(x.codigo));
-  if (!p) { try { p = await buscarParticipantePorQR(texto); } catch {} }
+  if (pontoModo) {
+    // controle de acesso: confere o cadastro mais novo no banco (credenciamento e bloqueio feitos em outro aparelho)
+    try { const fresco = await buscarParticipantePorQR(texto); if (fresco) p = fresco; } catch {}
+  } else if (!p) { try { p = await buscarParticipantePorQR(texto); } catch {} }
   el("mira-txt").textContent = "Aponte para o QR Code do crachá";
+  if (!p && pontoModo) return resultadoPonto({ nome: "Crachá não reconhecido" }, "erro", "Não está na lista de participantes");
   if (!p) return abrirSheetErro(texto);
   if (pontoModo) return registrarNoPonto(p);
   if (atvAcao) return processarNaAtividade(p);
@@ -865,7 +882,7 @@ function abrirFicha(p, abaFicha = "acoes") {
       ${cat ? `<span class="ck-pessoa-cat">${esc(cat)}</span>` : ""}
       <span class="ck-ficha-sit ${confirmado ? "ok" : "alerta"}">${confirmado ? "Inscrição confirmada" : esc(p.situacao || "—")}</span>
       ${bloqueado ? `<span class="ck-ficha-sit bloq">Acesso bloqueado</span>` : ""}
-      <span class="ck-ficha-status ${entrada ? "ok" : ""}">${entrada ? `Já fez check-in às ${esc(horaCurta(entrada.at))}` : "Ainda não fez check-in"}</span>
+      <span class="ck-ficha-status ${entrada ? "ok" : ""}">${entrada ? `Credenciado às ${esc(horaCurta(entrada.at))}` : "Ainda não foi credenciado"}</span>
     </div>
     <div class="ck-ficha-abas">
       <button type="button" data-aba="acoes" class="${abaFicha === "acoes" ? "ativa" : ""}">Ações</button>
@@ -883,11 +900,12 @@ function abrirFicha(p, abaFicha = "acoes") {
     const travaCheckin = bloqueado || !!entrada;
     corpo.innerHTML = `
       <div class="ck-sheet-acoes">
-        <button class="ck-btn ck-btn-primario" data-acao="credenciar" ${travaCheckin ? "disabled" : ""}>Check-in e imprimir etiqueta</button>
+        <button class="ck-btn ck-btn-primario" data-acao="credenciar" ${travaCheckin ? "disabled" : ""}>Credenciar + imprimir etiqueta</button>
         <div class="ck-duplo-btn">
+          <button class="ck-btn ck-btn-secundario" data-acao="credenciar-so" ${travaCheckin ? "disabled" : ""}>Credenciar</button>
           <button class="ck-btn ck-btn-secundario" data-acao="so-checkin" ${travaCheckin ? "disabled" : ""}>Check-in</button>
-          <button class="ck-btn ck-btn-secundario" data-acao="reimprimir" ${bloqueado ? "disabled" : ""}>Imprimir</button>
         </div>
+        <button class="ck-btn ck-btn-secundario" data-acao="reimprimir" ${bloqueado ? "disabled" : ""}>Imprimir etiqueta</button>
         ${bloqueado
           ? `<button class="ck-btn ck-btn-secundario" data-acao="liberar">Liberar acesso</button>`
           : `<button class="ck-btn ck-btn-bloquear" data-acao="bloquear">Bloquear acesso</button>`}
@@ -1050,11 +1068,15 @@ async function acao(tipo, p, btn) {
   }
 }
 
+// resultado em tela cheia: tom "ok" (verde), "erro" (vermelho) ou "atencao" (amarelo); mostra nome e categoria
 function telaSucesso(p, atvNome, opts = {}) {
+  const tom = opts.tom || (opts.aviso ? "erro" : "ok");
   const d = document.createElement("div");
-  d.className = "ck-sucesso" + (opts.aviso ? " aviso" : "");
+  d.className = "ck-sucesso" + (tom === "erro" ? " aviso" : tom === "atencao" ? " atencao" : "");
   const texto = opts.texto || (atvNome ? "credenciado(a) em " + atvNome : "credenciado(a)");
-  d.innerHTML = `<div class="ck-sucesso-check">${opts.aviso ? "!" : "✓"}</div><strong>${esc(p.nome)}</strong><span>${esc(texto)}</span>`;
+  const cat = (p.ingresso || p.tipo || "").trim();
+  const icone = tom === "ok" ? "✓" : tom === "erro" ? "✕" : "!";
+  d.innerHTML = `<div class="ck-sucesso-check">${icone}</div><strong>${esc(p.nome)}</strong>${cat ? `<em class="ck-sucesso-cat">${esc(cat)}</em>` : ""}<span>${esc(texto)}</span>`;
   document.body.appendChild(d);
   void d.offsetHeight;
   setTimeout(() => d.classList.add("aberto"), 10);

@@ -467,3 +467,9 @@ body.ck-app {
 :root[data-theme="light"] .ck-ler-grande:active { background: rgba(22,163,74,.22); }
 :root[data-theme="light"] .ck-mira-txt, :root[data-theme="light"] .ck-cam-erro { color: #fff; }
 .ck-ler-grande[disabled] { opacity: 1; }
+
+/* resultado do controle de acesso: verde (ok) · vermelho (.aviso) · amarelo (.atencao) — com nome e categoria */
+.ck-sucesso.atencao { background: rgba(202,138,4,.97); }
+.ck-sucesso-cat { font-style: normal; font-weight: 700; font-size: 1.05rem; letter-spacing: .02em; padding: 4px 14px; border-radius: 999px; background: rgba(255,255,255,.22); margin: 2px 0 6px; }
+.ck-sucesso strong { text-align: center; padding: 0 20px; }
+.ck-sucesso span { text-align: center; padding: 0 24px; font-size: 1.05rem; }
