@@ -348,7 +348,7 @@ body.ck-app {
 .ck-linha2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .ck-resumo { margin: 14px 0 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .ck-resumo div { background: var(--ck-superficie); border: 1px solid var(--ck-borda-forte); border-radius: 14px; padding: 12px 14px; }
-.ck-resumo b { display: block; font-size: 1.7rem; letter-spacing: -.02em; }
+.ck-resumo div > b { display: block; font-size: 1.7rem; letter-spacing: -.02em; }
 .ck-resumo span { font-size: .78rem; color: var(--ck-texto-suave); }
 .ck-ler-grande {
   width: 100%; min-height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
@@ -446,3 +446,24 @@ body.ck-app {
 .ck-sheet .ck-btn[disabled] { opacity: .42; }
 .ck-ficha-nota { font-size: .82rem; color: #b91c1c; margin: 12px 4px 0; line-height: 1.45; }
 .ck-label-prev { background: #fff; border-radius: 16px; margin-bottom: 14px; overflow: hidden; position: relative; }
+
+/* =============================================================================
+   Ajustes de contraste (tema claro e escuro): nada "apagado".
+   ========================================================================== */
+/* botões redondos do cabeçalho/voltar: o ".ck-icone-btn" (branco sobre câmera) vencia o "-claro" por vir depois */
+.ck-icone-btn.ck-icone-btn-claro { background: var(--ck-borda); color: var(--ck-texto); backdrop-filter: none; }
+.ck-icone-btn.ck-icone-btn-claro:active { background: var(--ck-borda-forte); }
+
+/* tema claro: a cor de destaque lilás-claro e os verdes/vermelhos "neon" não têm contraste no branco */
+:root[data-theme="light"] { --ck-laranja: #6d28d9; }
+:root[data-theme="light"] .ck-btn-txt { color: #6d28d9; }
+:root[data-theme="light"] .ck-busca-sit.ok,
+:root[data-theme="light"] .ck-reg-acao.entrada,
+:root[data-theme="light"] .ck-insc-ok { color: #15803d; }
+:root[data-theme="light"] .ck-busca-sit.alerta,
+:root[data-theme="light"] .ck-reg-acao.saida { color: #b91c1c; }
+:root[data-theme="light"] .ck-tag-ok { background: rgba(21,128,61,.14); color: #15803d; }
+:root[data-theme="light"] .ck-ler-grande { color: #15803d; background: rgba(22,163,74,.12); }
+:root[data-theme="light"] .ck-ler-grande:active { background: rgba(22,163,74,.22); }
+:root[data-theme="light"] .ck-mira-txt, :root[data-theme="light"] .ck-cam-erro { color: #fff; }
+.ck-ler-grande[disabled] { opacity: 1; }

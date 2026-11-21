@@ -353,7 +353,6 @@ function renderAcesso() {
     ? ativos.map((p) => `<option value="${p.id}" ${p.id === lembrar ? "selected" : ""}>${esc(p.nome)}</option>`).join("")
     : `<option value="">Sem pontos</option>`;
   el("ac-acao").value = lembrado("ck_acao") || "entrada";
-  el("ac-ler").disabled = !ativos.length;
 
   if (pontosIndisponivel) {
     el("ac-resumo").innerHTML = `<p class="pagina-sub-ck" style="grid-column:1/-1;margin:0">Falta ativar o controle de acesso: rode a migração <code>0047_pontos_de_controle.sql</code> no SQL Editor.</p>`;
@@ -463,8 +462,6 @@ function renderAtividades() {
   document.querySelectorAll(".ck-subtabs [data-sub]").forEach((b) => b.classList.toggle("ativa", b.dataset.sub === atvSub));
   el("atv-cred").hidden = atvSub !== "cred";
   el("atv-insc").hidden = atvSub !== "insc";
-  el("atv-entrada").disabled = !atv;
-  el("atv-saida").disabled = !atv;
   if (!atv) {
     el("atv-presentes").textContent = "0";
     ["atv-n-presentes", "atv-n-entradas", "atv-n-saidas"].forEach((id) => { el(id).textContent = "0"; });
