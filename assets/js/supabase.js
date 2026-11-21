@@ -550,7 +550,13 @@ export const registrarAcessoPonto = (pontoId, participanteId, acao, operador) =>
 export const listInscritosAtividades = (eid) =>
   supabase.from("atividade_inscritos").select("*").eq("evento_id", ev(eid)).limit(20000).then(ok);
 
-export const inscreverNaAtividade = (atividadeId, participanteId, operador) =>
+// a inscrição de UMA pessoa numa atividade (consulta rápida na hora do check-in); null se não estiver inscrita
+export const inscricaoDaAtividade = (atividadeId, participanteId) =>
+  supabase.from("atividade_inscritos").select("*")
+    .eq("atividade_id", atividadeId).eq("participante_id", participanteId).limit(1)
+    .then(ok).then((rows) => rows[0] || null);
+
+export const inscreverNaAtividade =(atividadeId, participanteId, operador) =>
   salvar("atividade_inscritos", { atividade_id: atividadeId, participante_id: participanteId, operador: operador || null });
 
 export async function registrarCheckin(participanteId, acao = "entrada", origem = "checkin", atividadeId = null) {

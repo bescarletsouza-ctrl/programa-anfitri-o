@@ -8,7 +8,7 @@ import {
   supabase, listEventos, listParticipantes, listCheckins, listAtividades,
   buscarParticipantePorQR, registrarCheckin, getEvento, salvarEventoPorId,
   meusAcessosEventos, eventosDoNivel, listPontos, listAcessosPontos, registrarAcessoPonto, salvar, remover,
-  listInscritosAtividades, inscreverNaAtividade,
+  listInscritosAtividades, inscreverNaAtividade, inscricaoDaAtividade,
 } from "./supabase.js";
 import { eventoId, definirEvento } from "./evento.js";
 import {
@@ -635,14 +635,15 @@ async function processarNaAtividade(p) {
       telaSucesso(p, null, { texto: `saída de ${atv.nome}` });
       return setTimeout(retomar, 1100);
     }
-    // entrada
+    // entrada: só entra quem está INSCRITO na atividade (vermelho, sem opção de credenciar); o inscrito é destacado
     if (dentro) return avisar(`Já está na atividade ${atv.nome}`);
+    if (!(await garantirInscricao(p, atv))) return avisar(`NÃO INSCRITO na atividade ${atv.nome}`);
     const cat = (p.ingresso || p.tipo || "").trim();
     const foraDaCategoria = atv.categorias?.length && !atv.categorias.includes(cat);
     const lotada = atv.vagas && credenciadosNaAtv(atv.id).length >= atv.vagas;
     if (foraDaCategoria || lotada) return abrirSheet(p);   // operador decide, com os alertas na tela
     await registrarAcessoAtv(p, atv, "entrada");
-    telaSucesso(p, null, { texto: `entrada em ${atv.nome}` });
+    telaSucesso(p, null, { texto: `INSCRITO ✓ · entrada em ${atv.nome}` });
     setTimeout(retomar, 1100);
   } catch (e) {
     toast(e.message || "Falha ao registrar.", "erro");
@@ -948,22 +949,36 @@ async function definirBloqueio(p, bloquear) {
   }
 }
 
-function abrirSheet(p) {
+// Está inscrito na atividade? Confere a lista local e, se não achar, o banco (outro aparelho pode ter inscrito agora).
+// Sem a migração 0048 a regra de inscrição não vale (devolve true pra não travar todo mundo).
+async function garantirInscricao(p, atv) {
+  if (inscritosIndisponivel) return true;
+  if (estaInscrito(p.id, atv.id)) return true;
+  try {
+    const r = await inscricaoDaAtividade(atv.id, p.id);
+    if (r) { inscritos.push(r); return true; }
+  } catch { /* sem rede: vale o que já está na lista local */ }
+  return false;
+}
+
+// folha de decisão da ATIVIDADE (o evento geral usa abrirFicha). Mostra em destaque se a pessoa está INSCRITA;
+// quem não está inscrito NÃO tem a opção de credenciar.
+async function abrirSheet(p) {
   const atv = atvAtual();
   if (!atv) return abrirFicha(p);   // evento geral: ficha com as abas Ações / Label
   el("sheet").classList.remove("ficha");
   const cat = (p.ingresso || p.tipo || "").trim();
   const confirmado = (p.situacao || "Confirmado") === "Confirmado";
-  const entrada = atv ? saldoAtividade(p.id, atv.id) : entradaEvento(p);
+  const entrada = saldoAtividade(p.id, atv.id);
+  const inscrito = await garantirInscricao(p, atv);
+  const bloqueado = !!p.acesso_bloqueado;
 
   const alertas = [];
-  if (atv) {
-    if (atv.categorias?.length && !atv.categorias.includes(cat))
-      alertas.push("⚠ Categoria não liberada nesta atividade");
-    if (atv.vagas && credenciadosNaAtv(atv.id).length >= atv.vagas && !entrada)
-      alertas.push("⚠ Atividade lotada");
-  }
+  if (bloqueado) alertas.push("✕ Acesso bloqueado");
+  if (atv.categorias?.length && !atv.categorias.includes(cat)) alertas.push("⚠ Categoria não liberada nesta atividade");
+  if (atv.vagas && credenciadosNaAtv(atv.id).length >= atv.vagas && !entrada) alertas.push("⚠ Atividade lotada");
 
+  const podeCredenciar = inscrito && !bloqueado;
   el("sheet").innerHTML = `
     <div class="ck-sheet-puxador"></div>
     <div class="ck-pessoa">
@@ -974,31 +989,29 @@ function abrirSheet(p) {
         <span class="ck-pessoa-cod">${esc(p.codigo || "")}</span>
       </div>
     </div>
+    <div class="ck-inscricao ${inscrito ? "sim" : "nao"}">
+      ${inscrito ? "✓ INSCRITO na atividade" : "✕ NÃO INSCRITO na atividade"}
+      <small>${esc(atv.nome)}</small>
+    </div>
     <div class="ck-status">
       <span class="ck-status-linha ${confirmado ? "ok" : "alerta"}">
-        ${confirmado ? "✓ Inscrição confirmada" : "• Situação: " + esc(p.situacao || "—")}
+        ${confirmado ? "✓ Inscrição no evento confirmada" : "• Situação: " + esc(p.situacao || "—")}
       </span>
       <span class="ck-status-linha ${entrada ? "ok" : "neutro"}">
-        ${entrada
-          ? (atv ? `✓ Na atividade desde ${esc(horaCurta(entrada.at))}` : `✓ Check-in feito às ${esc(horaCurta(entrada.at))}`)
-          : (atv ? "Ainda não entrou nesta atividade" : "Ainda não fez check-in")}
+        ${entrada ? `✓ Na atividade desde ${esc(horaCurta(entrada.at))}` : "Ainda não entrou nesta atividade"}
       </span>
       ${alertas.map((a) => `<span class="ck-status-linha alerta">${a}</span>`).join("")}
     </div>
     <div class="ck-sheet-acoes">
-      ${entrada && atv ? `
+      ${entrada ? `
         <button class="ck-btn ck-btn-secundario" data-acao="saida-atv">Registrar saída da atividade</button>
         <button class="ck-btn ck-btn-fantasma" data-acao="fechar">Escanear outro</button>
-      ` : entrada ? `
-        <button class="ck-btn ck-btn-primario" data-acao="reimprimir">Reimprimir crachá</button>
-        <button class="ck-btn ck-btn-fantasma" data-acao="fechar">Escanear outro</button>
-      ` : atv ? `
+      ` : podeCredenciar ? `
         <button class="ck-btn ck-btn-primario" data-acao="atv">Credenciar na atividade</button>
         <button class="ck-btn ck-btn-fantasma" data-acao="fechar">Cancelar</button>
       ` : `
-        <button class="ck-btn ck-btn-primario" data-acao="credenciar">Check-in + imprimir crachá</button>
-        <button class="ck-btn ck-btn-secundario" data-acao="so-checkin">Só fazer check-in</button>
-        <button class="ck-btn ck-btn-fantasma" data-acao="fechar">Cancelar</button>
+        ${!inscrito && !bloqueado && podeAdicionarAtv() ? `<button class="ck-btn ck-btn-secundario" data-acao="inscrever-atv">Inscrever nesta atividade</button>` : ""}
+        <button class="ck-btn ck-btn-fantasma" data-acao="fechar">Fechar</button>
       `}
     </div>`;
   mostrarSheet();
@@ -1043,6 +1056,12 @@ async function acao(tipo, p, btn) {
   if (tipo === "reimprimir") { imprimirCracha(p, evento.nome || ""); return fecharSheet(); }
   if (tipo === "bloquear" || tipo === "liberar") { btn.disabled = true; return definirBloqueio(p, tipo === "bloquear"); }
   if (p.acesso_bloqueado) { toast("Acesso bloqueado. Libere o acesso para continuar.", "erro"); return; }
+  if (tipo === "inscrever-atv") {
+    btn.disabled = true;
+    if (await inscrever(p, atv)) { renderAtividades(); abrirSheet(p); } else btn.disabled = false;
+    return;
+  }
+  if (tipo === "atv" && !(await garantirInscricao(p, atv))) { toast("Só quem está inscrito na atividade pode ser credenciado.", "erro"); return; }
 
   const antes = btn.textContent;
   btn.disabled = true; btn.textContent = "Registrando…";

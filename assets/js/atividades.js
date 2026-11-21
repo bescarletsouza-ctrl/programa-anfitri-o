@@ -6,7 +6,7 @@
 import { iniciarPagina, esc, icone, toast, confirmar, abrirModal, abrirGaveta, debounce, formatarData } from "./ui.js";
 import {
   listAtividades, listCheckins, listParticipantes, salvar, remover,
-  registrarCheckin, inserirLote, removerCheckinsAtividade,
+  registrarCheckin, inserirLote, removerCheckinsAtividade, listInscritosAtividades,
 } from "./supabase.js";
 import { parsearTabela, lerXlsx, baixarXLSX } from "./tabela.js";
 
@@ -93,6 +93,7 @@ function render() {
   el("lista").innerHTML = atividades.map(cardHtml).join("");
   el("lista").querySelectorAll("[data-id]").forEach((card) => {
     const atv = atividades.find((a) => a.id === card.dataset.id);
+    card.querySelector("[data-duplicar]").onclick = () => editar(atv, true);
     card.querySelector("[data-editar]").onclick = () => editar(atv);
     card.querySelector("[data-excluir]").onclick = () => excluir(atv);
     card.querySelector("[data-credenciados]").onclick = () => abrirGavetaAtv(atv, "lista");
@@ -113,6 +114,7 @@ function cardHtml(atv) {
         <div class="atv-horario">${esc(horarioLinha(atv))}</div>
       </div>
       <span class="linha-acoes">
+        <button class="icone-btn" data-duplicar title="Duplicar atividade">${icone("copiar")}</button>
         <button class="icone-btn" data-editar title="Editar">${icone("editar")}</button>
         <button class="icone-btn" data-excluir title="Excluir">${icone("excluir")}</button>
       </span>
@@ -137,13 +139,17 @@ function cardHtml(atv) {
   </div>`;
 }
 
-function editar(atv) {
+// duplicar = true: abre o cadastro já preenchido com os dados da atividade (nome "… (cópia)") e salva como UMA NOVA —
+// dá pra ajustar dia e horário antes de confirmar. Não copia inscritos nem credenciados.
+function editar(atv, duplicar = false) {
   const cats = (atv?.categorias || []).join(", ");
   abrirModal({
-    titulo: atv ? "Editar atividade" : "Nova atividade",
+    titulo: duplicar ? "Duplicar atividade" : atv ? "Editar atividade" : "Nova atividade",
+    textoConfirmar: duplicar ? "Criar cópia" : undefined,
     corpoHtml: `
+      ${duplicar ? `<p class="pagina-sub" style="margin:0 0 12px">Cria uma atividade nova com estes dados. Ajuste o que mudar (dia, horário…) e confirme. Inscritos e credenciados não são copiados.</p>` : ""}
       <label class="campo"><span>Nome *</span>
-        <input class="input" name="nome" required value="${esc(atv?.nome || "")}" /></label>
+        <input class="input" name="nome" required value="${esc(duplicar && atv ? atv.nome + " (cópia)" : atv?.nome || "")}" /></label>
       <label class="campo"><span>Dia</span>
         <input class="input" name="dia" type="date" value="${esc(atv?.dia || "")}" /></label>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
@@ -167,9 +173,9 @@ function editar(atv) {
         vagas: Number(f.vagas) > 0 ? Number(f.vagas) : null,
         categorias: f.categorias.split(",").map((s) => s.trim()).filter(Boolean),
       };
-      if (atv) registro.id = atv.id;
+      if (atv && !duplicar) registro.id = atv.id;
       await salvar("atividades", registro);
-      toast("Atividade salva.", "ok");
+      toast(duplicar ? "Atividade duplicada." : "Atividade salva.", "ok");
       carregar();
     },
   });
@@ -453,6 +459,7 @@ function modalImportarAtv() {
         await inserirLote("checkins", idsEntrada.map((id) => ({
           participante_id: id, acao: "entrada", origem: "atividades-import", atividade_id: gavetaAtv.id,
         })));
+        await inscreverNaPlataforma(gavetaAtv.id, idsEntrada);
       }
 
       [atividades, checkins, participantes] = await Promise.all([
@@ -480,6 +487,16 @@ function atualizarBotaoAdd() {
   btn.disabled = !n;
 }
 
+// Quem entra na atividade pela plataforma também vira INSCRITO (o app só deixa credenciar quem está inscrito).
+// Sem a migração 0048, ou se já estiver inscrito, segue sem erro.
+async function inscreverNaPlataforma(atvId, ids) {
+  try {
+    const ja = new Set((await listInscritosAtividades()).filter((i) => i.atividade_id === atvId).map((i) => i.participante_id));
+    const novos = [...new Set(ids)].filter((id) => !ja.has(id));
+    if (novos.length) await inserirLote("atividade_inscritos", novos.map((id) => ({ atividade_id: atvId, participante_id: id, operador: "plataforma" })));
+  } catch { /* migração 0048 ainda não rodou: ignora */ }
+}
+
 async function adicionarSelecionados() {
   const ids = [...selecionadosAdd];
   if (!ids.length) return;
@@ -489,6 +506,7 @@ async function adicionarSelecionados() {
     await inserirLote("checkins", ids.map((id) => ({
       participante_id: id, acao: "entrada", origem: "atividades", atividade_id: gavetaAtv.id,
     })));
+    await inscreverNaPlataforma(gavetaAtv.id, ids);
     selecionadosAdd.clear();
     checkins = await listCheckins().catch(() => checkins);
     gavetaModo = "lista";

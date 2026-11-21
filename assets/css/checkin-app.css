@@ -473,3 +473,9 @@ body.ck-app {
 .ck-sucesso-cat { font-style: normal; font-weight: 700; font-size: 1.05rem; letter-spacing: .02em; padding: 4px 14px; border-radius: 999px; background: rgba(255,255,255,.22); margin: 2px 0 6px; }
 .ck-sucesso strong { text-align: center; padding: 0 20px; }
 .ck-sucesso span { text-align: center; padding: 0 24px; font-size: 1.05rem; }
+
+/* ---- atividade: destaque de inscrito / não inscrito ---- */
+.ck-inscricao { border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; font-weight: 800; font-size: 1.02rem; letter-spacing: .01em; display: grid; gap: 2px; }
+.ck-inscricao small { font-weight: 600; font-size: .8rem; opacity: .85; }
+.ck-inscricao.sim { background: #dcfce7; color: #166534; border: 2px solid #16a34a; }
+.ck-inscricao.nao { background: #fee2e2; color: #991b1b; border: 2px solid #dc2626; }
