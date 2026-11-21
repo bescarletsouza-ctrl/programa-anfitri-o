@@ -806,3 +806,17 @@ export async function testarIntegracao(integracaoId) {
   if (data?.erro) throw new Error(data.erro);
   return data; // { disparadas, entregas: [{ ok, status, erro }] }
 }
+
+/* ---- Cadastro de participante pelo app de check-in (liberado com a senha do evento, 0050) ----
+   Entra na 1ª etapa do pipeline, Confirmado e Gratuito (cadastro no local); o código vem do banco. */
+export async function cadastrarParticipanteNoApp(dados) {
+  const etapa_id = await primeiraEtapaId(eventoId());
+  const salvo = await salvar("participantes", {
+    ...dados, situacao: "Confirmado", pagamento: "Gratuito", quantidade: 1, etapa_id,
+  });
+  dispararIntegracoes("participante.criado", {
+    participante_id: salvo.id,
+    participante: { nome: salvo.nome, email: salvo.email, telefone: salvo.telefone, empresa: salvo.empresa, ingresso: salvo.ingresso, situacao: salvo.situacao, codigo: salvo.codigo },
+  });
+  return salvo;
+}

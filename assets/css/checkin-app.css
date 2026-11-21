@@ -487,3 +487,12 @@ body.ck-app {
 .ck-nota { display: block; text-align: center; font-weight: 800; font-size: 1rem; padding: 9px 14px; border-radius: 12px; letter-spacing: .01em; }
 .ck-nota.ok { background: rgba(255,255,255,.95); color: #166534; }
 .ck-nota.alerta { background: #fde047; color: #713f12; }
+
+/* ---- adicionar participante (liberado com a senha do evento) ---- */
+.ck-pane-busca-linha { display: flex; gap: 10px; align-items: center; }
+.ck-pane-busca-linha .ck-input { flex: 1; min-width: 0; }
+.ck-pane-busca-linha .ck-icone-btn[hidden] { display: none; }
+.ck-cfg-estado { font-style: normal; font-weight: 700; font-size: .82rem; color: var(--ck-texto-tenue); }
+.ck-sheet .ck-input { background: #f4f4f5; color: #18181b; border: 1px solid #d4d4d8; }
+.ck-sheet h3 { margin: 4px 0 6px; font-size: 1.1rem; }
+.ck-sheet p.ck-sheet-txt { margin: 0 0 14px; color: #52525b; font-size: .9rem; line-height: 1.45; }

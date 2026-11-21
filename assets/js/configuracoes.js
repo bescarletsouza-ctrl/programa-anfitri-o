@@ -8,7 +8,7 @@ import {
   listarEquipe, criarMembroEquipe, editarMembroEquipe, trocarSenhaMembro, removerMembroEquipe,
   acessosDoMembro, salvarAcessosDoMembro,
 } from "./supabase.js";
-import { eventoId, definirEvento } from "./evento.js";
+import { eventoId, definirEvento, hashSenhaEvento } from "./evento.js";
 import { montarCrachaHtml, CRACHA_PADRAO, TAMANHOS_CRACHA, snapTamanho, qrDataURL } from "./cracha.js";
 
 const _iniciando = iniciarPagina("config");
@@ -80,6 +80,7 @@ async function carregar() {
     el("conteudo").hidden = false;
     montarCrachaConfig();
     montarCtaMobile();
+    montarSenhaApp();
     montarEquipe();
     await Promise.allSettled([renderGrupos(), renderEstagios(), renderEtapasPart(), renderMarcos(), renderCategoriasIngresso()]);
   } catch (e) {
@@ -613,6 +614,42 @@ function modalMembro(m) {
 }
 
 /* ---- CTA: check-in pelo celular (baixar o app + abrir no evento) ---- */
+// Senha de "Adicionar participantes" do app de check-in (guarda só o hash — 0050)
+async function montarSenhaApp() {
+  if (!el("ck-senha-salvar")) return;
+  const estado = el("ck-senha-estado");
+  const atualizar = async () => {
+    try {
+      const ev = await getEvento(eventoId());
+      const tem = !!ev?.senha_adicionar_hash;
+      estado.innerHTML = tem
+        ? `<b style="color:var(--ok-solid)">Senha definida.</b> Por segurança ela não é exibida; defina uma nova para trocar.`
+        : `<b>Nenhuma senha definida</b> — o app não deixa liberar a adição de participantes.`;
+      el("ck-senha-remover").hidden = !tem;
+    } catch {
+      estado.textContent = "Rode a migração 0050_senha_adicionar_participantes.sql no SQL Editor para usar este recurso.";
+    }
+  };
+  el("ck-senha-salvar").onclick = async () => {
+    const senha = el("ck-senha-nova").value.trim();
+    if (senha.length < 4) { toast("A senha precisa ter pelo menos 4 caracteres.", "erro"); return; }
+    try {
+      await salvarEvento({ senha_adicionar_hash: await hashSenhaEvento(eventoId(), senha) });
+      el("ck-senha-nova").value = "";
+      toast("Senha definida. Celulares já liberados precisam liberar de novo.", "ok");
+      atualizar();
+    } catch (e) {
+      toast(/senha_adicionar_hash|schema cache|column/i.test(e.message || "") ? "Rode a migração 0050 no SQL Editor." : e.message, "erro");
+    }
+  };
+  el("ck-senha-remover").onclick = async () => {
+    if (!confirmar("Remover a senha? O app deixa de permitir adicionar participantes.")) return;
+    try { await salvarEvento({ senha_adicionar_hash: null }); toast("Senha removida.", "ok"); atualizar(); }
+    catch (e) { toast(e.message, "erro"); }
+  };
+  atualizar();
+}
+
 function montarCtaMobile() {
   const inp = el("ck-mobile-link");
   if (!inp) return;

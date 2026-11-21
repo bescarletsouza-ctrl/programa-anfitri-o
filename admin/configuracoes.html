@@ -190,6 +190,22 @@
           </div>
         </section>
 
+        <section class="card" style="margin-bottom:14px">
+          <h3>Adicionar participantes pelo app</h3>
+          <p class="pagina-sub" style="margin:0 0 12px">
+            No app de check-in, <b>Adicionar participantes</b> vem <b>travado</b>. Só quem souber a senha abaixo libera
+            a opção naquele celular (aparece o botão <b>+</b> na lista de participantes). Se não houver senha definida,
+            ninguém consegue liberar.
+          </p>
+          <p class="pagina-sub" id="ck-senha-estado" style="margin:0 0 12px"></p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+            <label class="campo" style="flex:1;min-width:200px;margin:0"><span>Nova senha (mín. 4 caracteres)</span>
+              <input class="input" id="ck-senha-nova" type="text" autocomplete="off" /></label>
+            <button class="btn btn-primario btn-sm" id="ck-senha-salvar" type="button">Definir senha</button>
+            <button class="btn btn-fantasma btn-sm" id="ck-senha-remover" type="button">Remover senha</button>
+          </div>
+        </section>
+
         <section class="card">
           <h3>Crachá / Etiqueta</h3>
           <div class="grid grid-2" style="align-items:start">

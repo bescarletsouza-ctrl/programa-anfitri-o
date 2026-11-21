@@ -9,8 +9,9 @@ import {
   buscarParticipantePorQR, registrarCheckin, getEvento, salvarEventoPorId,
   meusAcessosEventos, eventosDoNivel, listPontos, listAcessosPontos, registrarAcessoPonto, salvar, remover,
   listInscritosAtividades, inscreverNaAtividade, inscricaoDaAtividade, removerInscritosAtividade, removerCheckinsAtividade,
+  listTiposIngresso, cadastrarParticipanteNoApp,
 } from "./supabase.js";
-import { eventoId, definirEvento } from "./evento.js";
+import { eventoId, definirEvento, hashSenhaEvento } from "./evento.js";
 import {
   imprimirCracha, CRACHA_PADRAO, TAMANHOS_CRACHA, snapTamanho, limparConfigCracha,
   appNativo, montarCrachaHtml, qrDataURL,
@@ -39,6 +40,7 @@ let pontosIndisponivel = false;
 let pontoModo = null;       // {id, nome, acao} enquanto o scanner lê pra um ponto de controle
 let atvAcao = null;         // "entrada" | "saida" | "inscrever" | "inscrever_entrada" quando o scanner age direto numa atividade
 let inscritos = [];         // inscritos por atividade (0048)
+let tiposIngresso = [];      // categorias de ingresso do evento (pra cadastrar participante)
 let inscritosIndisponivel = false;
 const ORIGEM_APP = "checkin-mobile";   // entradas/saídas feitas no app; a plataforma grava "atividades" / "atividades-import"
 const limparModo = () => { modo = ""; pontoModo = null; atvAcao = null; };
@@ -61,7 +63,7 @@ async function mostrarTela(alvo) {
    vários toques seguidos. Na raiz, o próximo "voltar" sai do app normal. */
 function overlayAberto() {
   return !el("menu").hidden || !el("sheet").hidden || !el("tela-busca").hidden || !el("tela-config").hidden
-    || !el("tela-pontos").hidden || !el("tela-registro").hidden;
+    || !el("tela-pontos").hidden || !el("tela-registro").hidden || !el("tela-novo").hidden;
 }
 function noTopo() {
   const telaRaiz = !el("tela-eventos").hidden || !el("tela-login").hidden || !el("tela-abrir").hidden;
@@ -78,6 +80,7 @@ function voltarUmNivel() {
   if (!el("menu").hidden) return fecharMenu();
   if (!el("sheet").hidden) return fecharSheet();
   if (!el("tela-config").hidden) return fecharConfig();
+  if (!el("tela-novo").hidden) return fecharNovoParticipante();
   if (!el("tela-pontos").hidden) return fecharPontos();
   if (!el("tela-registro").hidden) return fecharRegistro();
   if (!el("tela-busca").hidden) return fecharBusca();
@@ -123,6 +126,11 @@ window.addEventListener("popstate", () => {
   el("atv-add-qr").onclick = () => iniciarScanAtividade("inscrever");
   el("atv-add-qr-checkin").onclick = () => iniciarScanAtividade("inscrever_entrada");
   el("atv-busca").addEventListener("input", debounce(() => { const a = atvSelecionada(); if (a) renderInscritos(a); }, 200));
+  el("cfg-item-addpart").onclick = aoTocarAddPart;
+  el("part-add").onclick = abrirNovoParticipante;
+  el("novo-voltar").onclick = fecharNovoParticipante;
+  el("np-salvar").onclick = () => salvarNovoParticipante(false);
+  el("np-salvar-cred").onclick = () => salvarNovoParticipante(true);
   el("cfg-item-pontos").onclick = abrirPontos;
   el("cfg-item-impressora").onclick = abrirConfig;
   el("cfg-item-tema").onclick = alternarTema;
@@ -244,13 +252,14 @@ async function escolherEvento(id) {
 }
 
 async function recarregarTudo(silencioso) {
-  const [, , atvs] = await Promise.all([carregarDados(), carregarPontos(), listAtividades().catch(() => []), carregarInscritos()]);
+  const [, , atvs, , tipos] = await Promise.all([carregarDados(), carregarPontos(), listAtividades().catch(() => []), carregarInscritos(), listTiposIngresso().catch(() => [])]);
   atividades = atvs;
+  tiposIngresso = tipos || [];
   renderTudo();
   if (silencioso !== true) toast("Dados atualizados.", "ok");
 }
 
-function renderTudo() { renderParticipantes(); renderAcesso(); renderAtividades(); renderConfig(); }
+function renderTudo() { renderParticipantes(); renderAcesso(); renderAtividades(); renderConfig(); renderAddPart(); }
 
 const TITULOS_ABA = { part: "Lista de participantes", acesso: "Controle de acesso", atv: "Atividades", cfg: "Configurações" };
 function irParaAba(tab) {
@@ -265,7 +274,7 @@ function irParaAba(tab) {
 }
 
 function fecharOverlays() {
-  ["tela-busca", "tela-config", "tela-pontos", "tela-registro"].forEach((id) => { el(id).hidden = true; });
+  ["tela-busca", "tela-config", "tela-pontos", "tela-registro", "tela-novo"].forEach((id) => { el(id).hidden = true; });
   if (!el("menu").hidden) fecharMenu();
   if (!el("sheet").hidden) fecharSheet(true);
 }
@@ -687,6 +696,110 @@ async function processarNaAtividade(p) {
   }
 }
 
+/* ---- adicionar participantes (trava com a senha do evento) -------------- */
+// "Liberado" vale para ESTE aparelho e ESTE evento, enquanto a senha não mudar (guardamos o hash que foi aceito).
+const chaveAddPart = () => `ck_add_part_${evento?.id || ""}`;
+const addPartLiberado = () => !!evento?.senha_adicionar_hash && lembrado(chaveAddPart()) === evento.senha_adicionar_hash;
+
+function renderAddPart() {
+  el("part-add").hidden = !addPartLiberado();
+  el("cfg-addpart-estado").textContent = addPartLiberado() ? "Liberado" : "Bloqueado";
+}
+
+function aoTocarAddPart() {
+  if (addPartLiberado()) {   // liberado → toque de novo trava
+    guardar(chaveAddPart(), "");
+    toast("Adicionar participantes travado neste aparelho.", "ok");
+    renderAddPart();
+    return;
+  }
+  abrirDesbloqueio();
+}
+
+function abrirDesbloqueio() {
+  const sheet = el("sheet");
+  sheet.classList.remove("ficha");
+  if (!evento?.senha_adicionar_hash) {
+    sheet.innerHTML = `<div class="ck-sheet-puxador"></div>
+      <h3>Adicionar participantes</h3>
+      <p class="ck-sheet-txt">Este evento ainda não tem senha. Peça a um administrador para definir em <b>Configurações ▸ Check-in</b> na plataforma.</p>
+      <div class="ck-sheet-acoes"><button class="ck-btn ck-btn-fantasma" data-acao="fechar">Fechar</button></div>`;
+    mostrarSheet();
+    sheet.querySelector("[data-acao]").onclick = () => fecharSheet();
+    return;
+  }
+  sheet.innerHTML = `<div class="ck-sheet-puxador"></div>
+    <h3>Liberar adicionar participantes</h3>
+    <p class="ck-sheet-txt">Digite a senha do evento para poder cadastrar participantes neste aparelho.</p>
+    <input class="ck-input" id="sn-senha" type="password" autocomplete="off" placeholder="Senha" />
+    <p class="ck-form-erro" id="sn-erro" hidden style="margin-top:8px">Senha incorreta.</p>
+    <div class="ck-sheet-acoes" style="margin-top:14px">
+      <button class="ck-btn ck-btn-primario" id="sn-ok" type="button">Liberar</button>
+      <button class="ck-btn ck-btn-fantasma" id="sn-cancelar" type="button">Cancelar</button>
+    </div>`;
+  mostrarSheet();
+  const tentar = async () => {
+    const digitada = el("sn-senha").value;
+    let ok = false;
+    try { ok = (await hashSenhaEvento(evento.id, digitada)) === evento.senha_adicionar_hash; } catch { ok = false; }
+    if (!ok) { el("sn-erro").hidden = false; navigator.vibrate?.([80, 60, 80]); el("sn-senha").select(); return; }
+    guardar(chaveAddPart(), evento.senha_adicionar_hash);
+    fecharSheet();
+    toast("Adicionar participantes liberado neste aparelho.", "ok");
+    renderAddPart();
+  };
+  el("sn-ok").onclick = tentar;
+  el("sn-cancelar").onclick = () => fecharSheet();
+  el("sn-senha").addEventListener("keydown", (e) => { if (e.key === "Enter") tentar(); });
+  setTimeout(() => el("sn-senha")?.focus(), 300);
+}
+
+function abrirNovoParticipante() {
+  if (!addPartLiberado()) { abrirDesbloqueio(); return; }
+  ["np-nome", "np-email", "np-tel", "np-empresa"].forEach((id) => { el(id).value = ""; });
+  el("np-tipo").value = "Convidado";
+  el("np-ingresso").innerHTML = `<option value="">— sem categoria —</option>` +
+    tiposIngresso.map((t) => `<option>${esc(t.nome)}</option>`).join("");
+  el("np-erro").hidden = true;
+  el("tela-novo").hidden = false;
+  garantirHistorico();
+  setTimeout(() => el("np-nome").focus(), 200);
+}
+function fecharNovoParticipante() { el("tela-novo").hidden = true; }
+
+const normalizaNome = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+async function salvarNovoParticipante(credenciar) {
+  const erro = (m) => { el("np-erro").textContent = m; el("np-erro").hidden = false; };
+  el("np-erro").hidden = true;
+  const nome = el("np-nome").value.trim();
+  const email = el("np-email").value.trim();
+  if (!nome) return erro("Informe o nome.");
+  if (email && !/^\S+@\S+\.\S+$/.test(email)) return erro("E-mail inválido.");
+  // mesmo e-mail e mesmo nome = já cadastrado (e-mail igual com nome diferente é outra pessoa, como nas vendas)
+  if (email && participantes.some((p) => (p.email || "").toLowerCase() === email.toLowerCase() && normalizaNome(p.nome) === normalizaNome(nome))) {
+    return erro("Já existe um participante com esse nome e e-mail.");
+  }
+  const botoes = ["np-salvar", "np-salvar-cred"].map(el);
+  botoes.forEach((b) => { b.disabled = true; });
+  try {
+    const novo = await cadastrarParticipanteNoApp({
+      nome, email: email || null, telefone: el("np-tel").value.trim() || null,
+      empresa: el("np-empresa").value.trim() || null,
+      tipo: el("np-tipo").value, ingresso: el("np-ingresso").value || null,
+    });
+    participantes.push(novo);
+    fecharNovoParticipante();
+    renderParticipantes();
+    toast(`${novo.nome} cadastrado(a).`, "ok");
+    if (credenciar) abrirFicha(novo);
+  } catch (e) {
+    erro(e.message || "Não foi possível cadastrar.");
+  } finally {
+    botoes.forEach((b) => { b.disabled = false; });
+  }
+}
+
 /* ---- aba 4: configurações ------------------------------------------- */
 function renderConfig() {
   el("cfg-usuario").textContent = sessao?.user?.email || "";
@@ -694,6 +807,7 @@ function renderConfig() {
   el("cfg-operador").value = lembrado("ck_operador") || (sessao?.user?.email || "").split("@")[0];
   el("cfg-tema-txt").textContent = document.documentElement.dataset.theme === "light" ? "Tema escuro" : "Tema claro";
   el("cfg-atv-add").checked = podeAdicionarAtv();
+  renderAddPart();
 }
 
 /* ---- pontos de controle (cadastro) ----------------------------------- */

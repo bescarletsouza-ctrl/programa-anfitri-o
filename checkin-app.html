@@ -80,7 +80,12 @@
     <div class="ck-shell-corpo">
       <!-- 1. Lista de participantes -->
       <section class="ck-pane" id="pane-part">
-        <div class="ck-pane-busca"><input class="ck-input" id="part-busca" placeholder="Busque por nome, e-mail, telefone ou código" autocomplete="off" /></div>
+        <div class="ck-pane-busca ck-pane-busca-linha">
+          <input class="ck-input" id="part-busca" placeholder="Busque por nome, e-mail, telefone ou código" autocomplete="off" />
+          <button class="ck-icone-btn ck-icone-btn-claro" id="part-add" hidden aria-label="Adicionar participante">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+        </div>
         <div class="ck-busca-lista" id="part-lista"></div>
         <button class="ck-fab ck-fab-shell" id="part-fab">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 14v3M14 19h3"/></svg>
@@ -159,6 +164,7 @@
 
           <div class="ck-cfg-lista">
             <button class="ck-cfg-item" id="cfg-item-pontos" type="button"><span>Pontos de controle</span><i class="ck-chevron">›</i></button>
+            <button class="ck-cfg-item" id="cfg-item-addpart" type="button"><span>Adicionar participantes</span><i class="ck-cfg-estado" id="cfg-addpart-estado">Bloqueado</i></button>
             <button class="ck-cfg-item" id="cfg-item-impressora" type="button"><span>Impressora e etiqueta</span><i class="ck-chevron">›</i></button>
             <button class="ck-cfg-item" id="cfg-item-tema" type="button"><span id="cfg-tema-txt">Tema claro</span><i class="ck-chevron">›</i></button>
           </div>
@@ -303,6 +309,28 @@
     </div>
   </section>
 
+  <!-- Adicionar participante (libera com a senha do evento, em Configurações) -->
+  <section class="ck-tela ck-busca" id="tela-novo" hidden>
+    <header class="ck-busca-topo">
+      <button class="ck-icone-btn ck-icone-btn-claro" id="novo-voltar" aria-label="Voltar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <strong style="font-size:1rem">Adicionar participante</strong>
+    </header>
+    <div class="ck-lista-corpo">
+      <label class="ck-campo"><span>Nome *</span><input class="ck-input" id="np-nome" autocomplete="off" /></label>
+      <label class="ck-campo"><span>E-mail</span><input class="ck-input" id="np-email" type="email" autocomplete="off" /></label>
+      <label class="ck-campo"><span>Telefone</span><input class="ck-input" id="np-tel" type="tel" autocomplete="off" /></label>
+      <label class="ck-campo"><span>Empresa</span><input class="ck-input" id="np-empresa" autocomplete="off" /></label>
+      <label class="ck-campo"><span>Tipo</span>
+        <select class="ck-select" id="np-tipo">
+          <option>Convidado</option><option>Acompanhante</option><option>Comprador</option><option>Membro</option></select></label>
+      <label class="ck-campo"><span>Categoria de ingresso</span><select class="ck-select" id="np-ingresso"></select></label>
+      <p class="ck-form-erro" id="np-erro" hidden></p>
+      <button class="ck-btn ck-btn-primario" id="np-salvar-cred" type="button">Salvar e credenciar</button>
+      <button class="ck-btn ck-btn-secundario" id="np-salvar" type="button" style="margin-top:10px">Salvar</button>
+    </div>
+  </section>
   <!-- Menu lateral -->
   <div class="ck-menu-fundo" id="menu-fundo" hidden></div>
   <nav class="ck-menu" id="menu" hidden aria-label="Menu">
