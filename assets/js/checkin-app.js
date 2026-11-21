@@ -661,7 +661,11 @@ async function processarNaAtividade(p) {
       return setTimeout(retomar, 1100);
     }
     if (acao === "saida") {
-      if (!dentro) return avisar(`Não consta na atividade ${atv.nome}`);
+      if (!dentro) {   // VERMELHO: não está na atividade, não tem o que sair
+        navigator.vibrate?.([80, 60, 80]);
+        telaSucesso(p, null, { tom: "erro", texto: "ACESSO NÃO LIBERADO", notas: [{ texto: `Não consta na atividade ${atv.nome}`, nivel: "alerta" }], duracao: 2200 });
+        return setTimeout(retomar, 1900);
+      }
       await registrarAcessoAtv(p, atv, "saida");
       telaSucesso(p, null, { texto: `Saída de ${atv.nome}` });
       return setTimeout(retomar, 1100);
