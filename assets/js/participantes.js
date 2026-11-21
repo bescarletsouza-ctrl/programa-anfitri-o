@@ -21,7 +21,7 @@ import { multiSelects, valoresDe, casa } from "./multiselect.js";
 import { montarObservacoes } from "./observacoes.js";
 import { eventoNome, eventoId } from "./evento.js";
 import { imprimirCracha, imprimirCrachas } from "./cracha.js";
-import { parsearTabela, lerXlsx, baixarXLSX, baixarModeloXLSX, normalizarCab } from "./tabela.js";
+import { parsearTabela, lerXlsx, baixarXLSX, baixarModeloXLSX, normalizarCab, colunasCamposExtras } from "./tabela.js";
 import { abrirEnvioEmail } from "./email.js";
 import { avaliarPrazo, fmtDuracao, ROTULO_NIVEL, textoPrazo, resumirPrazos } from "./prazo.js";
 
@@ -1767,7 +1767,7 @@ async function exportarLista() {
 
 async function exportar(dados) {
   if (!dados.length) { toast("Nada para exportar.", "erro"); return; }
-  await baixarXLSX("participantes.xlsx", dados, [
+  const fixas = [
     { chave: "codigo", rotulo: "Código" },
     { chave: "nome", rotulo: "Nome" },
     { chave: "email", rotulo: "E-mail" },
@@ -1792,10 +1792,8 @@ async function exportar(dados) {
     { rotulo: "Data de cadastro", valor: (p) => formatarData(p.created_at) },
     { chave: "evento_origem_nome", rotulo: "Evento de origem" },
     { chave: "codigo_origem", rotulo: "Código de origem" },
-    ...camposPersonalizados.filter((c) => c.ativo).map((c) => ({
-      rotulo: c.nome,
-      valor: (p) => { const v = p.campos_extra?.[c.chave]; return Array.isArray(v) ? v.join(", ") : (v || ""); },
-    })),
-  ]);
+  ];
+  // + todos os campos adicionais (ativos, desativados com resposta e chaves antigas)
+  await baixarXLSX("participantes.xlsx", dados, [...fixas, ...colunasCamposExtras(dados, camposPersonalizados, fixas.map((c) => c.rotulo))]);
   toast("Arquivo gerado.", "ok");
 }

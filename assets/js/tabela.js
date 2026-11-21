@@ -90,6 +90,36 @@ export async function baixarXLSX(nomeArquivo, linhas, colunas) {
   baixarLivro(XLSX, livro, nomeArquivo);
 }
 
+// Colunas dos CAMPOS ADICIONAIS (participantes.campos_extra) para o Excel.
+// Entram: todo campo ativo, os desativados que tenham resposta e as respostas de chaves que já não existem
+// (nada se perde). `usados` = rótulos que já existem no arquivo (se repetir, ganha " (campo adicional)").
+export function colunasCamposExtras(registros, definicoes = [], usados = []) {
+  const IGNORAR = new Set(["tipo_outro"]);   // já sai na coluna "Tipo (qual)"
+  const tem = (chave) => registros.some((r) => {
+    const v = r.campos_extra?.[chave];
+    return v != null && v !== "" && !(Array.isArray(v) && !v.length);
+  });
+  const ativos = definicoes.filter((c) => c.ativo && !IGNORAR.has(c.chave));
+  const inativos = definicoes.filter((c) => !c.ativo && !IGNORAR.has(c.chave) && tem(c.chave));
+  const conhecidas = new Set(definicoes.map((c) => c.chave));
+  const orfas = [...new Set(registros.flatMap((r) => Object.keys(r.campos_extra || {})))]
+    .filter((k) => !conhecidas.has(k) && !IGNORAR.has(k) && tem(k))
+    .map((k) => ({ chave: k, nome: k }));
+  const ocupados = new Set(usados);
+  return [...ativos, ...inativos, ...orfas].map((c) => {
+    let rotulo = c.nome || c.chave;
+    if (ocupados.has(rotulo)) rotulo = `${rotulo} (campo adicional)`;
+    ocupados.add(rotulo);
+    return {
+      rotulo,
+      valor: (r) => {
+        const v = r.campos_extra?.[c.chave];
+        return v == null ? "" : Array.isArray(v) ? v.join(", ") : typeof v === "object" ? JSON.stringify(v) : v;
+      },
+    };
+  });
+}
+
 // linhasAoA: array de arrays, a primeira é o cabeçalho — usado para o link
 // "baixar modelo" dos formulários de importação.
 export async function baixarModeloXLSX(nomeArquivo, linhasAoA) {

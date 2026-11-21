@@ -7,8 +7,9 @@ import { iniciarPagina, esc, icone, toast, confirmar, abrirModal, abrirGaveta, d
 import {
   listAtividades, listCheckins, listParticipantes, salvar, remover,
   registrarCheckin, inserirLote, removerCheckinsAtividade, listInscritosAtividades, removerInscritosAtividade,
+  listCamposPersonalizados,
 } from "./supabase.js";
-import { parsearTabela, lerXlsx, baixarXLSX } from "./tabela.js";
+import { parsearTabela, lerXlsx, baixarXLSX, colunasCamposExtras } from "./tabela.js";
 
 const _iniciando = iniciarPagina("atividades");
 const el = (id) => document.getElementById(id);
@@ -349,15 +350,22 @@ function sincBarraLista(todos) {
 async function exportarCredenciados(linhas) {
   if (!linhas.length) { toast("Nada para exportar.", "erro"); return; }
   const nomeArq = "inscritos-" + (gavetaAtv.nome || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") + ".xlsx";
-  await baixarXLSX(nomeArq || "atividade.xlsx", linhas, [
+  const partDe = (l) => participantes.find((x) => x.id === l.pid) || {};
+  const fixas = [
     { rotulo: "Nome", valor: (l) => l.nome },
     { rotulo: "Categoria", valor: (l) => l.categoria },
     { rotulo: "Código", valor: (l) => l.codigo },
     { rotulo: "E-mail", valor: (l) => l.email },
+    { rotulo: "Telefone", valor: (l) => partDe(l).telefone || "" },
     { rotulo: "Empresa", valor: (l) => l.empresa },
     { rotulo: "Situação", valor: (l) => (l.estado === "dentro" ? "No local" : l.estado === "saiu" ? "Saiu" : "Ainda não entrou") },
     { rotulo: "Entrada em", valor: (l) => (l.desde ? `${formatarData(l.desde)} ${hora(l.desde)}` : "") },
-  ]);
+  ];
+  // campos adicionais do participante (mesmos do Excel de Participantes)
+  const defs = await listCamposPersonalizados().catch(() => []);
+  const extras = colunasCamposExtras(linhas.map(partDe), defs, fixas.map((c) => c.rotulo))
+    .map((c) => ({ rotulo: c.rotulo, valor: (l) => c.valor(partDe(l)) }));
+  await baixarXLSX(nomeArq || "atividade.xlsx", linhas, [...fixas, ...extras]);
   toast("Arquivo gerado.", "ok");
 }
 
