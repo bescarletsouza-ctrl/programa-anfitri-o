@@ -426,3 +426,23 @@ body.ck-app {
 .ck-insc-item span { font-size: .8rem; color: var(--ck-texto-suave); }
 .ck-insc-item .ck-mini { flex-shrink: 0; }
 .ck-insc-ok { color: #22c55e; font-weight: 700; font-size: .8rem; flex-shrink: 0; }
+
+/* ---- ficha do participante (abas Ações / Label) ---- */
+.ck-sheet.ficha { background: #eef0f5; }
+.ck-ficha-cab { background: #fff; border-radius: 18px; padding: 20px 16px 16px; display: grid; justify-items: center; gap: 7px; text-align: center; margin-bottom: 14px; }
+.ck-ficha-cab strong { font-size: 1.25rem; line-height: 1.2; letter-spacing: -.01em; }
+.ck-ficha-email { font-size: .82rem; color: #71717a; word-break: break-all; }
+.ck-ficha-sit { border: 1.5px solid; border-radius: 10px; padding: 6px 14px; font-weight: 650; font-size: .9rem; margin-top: 3px; }
+.ck-ficha-sit.ok { color: #15803d; border-color: #15803d; }
+.ck-ficha-sit.alerta { color: #b45309; border-color: #b45309; }
+.ck-ficha-sit.bloq { color: #b91c1c; border-color: #b91c1c; background: #fdecec; }
+.ck-ficha-status { font-size: .86rem; color: #71717a; font-weight: 600; }
+.ck-ficha-status.ok { color: #15803d; }
+.ck-ficha-abas { display: flex; gap: 10px; margin-bottom: 14px; }
+.ck-ficha-abas button { flex: 1; background: #fff; border: none; border-radius: 12px; padding: 13px 6px; font: inherit; font-weight: 650; color: #71717a; cursor: pointer; }
+.ck-ficha-abas button.ativa { color: var(--ck-laranja); box-shadow: inset 0 0 0 1.5px var(--ck-laranja); }
+.ck-duplo-btn { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.ck-btn-bloquear { background: #dc2626; color: #fff; }
+.ck-sheet .ck-btn[disabled] { opacity: .42; }
+.ck-ficha-nota { font-size: .82rem; color: #b91c1c; margin: 12px 4px 0; line-height: 1.45; }
+.ck-label-prev { background: #fff; border-radius: 16px; margin-bottom: 14px; overflow: hidden; position: relative; }

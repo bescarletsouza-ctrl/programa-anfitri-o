@@ -13,7 +13,7 @@ import {
 import { eventoId, definirEvento } from "./evento.js";
 import {
   imprimirCracha, CRACHA_PADRAO, TAMANHOS_CRACHA, snapTamanho, limparConfigCracha,
-  appNativo,
+  appNativo, montarCrachaHtml, qrDataURL,
 } from "./cracha.js";
 
 const el = (id) => document.getElementById(id);
@@ -393,7 +393,8 @@ async function registrarNoPonto(p) {
   if (!pt) return;
   const dentro = estaDentro(p.id, pt.id);
   let aviso = "";
-  if ((p.situacao || "Confirmado") === "Desativado") aviso = "Participante desativado";
+  if (p.acesso_bloqueado) aviso = "Acesso bloqueado";
+  else if ((p.situacao || "Confirmado") === "Desativado") aviso = "Participante desativado";
   else if (pt.acao === "entrada" && dentro) aviso = `Já consta dentro de ${pt.nome}`;
   else if (pt.acao === "saida" && !dentro) aviso = `Não consta dentro de ${pt.nome}`;
   if (aviso) {
@@ -603,6 +604,7 @@ async function processarNaAtividade(p) {
   if (!atv || !acao) return abrirSheet(p);
   const dentro = !!saldoAtividade(p.id, atv.id);
   const avisar = (texto) => { navigator.vibrate?.([80, 60, 80]); telaSucesso(p, null, { texto, aviso: true }); setTimeout(retomar, 1500); };
+  if (p.acesso_bloqueado) return avisar("Acesso bloqueado");
   try {
     if (acao === "inscrever") {
       if (estaInscrito(p.id, atv.id)) return avisar(`Já está inscrito(a) em ${atv.nome}`);
@@ -849,8 +851,92 @@ async function onScan(texto) {
 }
 
 /* ---- bottom sheet -------------------------------------------------- */
+/* ---- ficha do participante (lista e leitura de QR no evento): abas Ações e Label ---- */
+function abrirFicha(p, abaFicha = "acoes") {
+  const cat = (p.ingresso || p.tipo || "").trim();
+  const confirmado = (p.situacao || "Confirmado") === "Confirmado";
+  const entrada = entradaEvento(p);
+  const bloqueado = !!p.acesso_bloqueado;
+  const sheet = el("sheet");
+  sheet.classList.add("ficha");
+  sheet.innerHTML = `
+    <div class="ck-sheet-puxador"></div>
+    <div class="ck-ficha-cab">
+      <div class="ck-avatar">${AVATAR}</div>
+      <strong>${esc(p.nome || "—")}</strong>
+      ${p.email ? `<span class="ck-ficha-email">${esc(p.email)}</span>` : ""}
+      ${cat ? `<span class="ck-pessoa-cat">${esc(cat)}</span>` : ""}
+      <span class="ck-ficha-sit ${confirmado ? "ok" : "alerta"}">${confirmado ? "Inscrição confirmada" : esc(p.situacao || "—")}</span>
+      ${bloqueado ? `<span class="ck-ficha-sit bloq">Acesso bloqueado</span>` : ""}
+      <span class="ck-ficha-status ${entrada ? "ok" : ""}">${entrada ? `Já fez check-in às ${esc(horaCurta(entrada.at))}` : "Ainda não fez check-in"}</span>
+    </div>
+    <div class="ck-ficha-abas">
+      <button type="button" data-aba="acoes" class="${abaFicha === "acoes" ? "ativa" : ""}">Ações</button>
+      <button type="button" data-aba="label" class="${abaFicha === "label" ? "ativa" : ""}">Label</button>
+    </div>
+    <div id="ficha-corpo"></div>`;
+
+  const corpo = sheet.querySelector("#ficha-corpo");
+  if (abaFicha === "label") {
+    corpo.innerHTML = `
+      <div class="ck-label-prev" id="label-prev"><p class="ck-busca-vazio" style="padding:20px">Montando a etiqueta…</p></div>
+      <button class="ck-btn ck-btn-primario" data-acao="reimprimir" ${bloqueado ? "disabled" : ""}>Imprimir etiqueta</button>`;
+    desenharPreviaEtiqueta(p, corpo.querySelector("#label-prev"));
+  } else {
+    const travaCheckin = bloqueado || !!entrada;
+    corpo.innerHTML = `
+      <div class="ck-sheet-acoes">
+        <button class="ck-btn ck-btn-primario" data-acao="credenciar" ${travaCheckin ? "disabled" : ""}>Check-in e imprimir etiqueta</button>
+        <div class="ck-duplo-btn">
+          <button class="ck-btn ck-btn-secundario" data-acao="so-checkin" ${travaCheckin ? "disabled" : ""}>Check-in</button>
+          <button class="ck-btn ck-btn-secundario" data-acao="reimprimir" ${bloqueado ? "disabled" : ""}>Imprimir</button>
+        </div>
+        ${bloqueado
+          ? `<button class="ck-btn ck-btn-secundario" data-acao="liberar">Liberar acesso</button>`
+          : `<button class="ck-btn ck-btn-bloquear" data-acao="bloquear">Bloquear acesso</button>`}
+      </div>
+      ${bloqueado ? `<p class="ck-ficha-nota">Acesso bloqueado: esta pessoa não faz check-in nem passa nos pontos de controle e atividades até você liberar.</p>` : ""}`;
+  }
+  mostrarSheet();
+  sheet.querySelectorAll("[data-aba]").forEach((b) => { b.onclick = () => abrirFicha(p, b.dataset.aba); });
+  sheet.querySelectorAll("[data-acao]").forEach((b) => { b.onclick = () => acao(b.dataset.acao, p, b); });
+}
+
+// prévia da etiqueta no mesmo layout que sai impresso (largura × altura configuradas), reduzida pra caber na tela
+async function desenharPreviaEtiqueta(p, caixa) {
+  try {
+    const config = evento?.cracha_config || CRACHA_PADRAO;
+    const qr = config.qr !== false ? await qrDataURL(p.codigo || p.id || "") : null;
+    caixa.innerHTML = montarCrachaHtml(p, evento?.nome || "", config, qr);
+    const cartao = caixa.firstElementChild;
+    const disponivel = caixa.clientWidth - 24;
+    const s = Math.min(1, disponivel / cartao.offsetWidth);
+    cartao.style.transformOrigin = "top left";
+    cartao.style.transform = `scale(${s})`;
+    caixa.style.height = `${cartao.offsetHeight * s + 24}px`;
+    cartao.style.margin = "12px 0 0 12px";
+  } catch {
+    caixa.innerHTML = `<p class="ck-busca-vazio">Não foi possível montar a prévia.</p>`;
+  }
+}
+
+// marca/desmarca o bloqueio de acesso (0049) e redesenha a ficha
+async function definirBloqueio(p, bloquear) {
+  try {
+    const r = await salvar("participantes", { id: p.id, acesso_bloqueado: bloquear, acesso_bloqueado_em: bloquear ? new Date().toISOString() : null });
+    p.acesso_bloqueado = !!(r?.acesso_bloqueado ?? bloquear);
+    toast(bloquear ? `${p.nome}: acesso bloqueado.` : `${p.nome}: acesso liberado.`, "ok");
+    if (!el("tela-shell").hidden) renderParticipantes();
+    abrirFicha(p, "acoes");
+  } catch (e) {
+    toast(/acesso_bloqueado|schema cache|column/i.test(e.message || "") ? "Rode a migração 0049 no SQL Editor." : (e.message || "Não foi possível salvar."), "erro");
+  }
+}
+
 function abrirSheet(p) {
   const atv = atvAtual();
+  if (!atv) return abrirFicha(p);   // evento geral: ficha com as abas Ações / Label
+  el("sheet").classList.remove("ficha");
   const cat = (p.ingresso || p.tipo || "").trim();
   const confirmado = (p.situacao || "Confirmado") === "Confirmado";
   const entrada = atv ? saldoAtividade(p.id, atv.id) : entradaEvento(p);
@@ -905,6 +991,7 @@ function abrirSheet(p) {
 }
 
 function abrirSheetErro(texto) {
+  el("sheet").classList.remove("ficha");
   el("sheet").innerHTML = `
     <div class="ck-sheet-puxador"></div>
     <div class="ck-erro-icone">!</div>
@@ -939,6 +1026,8 @@ async function acao(tipo, p, btn) {
   if (tipo === "fechar") return fecharSheet();
   const atv = atvAtual();
   if (tipo === "reimprimir") { imprimirCracha(p, evento.nome || ""); return fecharSheet(); }
+  if (tipo === "bloquear" || tipo === "liberar") { btn.disabled = true; return definirBloqueio(p, tipo === "bloquear"); }
+  if (p.acesso_bloqueado) { toast("Acesso bloqueado. Libere o acesso para continuar.", "erro"); return; }
 
   const antes = btn.textContent;
   btn.disabled = true; btn.textContent = "Registrando…";
@@ -1126,7 +1215,9 @@ async function salvarConfig() {
   const antes = btn.textContent;
   btn.disabled = true; btn.textContent = "Salvando…";
   try {
-    await salvarEventoPorId(evento.id, { cracha_config: lerConfigForm() });
+    const nova = lerConfigForm();
+    await salvarEventoPorId(evento.id, { cracha_config: nova });
+    evento.cracha_config = nova;   // a prévia da etiqueta já usa o layout novo
     limparConfigCracha();
     toast("Configuração salva.", "ok");
   } catch (e) {
