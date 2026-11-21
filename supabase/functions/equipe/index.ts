@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ erro: "Método não suportado." }, 405);
 
   try {
-    const { acao, org_id, email, senha, nome, telefone, papel, membro_id } = await req.json();
+    const { acao, org_id, email, senha, nome, telefone, papel, membro_id, restringir, acessos } = await req.json();
     if (!org_id) return json({ erro: "org_id obrigatório." }, 400);
 
     const sb = svc();
@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
           .map((m) => ({
             id: m.id, user_id: m.user_id, email: m.email || porId.get(m.user_id)?.email,
             nome: m.nome, papel: m.papel,
-            ...(gestor ? { telefone: m.telefone || null, ultimo_login: porId.get(m.user_id)?.last_sign_in_at || null } : {}),
+            ...(gestor ? { telefone: m.telefone || null, ultimo_login: porId.get(m.user_id)?.last_sign_in_at || null, restringir_eventos: !!m.restringir_eventos } : {}),
           }))
           .filter((m) => ids.includes(m.user_id))
           .sort((a, b) => (a.email || "").localeCompare(b.email || "")),
@@ -149,6 +149,48 @@ Deno.serve(async (req) => {
       if (Object.keys(patch).length) {
         const { error: eU } = await sb.from("org_membros").update(patch).eq("id", membro_id);
         if (eU) return json({ erro: eU.message }, 400);
+      }
+      return json({ ok: true });
+    }
+
+    // Acesso por evento (migração 0046): lê os eventos da organização e o que este usuário pode em cada um.
+    // restringir = false → vê todos os eventos (padrão); true → só os que tiverem credenciamento e/ou gestão.
+    if (acao === "acessos") {
+      if (!membro_id) return json({ erro: "membro_id obrigatório." }, 400);
+      const { data: m } = await sb.from("org_membros").select("*").eq("id", membro_id).eq("org_id", org_id).maybeSingle();
+      if (!m) return json({ erro: "Membro não encontrado." }, 404);
+      const { data: evs } = await sb.from("eventos").select("id, nome, data_evento").eq("org_id", org_id).order("created_at", { ascending: false });
+      const { data: acs, error: eA } = await sb.from("evento_acessos").select("evento_id, credenciamento, gestao").eq("user_id", m.user_id);
+      if (eA) return json({ erro: /evento_acessos/.test(eA.message) ? "Rode a migração 0046_acesso_por_evento.sql no SQL Editor." : eA.message }, 400);
+      const porEvento = new Map((acs || []).map((a) => [a.evento_id, a]));
+      return json({
+        papel: m.papel,
+        restringir: !!m.restringir_eventos,
+        eventos: (evs || []).map((e) => ({
+          id: e.id, nome: e.nome, data_evento: e.data_evento,
+          credenciamento: !!porEvento.get(e.id)?.credenciamento,
+          gestao: !!porEvento.get(e.id)?.gestao,
+        })),
+      });
+    }
+
+    if (acao === "acessos_salvar") {
+      if (!membro_id) return json({ erro: "membro_id obrigatório." }, 400);
+      const { data: m } = await sb.from("org_membros").select("id, user_id").eq("id", membro_id).eq("org_id", org_id).maybeSingle();
+      if (!m) return json({ erro: "Membro não encontrado." }, 404);
+      const { error: eU } = await sb.from("org_membros").update({ restringir_eventos: !!restringir }).eq("id", membro_id);
+      if (eU) return json({ erro: /restringir_eventos/.test(eU.message) ? "Rode a migração 0046_acesso_por_evento.sql no SQL Editor." : eU.message }, 400);
+
+      const { data: evs } = await sb.from("eventos").select("id").eq("org_id", org_id);
+      const ids = new Set((evs || []).map((e) => e.id));
+      // só mexe nos eventos desta organização; troca tudo pelo que veio
+      if (ids.size) await sb.from("evento_acessos").delete().eq("user_id", m.user_id).in("evento_id", [...ids]);
+      const linhas = (Array.isArray(acessos) ? acessos : [])
+        .filter((a) => ids.has(a?.evento_id) && (a.credenciamento || a.gestao))
+        .map((a) => ({ evento_id: a.evento_id, user_id: m.user_id, credenciamento: !!a.credenciamento, gestao: !!a.gestao }));
+      if (linhas.length) {
+        const { error: eI } = await sb.from("evento_acessos").insert(linhas);
+        if (eI) return json({ erro: eI.message }, 400);
       }
       return json({ ok: true });
     }

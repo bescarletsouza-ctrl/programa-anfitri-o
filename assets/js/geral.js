@@ -7,8 +7,9 @@ import { iniciarPagina, esc, formatarData, abrirModal, toast } from "./ui.js";
 import {
   listEventos, listParticipantesTodos, listCheckinsTodos,
   listAnfitrioesTodos, listTiposIngressoTodos,
-  listarOrgs, usoEventos, reenviarConvite,
+  listarOrgs, usoEventos, reenviarConvite, meusAcessosEventos, eventosDoNivel,
 } from "./supabase.js";
+import { ehAgente } from "./auth.js";
 
 const _iniciando = iniciarPagina("geral", { semEvento: true });
 const el = (id) => document.getElementById(id);
@@ -43,6 +44,13 @@ async function carregar() {
       listAnfitrioesTodos().catch(() => []),
       listTiposIngressoTodos().catch(() => []),
     ]);
+    // quem foi restringido só vê os eventos em que tem "Gestão"
+    if (ehAgente(CTX)) {
+      const ok = new Set(eventosDoNivel(eventos, await meusAcessosEventos(), "gestao").map((e) => e.id));
+      eventos = eventos.filter((e) => ok.has(e.id));
+      const meus = (l) => l.filter((x) => ok.has(x.evento_id));
+      parts = meus(parts); checks = meus(checks); anfs = meus(anfs); tipos = meus(tipos);
+    }
     el("carregando").hidden = true;
     el("painel").hidden = false;
     render();

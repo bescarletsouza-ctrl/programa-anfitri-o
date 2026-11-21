@@ -6,6 +6,7 @@ import {
   listGrupos, listEstagios, listEtapasParticipante, listMarcos, listTiposIngresso,
   getEvento, salvar, remover, salvarEvento,
   listarEquipe, criarMembroEquipe, editarMembroEquipe, trocarSenhaMembro, removerMembroEquipe,
+  acessosDoMembro, salvarAcessosDoMembro,
 } from "./supabase.js";
 import { eventoId, definirEvento } from "./evento.js";
 import { montarCrachaHtml, CRACHA_PADRAO, TAMANHOS_CRACHA, snapTamanho, qrDataURL } from "./cracha.js";
@@ -467,6 +468,7 @@ async function montarEquipe() {
           </div>
         </div>
         <span class="linha-acoes">
+          <button class="btn btn-secundario btn-sm" data-eventos title="Escolher a quais eventos esta pessoa tem acesso (credenciamento e gestão de participantes)">Eventos${m.restringir_eventos && m.papel !== "admin" ? " ●" : ""}</button>
           <button class="btn btn-secundario btn-sm" data-editar title="Editar nome, e-mail, telefone e perfil">Editar</button>
           <button class="btn btn-secundario btn-sm" data-senha title="Trocar senha">Senha</button>
           <button class="icone-btn" data-excluir title="Remover acesso">${icone("excluir")}</button>
@@ -474,6 +476,7 @@ async function montarEquipe() {
       </div>`).join("");
     c.querySelectorAll("[data-id]").forEach((row) => {
       const m = membros.find((x) => x.id === row.dataset.id);
+      row.querySelector("[data-eventos]").onclick = () => modalAcessosEventos(m);
       row.querySelector("[data-editar]").onclick = () => modalEditarMembro(m);
       row.querySelector("[data-senha]").onclick = () => modalMembro(m);
       row.querySelector("[data-excluir]").onclick = async () => {
@@ -489,7 +492,67 @@ async function montarEquipe() {
   }
 }
 
-const TEXTO_PERFIS = "<b>Admin</b>: tudo, inclusive usuários e configurações. <b>Agente</b>: opera participantes, credenciamento e check-in; não aprova, não exclui e não altera tipos de ingresso, metas, formulário, automações, integrações nem configurações.";
+// Acesso por evento: "todos" (padrão, como sempre foi) ou "só os marcados", com dois tipos por evento —
+// Credenciamento (app de check-in: lista, QR, acessos, atividades, impressão) e Gestão de participantes (plataforma).
+function modalAcessosEventos(m) {
+  let estado = null;
+  abrirModal({
+    titulo: `Acesso a eventos — ${m.nome || m.email}`,
+    textoConfirmar: "Salvar",
+    corpoHtml: `<div id="ae-corpo"><p class="pagina-sub" style="margin:0">Carregando…</p></div>`,
+    aoMontar: async (root) => {
+      const corpo = root.querySelector("#ae-corpo");
+      try {
+        estado = await acessosDoMembro(CTX.org.id, m.id);
+      } catch (e) {
+        corpo.innerHTML = `<p class="pagina-sub" style="margin:0">${/deploy/.test(e.message)
+          ? "Faça o deploy de <code>supabase/functions/equipe</code> (versão nova)." : esc(e.message)}</p>`;
+        return;
+      }
+      if (estado.papel === "admin") {
+        corpo.innerHTML = `<p style="margin:0">Pessoas com perfil <b>Admin</b> sempre veem todos os eventos. Para limitar, mude o perfil para Agente em <i>Editar</i>.</p>`;
+        estado = null;
+        return;
+      }
+      const desenhar = () => {
+        corpo.innerHTML = `
+          <label class="campo"><span>Eventos que esta pessoa vê</span>
+            <select class="select" id="ae-modo">
+              <option value="todos" ${!estado.restringir ? "selected" : ""}>Todos os eventos da organização</option>
+              <option value="so" ${estado.restringir ? "selected" : ""}>Somente os eventos marcados abaixo</option></select></label>
+          <div id="ae-lista" ${estado.restringir ? "" : "hidden"}>
+            <div style="display:grid;grid-template-columns:1fr 92px 92px;gap:8px;align-items:center;font-size:.72rem;color:var(--texto-tenue);padding:6px 0;border-bottom:1px solid var(--cinza-100)">
+              <span>Evento</span><span title="Usa o app de check-in: lista de participantes, QR, controle de acesso, atividades, impressão">Credenciamento</span><span title="Gerencia os participantes do evento na plataforma">Gestão</span></div>
+            ${estado.eventos.map((e) => `
+              <div style="display:grid;grid-template-columns:1fr 92px 92px;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--cinza-100)" data-ev="${esc(e.id)}">
+                <span style="font-size:.88rem">${esc(e.nome)}</span>
+                <input type="checkbox" data-cred ${e.credenciamento ? "checked" : ""} aria-label="Credenciamento em ${esc(e.nome)}" />
+                <input type="checkbox" data-gest ${e.gestao ? "checked" : ""} aria-label="Gestão em ${esc(e.nome)}" /></div>`).join("")}
+            <p class="cel-tenue" style="font-size:.72rem;margin:10px 0 0"><b>Credenciamento</b>: usa o app de check-in do evento (lista de participantes, QR, acessos, atividades e impressão).
+              <b>Gestão</b>: gerencia os participantes do evento na plataforma. Evento sem nenhuma das duas fica oculto pra essa pessoa.</p>
+          </div>`;
+        corpo.querySelector("#ae-modo").onchange = (ev) => {
+          estado.restringir = ev.target.value === "so";
+          corpo.querySelector("#ae-lista").hidden = !estado.restringir;
+        };
+        corpo.querySelectorAll("[data-ev]").forEach((row) => {
+          const e = estado.eventos.find((x) => x.id === row.dataset.ev);
+          row.querySelector("[data-cred]").onchange = (ev) => { e.credenciamento = ev.target.checked; };
+          row.querySelector("[data-gest]").onchange = (ev) => { e.gestao = ev.target.checked; };
+        });
+      };
+      desenhar();
+    },
+    onConfirmar: async () => {
+      if (!estado) return;   // admin ou falha ao carregar: nada a salvar
+      await salvarAcessosDoMembro(CTX.org.id, m.id, estado.restringir, estado.eventos);
+      toast("Acesso aos eventos atualizado.", "ok");
+      montarEquipe();
+    },
+  });
+}
+
+const TEXTO_PERFIS ="<b>Admin</b>: tudo, inclusive usuários e configurações. <b>Agente</b>: opera participantes, credenciamento e check-in; não aprova, não exclui e não altera tipos de ingresso, metas, formulário, automações, integrações nem configurações.";
 
 function modalEditarMembro(m) {
   abrirModal({

@@ -2,8 +2,8 @@
 // UI compartilhada: ícones, sidebar, tema, formatação, toast, modal, gaveta.
 // =============================================================================
 import { APP } from "./config.js";
-import { CONFIGURADO, listEventos } from "./supabase.js";
-import { eventoId, eventoNome, definirEvento } from "./evento.js";
+import { CONFIGURADO, listEventos, meusAcessosEventos } from "./supabase.js";
+import { eventoId, eventoNome, definirEvento, sairEvento } from "./evento.js";
 import {
   exigirLogin, contexto, guardAcesso, sair, planoBloqueado, CLUSTERS_POR_ACESSO, ehAgente, PAGINAS_SO_ADMIN,
 } from "./auth.js";
@@ -477,6 +477,15 @@ export function iniciarPagina(chaveNav, opts = {}) {
     const ctx = await contexto();
     if (!guardAcesso(chaveNav, ctx)) return null;
     if (!opts.semEvento && !eventoId()) { location.href = "eventos.html"; return null; }
+    // Acesso por evento (0046): quem foi restringido e não tem "Gestão" neste evento volta pra escolha de evento
+    if (!opts.semEvento && ehAgente(ctx)) {
+      const ac = await meusAcessosEventos();
+      if (ac.restringir && !ac.porEvento[eventoId()]?.gestao) {
+        sairEvento();
+        location.href = "eventos.html";
+        return null;
+      }
+    }
     renderSidebar(chaveNav, ctx);
     document.body.classList.toggle("perfil-agente", ehAgente(ctx));   // esconde o que tem .so-admin
     bannerPlano(ctx);

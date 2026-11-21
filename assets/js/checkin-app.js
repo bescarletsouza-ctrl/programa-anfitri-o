@@ -7,6 +7,7 @@ import { esc, toast } from "./ui.js";
 import {
   supabase, listEventos, listParticipantes, listCheckins, listAtividades,
   buscarParticipantePorQR, registrarCheckin, getEvento, salvarEventoPorId,
+  meusAcessosEventos, eventosDoNivel,
 } from "./supabase.js";
 import { eventoId, definirEvento } from "./evento.js";
 import {
@@ -157,7 +158,8 @@ async function apósLogin() {
   el("eventos-usuario").textContent = sessao?.user?.email || "";
   await mostrarTela("tela-eventos");
   try {
-    eventos = await listEventos();
+    // quem foi restringido só vê os eventos em que tem "Credenciamento" (0046); sem restrição, todos
+    eventos = eventosDoNivel(await listEventos(), await meusAcessosEventos(), "credenciamento");
   } catch (e) {
     el("eventos-lista").innerHTML = `<p class="ck-lista-vazio">Falha ao carregar eventos.<br><small>${esc(e.message || "")}</small></p>`;
     return;

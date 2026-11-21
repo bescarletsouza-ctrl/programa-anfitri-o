@@ -704,6 +704,35 @@ export const listarEquipe = (orgId) => chamarEquipe({ acao: "listar", org_id: or
 export const criarMembroEquipe = (orgId, dados) => chamarEquipe({ acao: "criar", org_id: orgId, ...dados });
 // dados: { nome?, telefone?, papel?: "admin" | "agente", email? } — só o que vier é alterado
 export const editarMembroEquipe = (orgId, membroId, dados) => chamarEquipe({ acao: "editar", org_id: orgId, membro_id: membroId, ...dados });
+// Acesso por evento (0046). acessosDoMembro → { papel, restringir, eventos:[{id,nome,credenciamento,gestao}] }
+export const acessosDoMembro = (orgId, membroId) => chamarEquipe({ acao: "acessos", org_id: orgId, membro_id: membroId });
+export const salvarAcessosDoMembro = (orgId, membroId, restringir, acessos) =>
+  chamarEquipe({ acao: "acessos_salvar", org_id: orgId, membro_id: membroId, restringir, acessos });
+
+// O que o usuário LOGADO pode por evento: { restringir, porEvento: { [id]: {credenciamento, gestao} } }.
+// Sem a migração 0046 (ou sem restrição) devolve restringir=false → vê tudo, como sempre foi.
+export async function meusAcessosEventos() {
+  try {
+    const { data: u } = await supabase.auth.getUser();
+    const uid = u?.user?.id;
+    if (!uid) return { restringir: false, porEvento: {} };
+    const [{ data: m }, { data: acs }] = await Promise.all([
+      supabase.from("org_membros").select("papel, restringir_eventos").eq("user_id", uid).limit(1),
+      supabase.from("evento_acessos").select("evento_id, credenciamento, gestao").eq("user_id", uid),
+    ]);
+    const meu = (m || [])[0];
+    const restringir = !!meu?.restringir_eventos && meu?.papel !== "admin";
+    const porEvento = {};
+    (acs || []).forEach((a) => { porEvento[a.evento_id] = { credenciamento: !!a.credenciamento, gestao: !!a.gestao }; });
+    return { restringir, porEvento };
+  } catch {
+    return { restringir: false, porEvento: {} };
+  }
+}
+// aplica o filtro por nível ('credenciamento' | 'gestao') numa lista de eventos
+export const eventosDoNivel = (eventos, acessos, nivel) =>
+  !acessos?.restringir ? eventos : eventos.filter((e) => acessos.porEvento[e.id]?.[nivel]);
+
 export const trocarSenhaMembro =(orgId, membroId, senha) => chamarEquipe({ acao: "senha", org_id: orgId, membro_id: membroId, senha });
 export const removerMembroEquipe = (orgId, membroId) => chamarEquipe({ acao: "remover", org_id: orgId, membro_id: membroId });
 

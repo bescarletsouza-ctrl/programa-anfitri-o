@@ -3,7 +3,7 @@
 // Não usa iniciarPagina (não exige evento selecionado).
 // =============================================================================
 import { esc, formatarData, abrirModal, toast, icone } from "./ui.js";
-import { listEventos, criarEvento, salvarEventoPorId, excluirEvento, listarOrgs } from "./supabase.js";
+import { listEventos, criarEvento, salvarEventoPorId, excluirEvento, listarOrgs, meusAcessosEventos, eventosDoNivel } from "./supabase.js";
 import { definirEvento, eventoId, sairEvento } from "./evento.js";
 import { exigirLogin, contexto, sair, planoBloqueado, ehAgente } from "./auth.js";
 
@@ -23,7 +23,9 @@ el("btn-criar").onclick = modalCriar;
 
 async function carregar() {
   try {
-    const eventos = await listEventos();
+    // quem foi restringido só vê aqui os eventos em que tem "Gestão" (o credenciamento é do app de check-in)
+    let eventos = await listEventos();
+    if (ehAgente(CTX)) eventos = eventosDoNivel(eventos, await meusAcessosEventos(), "gestao");
     el("carregando").hidden = true;
     el("btn-criar").hidden = false;
     el("vazio").hidden = eventos.length > 0;
