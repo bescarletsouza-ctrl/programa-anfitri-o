@@ -106,14 +106,47 @@
         </div>
       </section>
 
-      <!-- 3. Atividades -->
+      <!-- 3. Controle de acesso às atividades -->
       <section class="ck-pane" id="pane-atv" hidden>
         <div class="ck-pane-corpo">
-          <p class="ck-lista-rotulo" style="margin-top:4px">Escolha a atividade</p>
-          <div id="atv-lista"></div>
+          <div class="ck-atv-selects">
+            <select class="ck-select" id="atv-dia" aria-label="Dia"></select>
+            <select class="ck-select" id="atv-sel" aria-label="Atividade"></select>
+          </div>
+          <div class="ck-subtabs">
+            <button type="button" data-sub="cred" class="ativa">Credenciamento</button>
+            <button type="button" data-sub="insc">Lista de inscritos</button>
+          </div>
+
+          <div id="atv-cred">
+            <div class="ck-duplo">
+              <button class="ck-bt-entrada" id="atv-entrada" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 15 12 9 18 15"/><polyline points="6 20 12 14 18 20"/></svg>Entrada</button>
+              <button class="ck-bt-saida" id="atv-saida" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 4 12 10 18 4"/><polyline points="6 9 12 15 18 9"/></svg>Saída</button>
+            </div>
+            <div class="ck-presentes"><b id="atv-presentes">0</b>
+              <div><strong>Presentes no local</strong><span id="atv-presentes-sub">Participantes no local neste momento</span></div></div>
+            <div class="ck-stats3">
+              <div><b id="atv-n-presentes">0</b><span>Participantes presentes</span></div>
+              <div><b id="atv-n-entradas">0</b><span>Check-ins realizados</span></div>
+              <div><b id="atv-n-saidas">0</b><span>Check-outs realizados</span></div>
+            </div>
+            <p class="ck-lista-rotulo">Histórico de acesso da atividade</p>
+            <div id="atv-hist"></div>
+          </div>
+
+          <div id="atv-insc" hidden>
+            <div id="atv-add-botoes" class="ck-linha2">
+              <button class="ck-btn ck-btn-primario" id="atv-add-qr" type="button">Adicionar lendo QR</button>
+              <button class="ck-btn ck-btn-secundario" id="atv-add-qr-checkin" type="button">Adicionar + check-in</button>
+            </div>
+            <input class="ck-input" id="atv-busca" style="margin-top:12px" placeholder="Pesquisar por nome, e-mail, telefone ou CPF" autocomplete="off" />
+            <p class="ck-lista-rotulo" id="atv-insc-titulo">Inscritos</p>
+            <div id="atv-insc-lista"></div>
+          </div>
         </div>
       </section>
-
       <!-- 4. Configurações -->
       <section class="ck-pane" id="pane-cfg" hidden>
         <div class="ck-pane-corpo">
@@ -121,6 +154,8 @@
           <label class="ck-campo"><span>Operador (aparece no registro de acesso)</span>
             <input class="ck-input" id="cfg-operador" placeholder="Seu nome" autocomplete="off" /></label>
           <button class="ck-btn ck-btn-primario" id="cfg-operador-salvar" type="button">Salvar</button>
+
+          <label class="ck-check-row" style="margin-top:18px"><input type="checkbox" id="cfg-atv-add" /> Permitir adicionar pessoas às atividades neste aparelho</label>
 
           <div class="ck-cfg-lista">
             <button class="ck-cfg-item" id="cfg-item-pontos" type="button"><span>Pontos de controle</span><i class="ck-chevron">›</i></button>

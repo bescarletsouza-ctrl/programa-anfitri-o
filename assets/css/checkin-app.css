@@ -397,3 +397,32 @@ body.ck-app {
 .ck-filtros[hidden] { display: none; }
 .ck-tabbar, :root:not([data-theme="light"]) .ck-tabbar { background: var(--marca-grad, #7c3aed); }
 .ck-sucesso.aviso { background: rgba(185,28,28,.96); }
+
+/* ---- atividades: dia/atividade, sub-abas, entrada/saída, inscritos ---- */
+.ck-atv-selects { display: grid; gap: 10px; }
+.ck-subtabs { display: grid; grid-template-columns: 1fr 1fr; margin: 16px 0 14px; border-bottom: 1px solid var(--ck-borda); }
+.ck-subtabs button { background: none; border: none; border-bottom: 3px solid transparent; color: var(--ck-texto-tenue); font: inherit; font-weight: 600; font-size: .94rem; padding: 12px 6px; cursor: pointer; }
+.ck-subtabs button.ativa { color: var(--ck-texto); border-bottom-color: var(--ck-laranja); }
+.ck-duplo { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.ck-bt-entrada, .ck-bt-saida {
+  min-height: 108px; border-radius: 16px; border: 2px solid; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  font: inherit; font-weight: 700; font-size: 1.1rem; color: #fff; cursor: pointer;
+}
+.ck-bt-entrada { background: #22a45d; border-color: #15803d; }
+.ck-bt-saida { background: #e5546b; border-color: #be123c; }
+.ck-bt-entrada svg, .ck-bt-saida svg { width: 34px; height: 34px; }
+.ck-bt-entrada:active, .ck-bt-saida:active { filter: brightness(.92); }
+.ck-bt-entrada[disabled], .ck-bt-saida[disabled] { opacity: .4; }
+.ck-presentes { margin: 14px 0; display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-radius: 14px; background: var(--marca-grad, #7c3aed); color: #fff; }
+.ck-presentes b { font-size: 2.2rem; letter-spacing: -.03em; }
+.ck-presentes strong { display: block; font-size: 1.05rem; }
+.ck-presentes span { font-size: .82rem; opacity: .9; }
+.ck-stats3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; margin-bottom: 6px; }
+.ck-stats3 b { display: block; font-size: 1.8rem; letter-spacing: -.02em; }
+.ck-stats3 span { font-size: .76rem; color: var(--ck-texto-suave); }
+.ck-insc-item { display: flex; align-items: center; gap: 12px; padding: 12px 4px; border-bottom: 1px solid var(--ck-borda-sutil); }
+.ck-insc-item > div { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.ck-insc-item strong { font-size: .98rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ck-insc-item span { font-size: .8rem; color: var(--ck-texto-suave); }
+.ck-insc-item .ck-mini { flex-shrink: 0; }
+.ck-insc-ok { color: #22c55e; font-weight: 700; font-size: .8rem; flex-shrink: 0; }

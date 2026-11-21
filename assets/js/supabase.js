@@ -32,7 +32,7 @@ const TABELAS_EVENTO = new Set([
   "grupos", "responsaveis", "estagios", "anfitrioes", "convidados",
   "form_perguntas", "marcos", "etapas_participante", "participantes", "checkins",
   "atividades", "tipos_ingresso", "integracoes", "webhook_entregas",
-  "campos_personalizados", "automacoes", "observacoes", "pontos_controle", "acessos_pontos",
+  "campos_personalizados", "automacoes", "observacoes", "pontos_controle", "acessos_pontos", "atividade_inscritos",
 ]);
 
 // eid: id explícito (páginas públicas). Sem argumento → evento atual do admin.
@@ -545,6 +545,13 @@ export const listAcessosPontos = (eid) =>
 
 export const registrarAcessoPonto = (pontoId, participanteId, acao, operador) =>
   salvar("acessos_pontos", { ponto_id: pontoId, participante_id: participanteId, acao, operador: operador || null });
+
+/* ---- Inscritos por atividade (0048) -------------------------------------- */
+export const listInscritosAtividades = (eid) =>
+  supabase.from("atividade_inscritos").select("*").eq("evento_id", ev(eid)).limit(20000).then(ok);
+
+export const inscreverNaAtividade = (atividadeId, participanteId, operador) =>
+  salvar("atividade_inscritos", { atividade_id: atividadeId, participante_id: participanteId, operador: operador || null });
 
 export async function registrarCheckin(participanteId, acao = "entrada", origem = "checkin", atividadeId = null) {
   const linha = { participante_id: participanteId, acao, origem };

@@ -8,6 +8,7 @@ import {
   supabase, listEventos, listParticipantes, listCheckins, listAtividades,
   buscarParticipantePorQR, registrarCheckin, getEvento, salvarEventoPorId,
   meusAcessosEventos, eventosDoNivel, listPontos, listAcessosPontos, registrarAcessoPonto, salvar, remover,
+  listInscritosAtividades, inscreverNaAtividade,
 } from "./supabase.js";
 import { eventoId, definirEvento } from "./evento.js";
 import {
@@ -36,6 +37,10 @@ let pontos = [];            // pontos de controle do evento (0047)
 let acessos = [];           // entradas/saídas nos pontos (mais recentes primeiro)
 let pontosIndisponivel = false;
 let pontoModo = null;       // {id, nome, acao} enquanto o scanner lê pra um ponto de controle
+let atvAcao = null;         // "entrada" | "saida" | "inscrever" | "inscrever_entrada" quando o scanner age direto numa atividade
+let inscritos = [];         // inscritos por atividade (0048)
+let inscritosIndisponivel = false;
+const limparModo = () => { modo = ""; pontoModo = null; atvAcao = null; };
 let aba = "part";
 
 /* ---- navegação entre telas ------------------------------------------- */
@@ -108,6 +113,15 @@ window.addEventListener("popstate", () => {
   el("ac-ponto").onchange = () => { guardar("ck_ponto", el("ac-ponto").value); renderAcesso(); };
   el("ac-acao").onchange = () => guardar("ck_acao", el("ac-acao").value);
   el("cfg-operador-salvar").onclick = () => { guardar("ck_operador", el("cfg-operador").value.trim()); toast("Operador salvo.", "ok"); };
+  el("cfg-atv-add").onchange = (e) => { guardar("ck_atv_add", e.target.checked ? "1" : "0"); toast(e.target.checked ? "Este aparelho pode adicionar pessoas às atividades." : "Este aparelho não adiciona pessoas às atividades.", "ok"); };
+  el("atv-dia").onchange = () => { guardar("ck_atv_dia", el("atv-dia").value); guardar("ck_atv", ""); renderAtividades(); };
+  el("atv-sel").onchange = () => { guardar("ck_atv", el("atv-sel").value); renderAtividades(); };
+  document.querySelectorAll(".ck-subtabs [data-sub]").forEach((b) => { b.onclick = () => { atvSub = b.dataset.sub; renderAtividades(); }; });
+  el("atv-entrada").onclick = () => iniciarScanAtividade("entrada");
+  el("atv-saida").onclick = () => iniciarScanAtividade("saida");
+  el("atv-add-qr").onclick = () => iniciarScanAtividade("inscrever");
+  el("atv-add-qr-checkin").onclick = () => iniciarScanAtividade("inscrever_entrada");
+  el("atv-busca").addEventListener("input", debounce(() => { const a = atvSelecionada(); if (a) renderInscritos(a); }, 200));
   el("cfg-item-pontos").onclick = abrirPontos;
   el("cfg-item-impressora").onclick = abrirConfig;
   el("cfg-item-tema").onclick = alternarTema;
@@ -221,7 +235,7 @@ async function escolherEvento(id) {
   definirEvento(evento.id, evento.nome);
   document.title = `Check-in — ${evento.nome || "We.events"}`;
   el("shell-evento").textContent = evento.nome || "";
-  modo = ""; pontoModo = null;
+  limparModo();
   el("part-lista").innerHTML = `<p class="ck-busca-vazio">Carregando…</p>`;
   await mostrarTela("tela-shell");
   irParaAba("part");
@@ -229,7 +243,7 @@ async function escolherEvento(id) {
 }
 
 async function recarregarTudo(silencioso) {
-  const [, , atvs] = await Promise.all([carregarDados(), carregarPontos(), listAtividades().catch(() => [])]);
+  const [, , atvs] = await Promise.all([carregarDados(), carregarPontos(), listAtividades().catch(() => []), carregarInscritos()]);
   atividades = atvs;
   renderTudo();
   if (silencioso !== true) toast("Dados atualizados.", "ok");
@@ -256,13 +270,13 @@ function fecharOverlays() {
 }
 // de qualquer lugar (menu, scanner, telas por cima): volta pro shell, já na aba pedida
 async function abrirAba(tab) {
-  modo = ""; pontoModo = null;
+  limparModo();
   fecharOverlays();
   await mostrarTela("tela-shell");
   irParaAba(tab);
 }
 async function voltarAoShell() {
-  modo = ""; pontoModo = null;
+  limparModo();
   fecharOverlays();
   await mostrarTela("tela-shell");
   irParaAba(aba);
@@ -296,7 +310,7 @@ function renderParticipantes() {
   });
 }
 async function iniciarScanEvento() {
-  modo = ""; pontoModo = null;
+  limparModo();
   el("topo-evento").textContent = evento?.nome || "Evento";
   el("topo-ctx").textContent = "◎ Evento geral";
   await mostrarTela("app");
@@ -366,7 +380,7 @@ async function iniciarScanPonto() {
   const pt = pontos.find((p) => p.id === el("ac-ponto").value);
   if (!pt) { toast("Cadastre um ponto de controle em Configurações.", "erro"); return; }
   const acaoSel = el("ac-acao").value;
-  modo = "";
+  limparModo();
   pontoModo = { id: pt.id, nome: pt.nome, acao: acaoSel };
   el("topo-evento").textContent = evento?.nome || "Evento";
   el("topo-ctx").textContent = `◎ ${pt.nome} · ${acaoSel === "entrada" ? "Entrada" : "Saída"}`;
@@ -398,30 +412,230 @@ async function registrarNoPonto(p) {
   setTimeout(retomar, 1100);
 }
 
-/* ---- aba 3: atividades (mantém o fluxo atual até a próxima etapa) ---- */
-function renderAtividades() {
-  el("atv-lista").innerHTML = atividades.length
-    ? atividades.map((a) => `
-      <button class="ck-lista-item" data-atv="${a.id}">
-        <span class="ck-lista-item-txt">
-          <strong>${esc(a.nome)}</strong>
-          <span>${[a.dia ? dataBR(a.dia) : "", [a.inicio, a.fim].filter(Boolean).join("–")].filter(Boolean).join(" · ") || "—"}</span>
-        </span>
-        <span class="ck-chevron">›</span>
-      </button>`).join("")
-    : `<p class="ck-lista-vazio">Nenhuma atividade cadastrada neste evento.</p>`;
-  el("atv-lista").querySelectorAll("[data-atv]").forEach((b) => { b.onclick = () => escolherModo(b.dataset.atv); });
+/* ---- aba 3: controle de acesso às atividades -------------------------- */
+// Neste aparelho, pode adicionar pessoas às atividades? (Configurações) — padrão: sim
+const podeAdicionarAtv = () => lembrado("ck_atv_add") !== "0";
+let atvSub = "cred";           // "cred" | "insc"
+let inscritoRemovendo = null;  // id da linha pedindo confirmação de remoção
+
+async function carregarInscritos() {
+  try { inscritos = await listInscritosAtividades(); inscritosIndisponivel = false; }
+  catch (e) {
+    inscritos = [];
+    inscritosIndisponivel = /atividade_inscritos|does not exist|schema cache/i.test(e.message || "");
+  }
 }
 
-async function escolherModo(m) {
-  modo = m;
-  pontoModo = null;
-  const atv = atvAtual();
-  el("topo-evento").textContent = evento.nome || "Evento";
-  el("topo-ctx").textContent = atv ? `▤ ${atv.nome}` : "◎ Evento geral";
-  document.title = `Check-in — ${evento.nome || "We.events"}`;
-  await carregarDados();
+// dia: "" = todos; "_" = atividades sem data; senão AAAA-MM-DD
+function atividadesDoDia(dia) {
+  return atividades.filter((a) => !dia || (dia === "_" ? !a.dia : a.dia === dia));
+}
+function atvSelecionada() {
+  const id = lembrado("ck_atv");
+  const lista = atividadesDoDia(lembrado("ck_atv_dia"));
+  return lista.find((a) => a.id === id) || lista[0] || null;
+}
+function inscritosDe(atvId) { return inscritos.filter((i) => i.atividade_id === atvId); }
+const estaInscrito = (pid, atvId) => inscritos.some((i) => i.participante_id === pid && i.atividade_id === atvId);
+const atividadesDe = (pid) => inscritos.filter((i) => i.participante_id === pid)
+  .map((i) => atividades.find((a) => a.id === i.atividade_id)?.nome).filter(Boolean);
+// texto pesquisável: nome, contato, código, empresa e qualquer campo personalizado (onde o CPF costuma ficar)
+const blobPessoa = (p) => [p.nome, p.email, p.telefone, p.codigo, p.empresa, p.cpf,
+  ...Object.values(p.campos_extra || {}).flat()].filter((x) => x != null).join(" ").toLowerCase();
+const soDigitos = (s) => String(s || "").replace(/\D/g, "");
+
+function renderAtividades() {
+  // ---- dia + atividade
+  const dias = [...new Set(atividades.map((a) => a.dia || "_"))].sort();
+  let dia = lembrado("ck_atv_dia");
+  if (dia && !dias.includes(dia)) dia = "";
+  el("atv-dia").innerHTML = `<option value="">Todos os dias</option>` +
+    dias.map((d) => `<option value="${d}" ${d === dia ? "selected" : ""}>${d === "_" ? "Sem data" : esc(dataBR(d))}</option>`).join("");
+  el("atv-dia").hidden = dias.length < 2;
+  const lista = atividadesDoDia(dia);
+  const atv = atividadesDoDia(dia).find((a) => a.id === lembrado("ck_atv")) || lista[0] || null;
+  el("atv-sel").innerHTML = lista.length
+    ? lista.map((a) => `<option value="${a.id}" ${atv && a.id === atv.id ? "selected" : ""}>${esc(a.nome)}${a.inicio ? " · " + esc(a.inicio) : ""}</option>`).join("")
+    : `<option value="">Nenhuma atividade</option>`;
+
+  // ---- sub-abas
+  document.querySelectorAll(".ck-subtabs [data-sub]").forEach((b) => b.classList.toggle("ativa", b.dataset.sub === atvSub));
+  el("atv-cred").hidden = atvSub !== "cred";
+  el("atv-insc").hidden = atvSub !== "insc";
+  el("atv-entrada").disabled = !atv;
+  el("atv-saida").disabled = !atv;
+  if (!atv) {
+    el("atv-presentes").textContent = "0";
+    ["atv-n-presentes", "atv-n-entradas", "atv-n-saidas"].forEach((id) => { el(id).textContent = "0"; });
+    el("atv-hist").innerHTML = `<p class="ck-busca-vazio">${atividades.length ? "Nenhuma atividade neste dia." : "Nenhuma atividade cadastrada neste evento."}</p>`;
+    el("atv-insc-lista").innerHTML = "";
+    return;
+  }
+
+  // ---- credenciamento: números + histórico
+  const doAtv = checkins.filter((c) => c.atividade_id === atv.id);
+  const presentes = credenciadosNaAtv(atv.id).length;
+  el("atv-presentes").textContent = presentes;
+  el("atv-presentes-sub").textContent = atv.vagas ? `de ${atv.vagas} vagas · no local neste momento` : "Participantes no local neste momento";
+  el("atv-n-presentes").textContent = presentes;
+  el("atv-n-entradas").textContent = doAtv.filter((c) => c.acao === "entrada").length;
+  el("atv-n-saidas").textContent = doAtv.filter((c) => c.acao === "saida").length;
+  const hist = [...doAtv].sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 30);
+  el("atv-hist").innerHTML = hist.length
+    ? hist.map((c) => `<div class="ck-reg-item"><div><strong>${esc(c.participante?.nome || participantes.find((x) => x.id === c.participante_id)?.nome || "—")}</strong>
+        <span>${esc(fmtDataHora(c.at))}</span></div>
+        <span class="ck-reg-acao ${c.acao}">${c.acao === "entrada" ? "Entrada" : "Saída"}</span></div>`).join("")
+    : `<p class="ck-busca-vazio" style="padding:18px">Nenhum acesso registrado ainda.</p>`;
+
+  renderInscritos(atv);
+}
+
+function renderInscritos(atv) {
+  const pode = podeAdicionarAtv();
+  el("atv-add-botoes").hidden = !pode;
+  if (inscritosIndisponivel) {
+    el("atv-insc-titulo").textContent = "Inscritos";
+    el("atv-insc-lista").innerHTML = `<p class="pagina-sub-ck">Falta ativar a lista de inscritos: rode a migração <code>0048_atividade_inscritos.sql</code> no SQL Editor.</p>`;
+    return;
+  }
+  const termo = el("atv-busca").value.trim().toLowerCase();
+  const digitos = soDigitos(termo);
+  if (termo) {
+    // pesquisa em TODOS os participantes do evento
+    const achados = participantes.filter((p) => {
+      const b = blobPessoa(p);
+      return b.includes(termo) || (digitos.length >= 3 && soDigitos(b).includes(digitos));
+    }).slice(0, 40);
+    el("atv-insc-titulo").textContent = `Resultado da pesquisa (${achados.length})`;
+    el("atv-insc-lista").innerHTML = achados.length
+      ? achados.map((p) => {
+          const atvs = atividadesDe(p.id);
+          const ja = estaInscrito(p.id, atv.id);
+          return `<div class="ck-insc-item" data-pid="${p.id}"><div>
+              <strong>${esc(p.nome)}</strong>
+              <span>${esc(p.telefone || "sem telefone")} · ${esc((p.ingresso || p.tipo || "sem categoria"))}</span>
+              <span>${atvs.length ? "Inscrito em: " + esc(atvs.join(", ")) : "Sem atividades"}</span></div>
+            ${ja ? `<span class="ck-insc-ok">✓ Inscrito</span>`
+                 : pode ? `<button class="ck-mini" data-inscrever>Inscrever</button>` : ""}</div>`;
+        }).join("")
+      : `<p class="ck-busca-vazio">Ninguém encontrado.</p>`;
+    el("atv-insc-lista").querySelectorAll("[data-inscrever]").forEach((b) => {
+      b.onclick = async () => {
+        const pid = b.closest("[data-pid]").dataset.pid;
+        b.disabled = true;
+        await inscrever(participantes.find((x) => x.id === pid), atv);
+        renderAtividades();
+      };
+    });
+    return;
+  }
+  const lista = inscritosDe(atv.id)
+    .map((i) => ({ i, p: participantes.find((x) => x.id === i.participante_id) }))
+    .filter((x) => x.p)
+    .sort((a, b) => a.p.nome.localeCompare(b.p.nome, "pt-BR"));
+  el("atv-insc-titulo").textContent = `Inscritos (${lista.length}${atv.vagas ? " de " + atv.vagas : ""})`;
+  el("atv-insc-lista").innerHTML = lista.length
+    ? lista.map(({ i, p }) => {
+        const dentro = !!saldoAtividade(p.id, atv.id);
+        return `<div class="ck-insc-item" data-iid="${i.id}"><div>
+            <strong>${esc(p.nome)}</strong>
+            <span>${esc(p.telefone || "sem telefone")} · ${esc((p.ingresso || p.tipo || "sem categoria"))}</span></div>
+          ${dentro ? `<span class="ck-insc-ok">✓ No local</span>` : ""}
+          ${pode ? (inscritoRemovendo === i.id
+            ? `<button class="ck-mini perigo" data-remover-ok>Remover</button><button class="ck-mini" data-remover-nao>Não</button>`
+            : `<button class="ck-mini" data-remover>Remover</button>`) : ""}</div>`;
+      }).join("")
+    : `<p class="ck-busca-vazio">Ninguém inscrito ainda. Use os botões acima ou a pesquisa.</p>`;
+  el("atv-insc-lista").querySelectorAll("[data-iid]").forEach((row) => {
+    const iid = row.dataset.iid;
+    const on = (sel, fn) => { const b = row.querySelector(sel); if (b) b.onclick = fn; };
+    on("[data-remover]", () => { inscritoRemovendo = iid; renderAtividades(); });
+    on("[data-remover-nao]", () => { inscritoRemovendo = null; renderAtividades(); });
+    on("[data-remover-ok]", async () => {
+      try {
+        await remover("atividade_inscritos", iid);
+        inscritos = inscritos.filter((x) => x.id !== iid);
+        toast("Removido da atividade.", "ok");
+      } catch (e) { toast(e.message || "Não foi possível remover.", "erro"); }
+      inscritoRemovendo = null;
+      renderAtividades();
+    });
+  });
+}
+
+// inscreve alguém na atividade (devolve false se já estava)
+async function inscrever(p, atv) {
+  if (!p || !atv) return false;
+  if (estaInscrito(p.id, atv.id)) return false;
+  try {
+    const r = await inscreverNaAtividade(atv.id, p.id, operador());
+    inscritos.push(r);
+    toast(`${p.nome} inscrito(a) em ${atv.nome}.`, "ok");
+    return true;
+  } catch (e) {
+    toast(/duplicate|unique|23505/i.test(e.message || "") ? "Já estava inscrito(a)." : (e.message || "Não foi possível inscrever."), "erro");
+    return false;
+  }
+}
+
+// ação direta de entrada/saída/inscrição lendo o QR (ou escolhendo pelo nome)
+async function iniciarScanAtividade(acao) {
+  const atv = atvSelecionada();
+  if (!atv) { toast("Escolha uma atividade.", "erro"); return; }
+  limparModo();
+  modo = atv.id;
+  atvAcao = acao;
+  const rotulo = { entrada: "Entrada", saida: "Saída", inscrever: "Adicionar", inscrever_entrada: "Adicionar + check-in" }[acao];
+  el("topo-evento").textContent = evento?.nome || "Evento";
+  el("topo-ctx").textContent = `▤ ${atv.nome} · ${rotulo}`;
   await mostrarTela("app");
+}
+
+async function registrarAcessoAtv(p, atv, acao) {
+  await registrarCheckin(p.id, acao, "checkin-mobile", atv.id);
+  checkins.unshift({ participante_id: p.id, acao, at: new Date().toISOString(), atividade_id: atv.id,
+    participante: { nome: p.nome, ingresso: p.ingresso, codigo: p.codigo } });
+}
+
+async function processarNaAtividade(p) {
+  const atv = atvAtual();
+  const acao = atvAcao;
+  if (!atv || !acao) return abrirSheet(p);
+  const dentro = !!saldoAtividade(p.id, atv.id);
+  const avisar = (texto) => { navigator.vibrate?.([80, 60, 80]); telaSucesso(p, null, { texto, aviso: true }); setTimeout(retomar, 1500); };
+  try {
+    if (acao === "inscrever") {
+      if (estaInscrito(p.id, atv.id)) return avisar(`Já está inscrito(a) em ${atv.nome}`);
+      if (!(await inscrever(p, atv))) return setTimeout(retomar, 800);
+      telaSucesso(p, null, { texto: `inscrito(a) em ${atv.nome}` });
+      return setTimeout(retomar, 1100);
+    }
+    if (acao === "inscrever_entrada") {
+      if (dentro) return avisar(`Já está na atividade ${atv.nome}`);
+      if (!estaInscrito(p.id, atv.id) && !(await inscrever(p, atv))) return setTimeout(retomar, 800);
+      await registrarAcessoAtv(p, atv, "entrada");
+      telaSucesso(p, null, { texto: `inscrito(a) e com entrada em ${atv.nome}` });
+      return setTimeout(retomar, 1100);
+    }
+    if (acao === "saida") {
+      if (!dentro) return avisar(`Não consta na atividade ${atv.nome}`);
+      await registrarAcessoAtv(p, atv, "saida");
+      telaSucesso(p, null, { texto: `saída de ${atv.nome}` });
+      return setTimeout(retomar, 1100);
+    }
+    // entrada
+    if (dentro) return avisar(`Já está na atividade ${atv.nome}`);
+    const cat = (p.ingresso || p.tipo || "").trim();
+    const foraDaCategoria = atv.categorias?.length && !atv.categorias.includes(cat);
+    const lotada = atv.vagas && credenciadosNaAtv(atv.id).length >= atv.vagas;
+    if (foraDaCategoria || lotada) return abrirSheet(p);   // operador decide, com os alertas na tela
+    await registrarAcessoAtv(p, atv, "entrada");
+    telaSucesso(p, null, { texto: `entrada em ${atv.nome}` });
+    setTimeout(retomar, 1100);
+  } catch (e) {
+    toast(e.message || "Falha ao registrar.", "erro");
+    setTimeout(retomar, 800);
+  }
 }
 
 /* ---- aba 4: configurações ------------------------------------------- */
@@ -430,6 +644,7 @@ function renderConfig() {
   el("cfg-evento").textContent = evento?.nome || "";
   el("cfg-operador").value = lembrado("ck_operador") || (sessao?.user?.email || "").split("@")[0];
   el("cfg-tema-txt").textContent = document.documentElement.dataset.theme === "light" ? "Tema escuro" : "Tema claro";
+  el("cfg-atv-add").checked = podeAdicionarAtv();
 }
 
 /* ---- pontos de controle (cadastro) ----------------------------------- */
@@ -629,6 +844,7 @@ async function onScan(texto) {
   el("mira-txt").textContent = "Aponte para o QR Code do crachá";
   if (!p) return abrirSheetErro(texto);
   if (pontoModo) return registrarNoPonto(p);
+  if (atvAcao) return processarNaAtividade(p);
   abrirSheet(p);
 }
 
@@ -779,7 +995,7 @@ function irParaScanner() {
   const jaNoScanner = el("app").hidden === false;
   el("tela-busca").hidden = true;
   if (jaNoScanner) retomar();
-  else escolherModo(modo);
+  else iniciarScanEvento();
 }
 function renderBusca() {
   const t = el("in-busca").value.trim().toLowerCase();
@@ -795,7 +1011,9 @@ function renderBusca() {
     b.onclick = () => {
       el("tela-busca").hidden = true;
       const escolhido = participantes.find((x) => x.id === b.dataset.id);
-      if (pontoModo) registrarNoPonto(escolhido); else abrirSheet(escolhido);
+      if (pontoModo) registrarNoPonto(escolhido);
+      else if (atvAcao) processarNaAtividade(escolhido);
+      else abrirSheet(escolhido);
     };
   });
 }
