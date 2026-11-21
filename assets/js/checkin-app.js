@@ -12,6 +12,7 @@ import {
   listTiposIngresso, cadastrarParticipanteNoApp,
 } from "./supabase.js";
 import { eventoId, definirEvento, hashSenhaEvento } from "./evento.js";
+import { kvSet, kvGet, filaAdd, filaList, filaDel, filaPut } from "./offline.js";
 import {
   imprimirCracha, CRACHA_PADRAO, TAMANHOS_CRACHA, snapTamanho, limparConfigCracha,
   appNativo, montarCrachaHtml, qrDataURL,
@@ -63,7 +64,7 @@ async function mostrarTela(alvo) {
    vários toques seguidos. Na raiz, o próximo "voltar" sai do app normal. */
 function overlayAberto() {
   return !el("menu").hidden || !el("sheet").hidden || !el("tela-busca").hidden || !el("tela-config").hidden
-    || !el("tela-pontos").hidden || !el("tela-registro").hidden || !el("tela-novo").hidden;
+    || !el("tela-pontos").hidden || !el("tela-registro").hidden || !el("tela-novo").hidden || !el("tela-offline").hidden;
 }
 function noTopo() {
   const telaRaiz = !el("tela-eventos").hidden || !el("tela-login").hidden || !el("tela-abrir").hidden;
@@ -80,6 +81,7 @@ function voltarUmNivel() {
   if (!el("menu").hidden) return fecharMenu();
   if (!el("sheet").hidden) return fecharSheet();
   if (!el("tela-config").hidden) return fecharConfig();
+  if (!el("tela-offline").hidden) return fecharOffline();
   if (!el("tela-novo").hidden) return fecharNovoParticipante();
   if (!el("tela-pontos").hidden) return fecharPontos();
   if (!el("tela-registro").hidden) return fecharRegistro();
@@ -127,6 +129,24 @@ window.addEventListener("popstate", () => {
   el("atv-add-qr-checkin").onclick = () => iniciarScanAtividade("inscrever_entrada");
   el("atv-busca").addEventListener("input", debounce(() => { const a = atvSelecionada(); if (a) renderInscritos(a); }, 200));
   el("cfg-item-addpart").onclick = aoTocarAddPart;
+  el("cfg-item-offline").onclick = abrirOffline;
+  el("rede-pill").onclick = abrirOffline;
+  el("offline-voltar").onclick = fecharOffline;
+  el("of-manual").onchange = (e) => {
+    guardar("ck_offline", e.target.checked ? "1" : "");
+    if (!e.target.checked) { OFF.semRede = false; sincronizar(); }
+    atualizarIndicadorRede();
+    toast(e.target.checked ? "Modo offline ligado: nada é enviado até você desligar." : "Modo offline desligado.", "ok");
+  };
+  el("of-sync").onclick = async () => {
+    if (offlineManual()) { toast("Desligue o modo offline para enviar.", "erro"); return; }
+    OFF.semRede = false; await sincronizar(); await contarFila(); renderOffline();
+    if (OFF.pendentes === 0 && !estaOffline()) toast("Tudo enviado.", "ok");
+  };
+  el("of-baixar").onclick = async () => {
+    if (estaOffline()) { toast("Precisa de internet para baixar os dados.", "erro"); return; }
+    OFF.semRede = false; await recarregarTudo(false); renderOffline();
+  };
   el("part-add").onclick = abrirNovoParticipante;
   el("novo-voltar").onclick = fecharNovoParticipante;
   el("np-salvar").onclick = () => salvarNovoParticipante(false);
@@ -161,17 +181,32 @@ window.addEventListener("popstate", () => {
   aplicarTema(temaSalvo() || "dark");
 
   supabase.auth.onAuthStateChange((ev) => {
-    if (ev === "SIGNED_OUT") { sessao = null; mostrarTela("tela-login"); }
+    if (ev === "SIGNED_OUT") { if (estaOffline()) return; sessao = null; mostrarTela("tela-login"); }
   });
 
   try {
     const { data } = await supabase.auth.getSession();
     sessao = data?.session || null;
   } catch { sessao = null; }
+  // sem internet o login não renova: se este aparelho já entrou antes, abre no modo offline com o usuário guardado
+  if (!sessao) {
+    const guardado = await kvGet("usuario").catch(() => null);
+    if (guardado?.email && estaOffline()) sessao = { user: { email: guardado.email }, offline: true };
+  } else {
+    kvSet("usuario", { email: sessao.user?.email }).catch(() => {});
+  }
+  contarFila();
+  registrarServiceWorker();
 
   if (sessao) apósLogin();
   else mostrarTela("tela-login");
 })();
+
+// deixa o app abrir sem internet (guarda a página e as bibliotecas na primeira vez que abre com rede)
+function registrarServiceWorker() {
+  if (!("serviceWorker" in navigator) || location.protocol === "file:") return;
+  navigator.serviceWorker.register("/sw-checkin.js", { scope: "/checkin-app.html" }).catch((e) => console.warn("service worker:", e));
+}
 
 /* ---- login -------------------------------------------------------- */
 async function entrar(e) {
@@ -185,6 +220,7 @@ async function entrar(e) {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password: senha });
     if (error) throw error;
     sessao = data.session;
+    kvSet("usuario", { email: sessao.user?.email }).catch(() => {});
     apósLogin();
   } catch (err) {
     el("login-erro").hidden = false;
@@ -206,11 +242,22 @@ async function apósLogin() {
   el("eventos-usuario").textContent = sessao?.user?.email || "";
   await mostrarTela("tela-eventos");
   try {
+    if (estaOffline()) throw new Error("offline");
     // quem foi restringido só vê os eventos em que tem "Credenciamento" (0046); sem restrição, todos
-    eventos = eventosDoNivel(await listEventos(), await meusAcessosEventos(), "credenciamento");
+    eventos = eventosDoNivel(await comTimeout(listEventos(), 15000), await meusAcessosEventos(), "credenciamento");
+    kvSet("eventos", { em: Date.now(), eventos }).catch(() => {});
   } catch (e) {
-    el("eventos-lista").innerHTML = `<p class="ck-lista-vazio">Falha ao carregar eventos.<br><small>${esc(e.message || "")}</small></p>`;
-    return;
+    // sem internet: usa os eventos guardados da última vez que o app abriu com rede
+    const guardado = await kvGet("eventos").catch(() => null);
+    if (guardado?.eventos?.length && (estaOffline() || ehErroDeRede(e))) {
+      eventos = guardado.eventos;
+      if (!offlineManual()) OFF.semRede = true;
+      atualizarIndicadorRede();
+      toast("Sem internet: mostrando os eventos salvos neste aparelho.", "ok");
+    } else {
+      el("eventos-lista").innerHTML = `<p class="ck-lista-vazio">${estaOffline() ? "Sem internet e este aparelho ainda não baixou nenhum evento.<br><small>Conecte-se uma vez para baixar.</small>" : "Falha ao carregar eventos.<br><small>" + esc(e.message || "") + "</small>"}</p>`;
+      return;
+    }
   }
   el("eventos-lista").innerHTML = eventos.length
     ? eventos.map((ev) => `<button class="ck-lista-item" data-id="${ev.id}">
@@ -233,6 +280,220 @@ async function apósLogin() {
 
 const dataBR = (iso) => { try { return new Intl.DateTimeFormat("pt-BR").format(new Date(iso + "T12:00")); } catch { return iso; } };
 
+/* ---- MODO OFFLINE -----------------------------------------------------------------------------------------------
+   Tudo que o operador faz (ler QR, credenciar, acessos nos pontos, atividades, cadastrar participante, bloquear) vale NA
+   HORA no celular. Com internet vai direto pro banco; sem internet (ou com o modo offline ligado) entra numa FILA local e
+   é enviado depois, com a hora original e um id gerado no celular (reenviar não duplica). Os dados do evento ficam
+   copiados no aparelho, então ler QR e consultar a lista funcionam sem rede. */
+const OFF = { semRede: false, sincronizando: false, pendentes: 0, falhas: 0, baixadoEm: 0 };
+const offlineManual = () => lembrado("ck_offline") === "1";
+const estaOffline = () => offlineManual() || OFF.semRede || navigator.onLine === false;
+const ehErroDeRede = (e) => /failed to fetch|networkerror|network request failed|load failed|fetch failed|tempo esgotado|timed out|aborted|offline/i.test(String(e?.message || e || ""));
+const ehErroDeLogin = (e) => /jwt|not authenticated|invalid token|token is expired|\b401\b/i.test(String(e?.message || ""));
+const comTimeout = (p, ms = 7000) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error("tempo esgotado")), ms))]);
+const novoId = () => (globalThis.crypto?.randomUUID
+  ? crypto.randomUUID()
+  : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => { const r = (Math.random() * 16) | 0; return (c === "x" ? r : (r & 3) | 8).toString(16); }));
+
+// como cada operação é gravada no banco (usado na hora, quando há rede, e depois pela sincronização)
+const EXEC = {
+  checkin: (op) => registrarCheckin(op.pid, op.acao, op.origem, op.atv || null, { id: op.uid, at: op.at, evento_id: op.evento_id }),
+  acesso: (op) => registrarAcessoPonto(op.ponto, op.pid, op.acao, op.operador, { id: op.uid, at: op.at, evento_id: op.evento_id }),
+  inscrever: (op) => inscreverNaAtividade(op.atv, op.pid, op.operador, { id: op.uid, evento_id: op.evento_id }),
+  remover_inscrito: async (op) => { await removerInscritosAtividade(op.atv, [op.pid]); await removerCheckinsAtividade(op.atv, [op.pid]); },
+  novo_participante: (op) => cadastrarParticipanteNoApp(op.dados, { id: op.pid, evento_id: op.evento_id }),
+  bloqueio: (op) => salvar("participantes", { id: op.pid, acesso_bloqueado: op.bloquear, acesso_bloqueado_em: op.bloquear ? op.at : null }),
+};
+const novaOp = (tipo, dados) => ({ tipo, uid: novoId(), at: new Date().toISOString(), evento_id: evento?.id, ...dados });
+function rotuloOp(op) {
+  const n = op.nome || "—";
+  switch (op.tipo) {
+    case "checkin": return op.atv
+      ? `${op.acao === "entrada" ? "Entrada" : "Saída"} em atividade · ${n}`
+      : `Credenciamento · ${n}`;
+    case "acesso": return `${op.acao === "entrada" ? "Check-in" : "Saída"} em ponto de controle · ${n}`;
+    case "inscrever": return `Inscrição em atividade · ${n}`;
+    case "remover_inscrito": return `Remoção da atividade · ${n}`;
+    case "novo_participante": return `Cadastro de participante · ${n}`;
+    case "bloqueio": return `${op.bloquear ? "Bloqueio" : "Liberação"} de acesso · ${n}`;
+    default: return n;
+  }
+}
+
+// Executa a operação: online → grava agora; sem rede → vai pra fila (e vale localmente do mesmo jeito)
+async function comOffline(op) {
+  if (!estaOffline() && OFF.pendentes === 0) {
+    try {
+      const resultado = await comTimeout(EXEC[op.tipo](op), 7000);
+      OFF.semRede = false;
+      atualizarIndicadorRede();
+      if (OFF.pendentes) sincronizar();
+      agendarSnapshot();
+      return { fila: false, resultado };
+    } catch (e) {
+      if (!ehErroDeRede(e)) throw e;   // erro de verdade (permissão, dado inválido…): o operador precisa ver
+      OFF.semRede = true;
+    }
+  }
+  await filaAdd(op);
+  OFF.pendentes++;
+  atualizarIndicadorRede();
+  agendarSnapshot();
+  if (!estaOffline()) sincronizar();   // já voltou a rede: manda a fila em ordem
+  return { fila: true };
+}
+
+/* ---- cópia dos dados do evento no aparelho ---- */
+let timerSnapshot = null;
+function agendarSnapshot() { clearTimeout(timerSnapshot); timerSnapshot = setTimeout(salvarSnapshot, 1500); }
+async function salvarSnapshot() {
+  if (!evento) return;
+  try {
+    const em = Date.now();
+    await kvSet("evento:" + evento.id, {
+      em, evento, participantes, checkins, atividades, inscritos, inscritosIndisponivel, pontos, acessos, pontosIndisponivel, tiposIngresso,
+    });
+    OFF.baixadoEm = em;
+  } catch (e) { console.warn("não consegui guardar a cópia dos dados:", e); }
+}
+async function aplicarSnapshot() {
+  if (!evento) return false;
+  const s = await kvGet("evento:" + evento.id).catch(() => null);
+  if (!s) return false;
+  participantes = s.participantes || []; checkins = s.checkins || []; atividades = s.atividades || [];
+  inscritos = s.inscritos || []; pontos = s.pontos || []; acessos = s.acessos || []; tiposIngresso = s.tiposIngresso || [];
+  inscritosIndisponivel = !!s.inscritosIndisponivel; pontosIndisponivel = !!s.pontosIndisponivel;
+  OFF.baixadoEm = s.em || 0;
+  return true;
+}
+
+// tabelas opcionais (ainda sem a migração) viram "indisponível"; erro de REDE sobe pra quem chamou
+const opcional = (promessa, vazio) => promessa.catch((e) => { if (ehErroDeRede(e)) throw e; return vazio; });
+async function buscarTudoDoServidor() {
+  const [parts, checks, atvs, tipos, ins, pts] = await Promise.all([
+    listParticipantes(), listCheckins(), opcional(listAtividades(), []), opcional(listTiposIngresso(), []),
+    opcional(listInscritosAtividades(), null), opcional(Promise.all([listPontos(), listAcessosPontos()]), null),
+  ]);
+  return {
+    participantes: parts.filter((p) => p.situacao !== "Desativado"), checkins: checks, atividades: atvs, tiposIngresso: tipos || [],
+    inscritos: ins || [], inscritosIndisponivel: ins === null,
+    pontos: pts ? pts[0] : [], acessos: pts ? pts[1] : [], pontosIndisponivel: pts === null,
+  };
+}
+
+async function recarregarTudo(silencioso, semSync) {
+  // 1) o que ficou pendente vai primeiro — senão a cópia nova do servidor apagaria o que foi feito offline
+  if (!semSync && !estaOffline()) await sincronizar();
+  await contarFila();
+  if (estaOffline() || OFF.pendentes > 0) {
+    const tem = await aplicarSnapshot();
+    if (!tem && !participantes.length) toast("Este evento ainda não foi baixado neste aparelho. Conecte-se à internet uma vez.", "erro");
+    renderTudo();
+    if (silencioso !== true) toast(estaOffline() ? "Offline: usando os dados salvos neste aparelho." : "Há registros pendentes; mantive os dados do aparelho.", "ok");
+    return;
+  }
+  try {
+    const d = await comTimeout(buscarTudoDoServidor(), 25000);
+    participantes = d.participantes; checkins = d.checkins; atividades = d.atividades; tiposIngresso = d.tiposIngresso;
+    inscritos = d.inscritos; inscritosIndisponivel = d.inscritosIndisponivel;
+    pontos = d.pontos; acessos = d.acessos; pontosIndisponivel = d.pontosIndisponivel;
+    OFF.semRede = false;
+    renderTudo();
+    await salvarSnapshot();
+    if (silencioso !== true) toast("Dados atualizados.", "ok");
+  } catch (e) {
+    if (!ehErroDeRede(e)) { toast("Falha ao carregar os dados do evento.", "erro"); console.warn(e); return; }
+    OFF.semRede = true;
+    await aplicarSnapshot();
+    renderTudo();
+    toast("Sem internet: usando os dados salvos neste aparelho.", "ok");
+  }
+  atualizarIndicadorRede();
+}
+
+/* ---- sincronização ---- */
+async function contarFila() {
+  const f = await filaList().catch(() => []);
+  OFF.pendentes = f.filter((o) => !o.falha).length;
+  OFF.falhas = f.filter((o) => o.falha).length;
+  atualizarIndicadorRede();
+  return f;
+}
+async function sincronizar() {
+  if (OFF.sincronizando || offlineManual() || navigator.onLine === false) return;
+  const fila = (await contarFila()).filter((o) => !o.falha);
+  if (!fila.length) return;
+  OFF.sincronizando = true;
+  atualizarIndicadorRede();
+  let enviados = 0, caiu = false;
+  try {
+    for (const op of fila) {
+      try {
+        await comTimeout(EXEC[op.tipo](op), 20000);
+        await filaDel(op.seq);
+        enviados++;
+      } catch (e) {
+        if (ehErroDeRede(e)) { OFF.semRede = true; caiu = true; break; }
+        if (ehErroDeLogin(e)) { toast("Entre de novo para enviar os registros pendentes.", "erro"); break; }
+        op.falha = String(e?.message || e).slice(0, 200);   // erro de verdade: guarda pra você ver e decidir
+        await filaPut(op);
+      }
+    }
+  } finally {
+    OFF.sincronizando = false;
+    await contarFila();
+  }
+  if (enviados) {
+    if (!caiu) OFF.semRede = false;
+    toast(`${enviados} registro(s) enviado(s).`, "ok");
+    if (OFF.pendentes === 0) recarregarTudo(true, true);   // traz o que os outros aparelhos fizeram
+  }
+  atualizarIndicadorRede();
+}
+
+window.addEventListener("online", () => { OFF.semRede = false; atualizarIndicadorRede(); sincronizar(); });
+window.addEventListener("offline", () => atualizarIndicadorRede());
+document.addEventListener("visibilitychange", () => { if (!document.hidden) sincronizar(); });
+setInterval(() => { if (OFF.pendentes > 0) sincronizar(); }, 20000);
+
+/* ---- indicador e tela "Modo offline" ---- */
+function atualizarIndicadorRede() {
+  const pill = el("rede-pill");
+  if (!pill) return;
+  let texto = "", tom = "";
+  if (OFF.falhas) { texto = `⚠ ${OFF.falhas} com erro`; tom = "erro"; }
+  else if (OFF.sincronizando) { texto = "Sincronizando…"; tom = "sync"; }
+  else if (estaOffline()) { texto = OFF.pendentes ? `Offline · ${OFF.pendentes} pendente(s)` : "Offline"; tom = "off"; }
+  else if (OFF.pendentes) { texto = `${OFF.pendentes} pendente(s)`; tom = "sync"; }
+  pill.hidden = !texto;
+  pill.textContent = texto;
+  pill.dataset.tom = tom;
+  const est = el("cfg-offline-estado");
+  if (est) est.textContent = offlineManual() ? "Ligado" : estaOffline() ? "Sem rede" : "Online";
+  if (!el("tela-offline").hidden) renderOffline();
+}
+
+function abrirOffline() { el("tela-offline").hidden = false; renderOffline(); garantirHistorico(); }
+function fecharOffline() { el("tela-offline").hidden = true; }
+async function renderOffline() {
+  const fila = await filaList().catch(() => []);
+  el("of-estado").textContent = offlineManual() ? "Modo offline ligado (não usa a internet)" : estaOffline() ? "Sem internet no momento" : "Online";
+  el("of-manual").checked = offlineManual();
+  el("of-baixado").textContent = OFF.baixadoEm
+    ? `${fmtDataHora(new Date(OFF.baixadoEm).toISOString())} · ${participantes.length} participantes`
+    : "Ainda não baixados neste aparelho";
+  const pend = fila.filter((o) => !o.falha), falhas = fila.filter((o) => o.falha);
+  el("of-pend").textContent = pend.length ? `${pend.length} registro(s) esperando para enviar` : "Nada pendente";
+  el("of-fila").innerHTML =
+    falhas.map((o) => `<div class="ck-reg-item"><div><strong>${esc(rotuloOp(o))}</strong><span style="color:#f87171">Não foi aceito: ${esc(o.falha)}</span></div>
+        <button class="ck-mini perigo" data-descartar="${o.seq}">Descartar</button></div>`).join("") +
+    pend.slice(0, 40).map((o) => `<div class="ck-reg-item"><div><strong>${esc(rotuloOp(o))}</strong><span>${esc(fmtDataHora(o.at))}</span></div></div>`).join("") +
+    (pend.length > 40 ? `<p class="pagina-sub-ck">… e mais ${pend.length - 40}.</p>` : "");
+  el("of-fila").querySelectorAll("[data-descartar]").forEach((b) => {
+    b.onclick = async () => { await filaDel(Number(b.dataset.descartar)); await contarFila(); renderOffline(); };
+  });
+}
+
 /* ---- evento + shell ------------------------------------------------ */
 const guardar = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 const lembrado = (k) => { try { return localStorage.getItem(k) || ""; } catch { return ""; } };
@@ -251,14 +512,6 @@ async function escolherEvento(id) {
   await recarregarTudo(true);
 }
 
-async function recarregarTudo(silencioso) {
-  const [, , atvs, , tipos] = await Promise.all([carregarDados(), carregarPontos(), listAtividades().catch(() => []), carregarInscritos(), listTiposIngresso().catch(() => [])]);
-  atividades = atvs;
-  tiposIngresso = tipos || [];
-  renderTudo();
-  if (silencioso !== true) toast("Dados atualizados.", "ok");
-}
-
 function renderTudo() { renderParticipantes(); renderAcesso(); renderAtividades(); renderConfig(); renderAddPart(); }
 
 const TITULOS_ABA = { part: "Lista de participantes", acesso: "Controle de acesso", atv: "Atividades", cfg: "Configurações" };
@@ -274,7 +527,7 @@ function irParaAba(tab) {
 }
 
 function fecharOverlays() {
-  ["tela-busca", "tela-config", "tela-pontos", "tela-registro", "tela-novo"].forEach((id) => { el(id).hidden = true; });
+  ["tela-busca", "tela-config", "tela-pontos", "tela-registro", "tela-novo", "tela-offline"].forEach((id) => { el(id).hidden = true; });
   if (!el("menu").hidden) fecharMenu();
   if (!el("sheet").hidden) fecharSheet(true);
 }
@@ -420,8 +673,10 @@ async function registrarNoPonto(p) {
     return resultadoPonto(p, "atencao", `Não consta dentro de ${pt.nome}`);
   }
   try {
-    const r = await registrarAcessoPonto(pt.id, p.id, pt.acao, operador());
-    acessos.unshift({ ...r, participante: { nome: p.nome, ingresso: p.ingresso, tipo: p.tipo, codigo: p.codigo } });
+    const op = novaOp("acesso", { ponto: pt.id, pid: p.id, acao: pt.acao, operador: operador(), nome: p.nome });
+    await comOffline(op);
+    acessos.unshift({ id: op.uid, ponto_id: pt.id, participante_id: p.id, acao: pt.acao, operador: op.operador, at: op.at,
+      participante: { nome: p.nome, ingresso: p.ingresso, tipo: p.tipo, codigo: p.codigo } });
     resultadoPonto(p, "ok", pt.acao === "entrada" ? `Check-in em ${pt.nome}` : `Saída de ${pt.nome}`);
   } catch (e) {
     toast(e.message || "Falha ao registrar.", "erro");
@@ -437,7 +692,7 @@ let inscritoRemovendo = null;  // id da linha pedindo confirmação de remoção
 // A plataforma (ou outro aparelho) pode ter inscrito/removido gente: ao abrir a aba Atividades, relê do banco
 let atualizandoAtv = false;
 async function atualizarAtividadesDoBanco() {
-  if (atualizandoAtv) return;
+  if (atualizandoAtv || estaOffline() || OFF.pendentes > 0) return;   // offline/pendente: a cópia do aparelho é a verdade
   atualizandoAtv = true;
   try {
     const [ins, chk] = await Promise.all([listInscritosAtividades().catch(() => null), listCheckins().catch(() => null)]);
@@ -598,8 +853,8 @@ function renderInscritos(atv) {
     on("[data-remover-ok]", async () => {
       try {
         // igual à plataforma: sai da lista de inscritos e o histórico de entrada/saída dele nesta atividade é apagado
-        await removerInscritosAtividade(atv.id, [pid]);
-        await removerCheckinsAtividade(atv.id, [pid]).catch(() => {});
+        const alvoNome = participantes.find((x) => x.id === pid)?.nome;
+        await comOffline(novaOp("remover_inscrito", { atv: atv.id, pid, nome: alvoNome }));
         inscritos = inscritos.filter((x) => !(x.atividade_id === atv.id && x.participante_id === pid));
         checkins = checkins.filter((c) => !(c.atividade_id === atv.id && c.participante_id === pid));
         toast("Removido da atividade.", "ok");
@@ -614,8 +869,9 @@ async function inscrever(p, atv) {
   if (!p || !atv) return false;
   if (estaInscrito(p.id, atv.id)) return false;
   try {
-    const r = await inscreverNaAtividade(atv.id, p.id, operador());
-    inscritos.push(r);
+    const op = novaOp("inscrever", { atv: atv.id, pid: p.id, operador: operador(), nome: p.nome });
+    await comOffline(op);
+    inscritos.push({ id: op.uid, atividade_id: atv.id, participante_id: p.id });
     toast(`${p.nome} inscrito(a) em ${atv.nome}.`, "ok");
     return true;
   } catch (e) {
@@ -638,8 +894,9 @@ async function iniciarScanAtividade(acao) {
 }
 
 async function registrarAcessoAtv(p, atv, acao) {
-  await registrarCheckin(p.id, acao, ORIGEM_APP, atv.id);
-  checkins.unshift({ participante_id: p.id, acao, at: new Date().toISOString(), atividade_id: atv.id, origem: ORIGEM_APP,
+  const op = novaOp("checkin", { pid: p.id, acao, origem: ORIGEM_APP, atv: atv.id, nome: p.nome });
+  await comOffline(op);
+  checkins.unshift({ id: op.uid, participante_id: p.id, acao, at: op.at, atividade_id: atv.id, origem: ORIGEM_APP,
     participante: { nome: p.nome, ingresso: p.ingresso, codigo: p.codigo } });
 }
 
@@ -783,11 +1040,15 @@ async function salvarNovoParticipante(credenciar) {
   const botoes = ["np-salvar", "np-salvar-cred"].map(el);
   botoes.forEach((b) => { b.disabled = true; });
   try {
-    const novo = await cadastrarParticipanteNoApp({
+    const dados = {
       nome, email: email || null, telefone: el("np-tel").value.trim() || null,
       empresa: el("np-empresa").value.trim() || null,
       tipo: el("np-tipo").value, ingresso: el("np-ingresso").value || null,
-    });
+    };
+    // o id nasce no celular: dá pra credenciar e imprimir a etiqueta já (o QR usa o id; o código chega ao sincronizar)
+    const op = novaOp("novo_participante", { pid: novoId(), dados, nome });
+    const r = await comOffline(op);
+    const novo = r.resultado ? { ...r.resultado } : { id: op.pid, ...dados, situacao: "Confirmado", pagamento: "Gratuito", quantidade: 1, codigo: null, presente: false, created_at: op.at };
     participantes.push(novo);
     fecharNovoParticipante();
     renderParticipantes();
@@ -858,6 +1119,7 @@ function renderPontos() {
     });
     on("[data-ativo]", async () => { const p = pontos.find((x) => x.id === id); await alterarPonto(id, { ativo: !p.ativo }); renderPontos(); });
     on("[data-confirmar]", async () => {
+      if (exigeInternet()) return;
       try {
         await remover("pontos_controle", id);
         pontos = pontos.filter((p) => p.id !== id);
@@ -870,12 +1132,15 @@ function renderPontos() {
   });
 }
 async function alterarPonto(id, patch) {
+  if (exigeInternet()) return;
   try {
     const novo = await salvar("pontos_controle", { id, ...patch });
     Object.assign(pontos.find((p) => p.id === id) || {}, novo);
   } catch (e) { toast(e.message || "Não foi possível salvar.", "erro"); }
 }
+const exigeInternet = () => { if (estaOffline()) { toast("Sem internet: pontos de controle só podem ser alterados online.", "erro"); return true; } return false; };
 async function adicionarPonto() {
+  if (exigeInternet()) return;
   const nome = el("ponto-novo").value.trim();
   if (!nome) return toast("Dê um nome ao ponto.", "erro");
   if (pontos.some((p) => p.nome.toLowerCase() === nome.toLowerCase())) return toast("Já existe um ponto com esse nome.", "erro");
@@ -1024,11 +1289,12 @@ async function tratarLeitura(texto) {
   navigator.vibrate?.(60);
   await pausar();
   el("mira-txt").textContent = "Buscando…";
-  let p = participantes.find((x) => x.codigo && texto.includes(x.codigo));
+  let p = participantes.find((x) => (x.codigo && texto.includes(x.codigo)) || (x.id && texto.includes(x.id)));
+  const comRede = !estaOffline() && OFF.pendentes === 0;   // com fila pendente a cópia local manda (o banco ainda não sabe)
   if (pontoModo) {
     // controle de acesso: confere o cadastro mais novo no banco (credenciamento e bloqueio feitos em outro aparelho)
-    try { const fresco = await buscarParticipantePorQR(texto); if (fresco) p = fresco; } catch {}
-  } else if (!p) { try { p = await buscarParticipantePorQR(texto); } catch {} }
+    if (comRede) { try { const fresco = await comTimeout(buscarParticipantePorQR(texto), 2500); if (fresco) p = fresco; } catch {} }
+  } else if (!p && comRede) { try { p = await comTimeout(buscarParticipantePorQR(texto), 4000); } catch {} }
   el("mira-txt").textContent = "Aponte para o QR Code do crachá";
   if (!p && pontoModo) return resultadoPonto({ nome: "Crachá não reconhecido" }, "erro", "Não está na lista de participantes");
   if (!p) return abrirSheetErro(texto);
@@ -1111,8 +1377,8 @@ async function desenharPreviaEtiqueta(p, caixa) {
 // marca/desmarca o bloqueio de acesso (0049) e redesenha a ficha
 async function definirBloqueio(p, bloquear) {
   try {
-    const r = await salvar("participantes", { id: p.id, acesso_bloqueado: bloquear, acesso_bloqueado_em: bloquear ? new Date().toISOString() : null });
-    p.acesso_bloqueado = !!(r?.acesso_bloqueado ?? bloquear);
+    await comOffline(novaOp("bloqueio", { pid: p.id, bloquear, nome: p.nome }));
+    p.acesso_bloqueado = bloquear;
     toast(bloquear ? `${p.nome}: acesso bloqueado.` : `${p.nome}: acesso liberado.`, "ok");
     if (!el("tela-shell").hidden) renderParticipantes();
     abrirFicha(p, "acoes");
@@ -1126,8 +1392,9 @@ async function definirBloqueio(p, bloquear) {
 async function garantirInscricao(p, atv) {
   if (inscritosIndisponivel) return true;
   if (estaInscrito(p.id, atv.id)) return true;
+  if (estaOffline() || OFF.pendentes > 0) return false;   // sem rede vale a lista salva no aparelho
   try {
-    const r = await inscricaoDaAtividade(atv.id, p.id);
+    const r = await comTimeout(inscricaoDaAtividade(atv.id, p.id), 2500);
     if (r) { inscritos.push(r); return true; }
   } catch { /* sem rede: vale o que já está na lista local */ }
   return false;
@@ -1239,15 +1506,17 @@ async function acao(tipo, p, btn) {
   btn.disabled = true; btn.textContent = "Registrando…";
   try {
     if (tipo === "saida-atv") {
-      await registrarCheckin(p.id, "saida", ORIGEM_APP, atv.id);
-      checkins.unshift({ participante_id: p.id, acao: "saida", at: new Date().toISOString(), atividade_id: atv.id, origem: ORIGEM_APP });
+      const opS = novaOp("checkin", { pid: p.id, acao: "saida", origem: ORIGEM_APP, atv: atv.id, nome: p.nome });
+      await comOffline(opS);
+      checkins.unshift({ id: opS.uid, participante_id: p.id, acao: "saida", at: opS.at, atividade_id: atv.id, origem: ORIGEM_APP });
       fecharSheet();
       toast(`Saída de ${p.nome} registrada.`, "ok");
       return;
     }
     const atvId = tipo === "atv" ? atv.id : null;
-    await registrarCheckin(p.id, "entrada", ORIGEM_APP, atvId);
-    checkins.unshift({ participante_id: p.id, acao: "entrada", at: new Date().toISOString(), atividade_id: atvId, origem: ORIGEM_APP });
+    const opE = novaOp("checkin", { pid: p.id, acao: "entrada", origem: ORIGEM_APP, atv: atvId, nome: p.nome });
+    await comOffline(opE);
+    checkins.unshift({ id: opE.uid, participante_id: p.id, acao: "entrada", at: opE.at, atividade_id: atvId, origem: ORIGEM_APP });
     if (!atvId) p.presente = true;
     if (tipo === "credenciar") imprimirCracha(p, evento.nome || "");
     fecharSheet();
@@ -1440,7 +1709,7 @@ async function salvarConfig() {
 
 /* ---- atualização periódica dos check-ins ------------------------- */
 setInterval(() => {
-  if (!document.hidden && evento && el("app").hidden === false) {
+  if (!document.hidden && evento && el("app").hidden === false && !estaOffline() && OFF.pendentes === 0) {
     listCheckins().then((c) => { checkins = c; }).catch(() => {});
   }
 }, 20000);

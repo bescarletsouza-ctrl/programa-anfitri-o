@@ -5,10 +5,14 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.ActivityNotFoundException
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.Uri
+import android.webkit.WebSettings
 import android.os.Bundle
 import android.webkit.JavascriptInterface
 import android.webkit.PermissionRequest
@@ -50,6 +54,8 @@ class CheckinActivity : Activity() {
             setSupportZoom(false)
             userAgentString = "$userAgentString WeEventsApp/1"
         }
+        // Sem internet ao abrir: usa a cópia guardada (o app de check-in tem modo offline e abre do cache)
+        web.settings.cacheMode = if (semRede()) WebSettings.LOAD_CACHE_ELSE_NETWORK else WebSettings.LOAD_DEFAULT
         // Só a nossa página carrega neste WebView (links de fora abrem no navegador), então a ponte é segura.
         web.addJavascriptInterface(Ponte(), "WeEventsApp")
 
@@ -100,6 +106,13 @@ class CheckinActivity : Activity() {
     override fun onDestroy() {
         web.destroy()
         super.onDestroy()
+    }
+
+    private fun semRede(): Boolean {
+        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val rede = cm.activeNetwork ?: return true
+        val caps = cm.getNetworkCapabilities(rede) ?: return true
+        return !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 
     /* ---- câmera ---- */

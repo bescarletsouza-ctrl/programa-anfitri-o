@@ -543,8 +543,30 @@ export const listAcessosPontos = (eid) =>
     .select("*, participante:participantes(nome, ingresso, tipo, codigo, email, empresa)")
     .eq("evento_id", ev(eid)).order("at", { ascending: false }).limit(5000).then(ok);
 
-export const registrarAcessoPonto = (pontoId, participanteId, acao, operador) =>
-  salvar("acessos_pontos", { ponto_id: pontoId, participante_id: participanteId, acao, operador: operador || null });
+// ---- Inserção IDEMPOTENTE (modo offline) ------------------------------------------------------------------
+// O app gera o id (uuid) e a hora (at) no celular, na hora em que a pessoa foi lida — mesmo sem internet. Reenviar a
+// mesma operação depois (queda no meio, timeout, sincronização repetida) não duplica: id repetido = já foi, segue.
+export async function inserirIdempotente(tabela, registro) {
+  const { data, error } = await supabase.from(tabela).insert(registro).select().single();
+  if (error) {
+    if (error.code === "23505") return registro;   // chave duplicada: essa operação já tinha chegado
+    console.error(error);
+    throw new Error(error.message || "Erro ao gravar no banco.");
+  }
+  return data;
+}
+// campos extras que o app offline manda: id e at (gerados no celular) e evento_id (o evento em que a operação foi feita)
+const comExtra = (linha, extra = {}) => {
+  if (extra.id) linha.id = extra.id;
+  if (extra.at) linha.at = extra.at;
+  if (extra.evento_id) linha.evento_id = extra.evento_id;
+  return linha;
+};
+
+export const registrarAcessoPonto = (pontoId, participanteId, acao, operador, extra = {}) =>
+  extra.id
+    ? inserirIdempotente("acessos_pontos", comExtra({ ponto_id: pontoId, participante_id: participanteId, acao, operador: operador || null }, extra))
+    : salvar("acessos_pontos", { ponto_id: pontoId, participante_id: participanteId, acao, operador: operador || null });
 
 /* ---- Inscritos por atividade (0048) -------------------------------------- */
 export const listInscritosAtividades = (eid) =>
@@ -564,13 +586,16 @@ export const removerInscritosAtividade = async (atividadeId, participanteIds) =>
   if (error) throw error;
 };
 
-export const inscreverNaAtividade =(atividadeId, participanteId, operador) =>
-  salvar("atividade_inscritos", { atividade_id: atividadeId, participante_id: participanteId, operador: operador || null });
+export const inscreverNaAtividade =(atividadeId, participanteId, operador, extra = {}) =>
+  extra.id
+    ? inserirIdempotente("atividade_inscritos", comExtra({ atividade_id: atividadeId, participante_id: participanteId, operador: operador || null }, { id: extra.id, evento_id: extra.evento_id }))
+    : salvar("atividade_inscritos", { atividade_id: atividadeId, participante_id: participanteId, operador: operador || null });
 
-export async function registrarCheckin(participanteId, acao = "entrada", origem = "checkin", atividadeId = null) {
+export async function registrarCheckin(participanteId, acao = "entrada", origem = "checkin", atividadeId = null, extra = {}) {
   const linha = { participante_id: participanteId, acao, origem };
   if (atividadeId) linha.atividade_id = atividadeId;
-  await salvar("checkins", linha);
+  if (extra.id) await inserirIdempotente("checkins", comExtra(linha, extra));   // vindo do modo offline: id/hora do momento da leitura
+  else await salvar("checkins", linha);
   if (acao === "entrada") {
     dispararIntegracoes(atividadeId ? "checkin.atividade" : "checkin.realizado", {
       participante_id: participanteId, atividade_id: atividadeId || null,
@@ -580,7 +605,7 @@ export async function registrarCheckin(participanteId, acao = "entrada", origem 
   return salvar("participantes", {
     id: participanteId,
     presente: acao === "entrada",
-    checkin_at: acao === "entrada" ? new Date().toISOString() : null,
+    checkin_at: acao === "entrada" ? (extra.at || new Date().toISOString()) : null,
   });
 }
 
@@ -809,11 +834,13 @@ export async function testarIntegracao(integracaoId) {
 
 /* ---- Cadastro de participante pelo app de check-in (liberado com a senha do evento, 0050) ----
    Entra na 1ª etapa do pipeline, Confirmado e Gratuito (cadastro no local); o código vem do banco. */
-export async function cadastrarParticipanteNoApp(dados) {
-  const etapa_id = await primeiraEtapaId(eventoId());
-  const salvo = await salvar("participantes", {
-    ...dados, situacao: "Confirmado", pagamento: "Gratuito", quantidade: 1, etapa_id,
-  });
+export async function cadastrarParticipanteNoApp(dados, extra = {}) {
+  const etapa_id = await primeiraEtapaId(extra.evento_id || eventoId());
+  const reg = { ...dados, situacao: "Confirmado", pagamento: "Gratuito", quantidade: 1, etapa_id };
+  // com id vindo do celular (cadastro offline) a inserção é idempotente; o código (codigo) o banco gera ao inserir
+  const salvo = extra.id
+    ? await inserirIdempotente("participantes", { ...reg, id: extra.id, evento_id: extra.evento_id || eventoId() })
+    : await salvar("participantes", reg);
   dispararIntegracoes("participante.criado", {
     participante_id: salvo.id,
     participante: { nome: salvo.nome, email: salvo.email, telefone: salvo.telefone, empresa: salvo.empresa, ingresso: salvo.ingresso, situacao: salvo.situacao, codigo: salvo.codigo },

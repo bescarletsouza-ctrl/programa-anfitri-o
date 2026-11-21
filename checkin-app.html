@@ -165,6 +165,7 @@
           <div class="ck-cfg-lista">
             <button class="ck-cfg-item" id="cfg-item-pontos" type="button"><span>Pontos de controle</span><i class="ck-chevron">›</i></button>
             <button class="ck-cfg-item" id="cfg-item-addpart" type="button"><span>Adicionar participantes</span><i class="ck-cfg-estado" id="cfg-addpart-estado">Bloqueado</i></button>
+            <button class="ck-cfg-item" id="cfg-item-offline" type="button"><span>Modo offline</span><i class="ck-cfg-estado" id="cfg-offline-estado">Online</i></button>
             <button class="ck-cfg-item" id="cfg-item-impressora" type="button"><span>Impressora e etiqueta</span><i class="ck-chevron">›</i></button>
             <button class="ck-cfg-item" id="cfg-item-tema" type="button"><span id="cfg-tema-txt">Tema claro</span><i class="ck-chevron">›</i></button>
           </div>
@@ -331,6 +332,30 @@
       <button class="ck-btn ck-btn-secundario" id="np-salvar" type="button" style="margin-top:10px">Salvar</button>
     </div>
   </section>
+  <!-- Modo offline: estado, dados baixados e fila de envio -->
+  <section class="ck-tela ck-busca" id="tela-offline" hidden>
+    <header class="ck-busca-topo">
+      <button class="ck-icone-btn ck-icone-btn-claro" id="offline-voltar" aria-label="Voltar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <strong style="font-size:1rem">Modo offline</strong>
+    </header>
+    <div class="ck-lista-corpo">
+      <div class="ck-cfg-cab"><strong id="of-estado">Online</strong><span>O app guarda os dados do evento neste celular e continua lendo QR, credenciando e registrando acessos sem internet. Ao voltar a rede, tudo é enviado sozinho, com a hora em que foi feito.</span></div>
+      <label class="ck-check-row"><input type="checkbox" id="of-manual" /> Trabalhar offline (não usar a internet agora)</label>
+      <p class="ck-lista-rotulo">Dados deste aparelho</p>
+      <p class="pagina-sub-ck" style="margin:0 0 12px">Baixados em: <b id="of-baixado">—</b></p>
+      <button class="ck-btn ck-btn-secundario" id="of-baixar" type="button">Baixar dados do evento agora</button>
+      <p class="ck-lista-rotulo">Envio</p>
+      <p class="pagina-sub-ck" style="margin:0 0 12px"><b id="of-pend">Nada pendente</b></p>
+      <button class="ck-btn ck-btn-primario" id="of-sync" type="button">Sincronizar agora</button>
+      <div id="of-fila" style="margin-top:14px"></div>
+      <p class="pagina-sub-ck">Dica: antes do evento, abra o app com internet e toque em <b>Baixar dados do evento agora</b>. Cadastrar ou apagar pontos de controle exige internet.</p>
+    </div>
+  </section>
+
+  <!-- Indicador de rede / pendências -->
+  <button class="ck-rede" id="rede-pill" type="button" hidden></button>
   <!-- Menu lateral -->
   <div class="ck-menu-fundo" id="menu-fundo" hidden></div>
   <nav class="ck-menu" id="menu" hidden aria-label="Menu">
