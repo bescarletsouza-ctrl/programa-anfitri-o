@@ -21,6 +21,8 @@ let inscritos = [];   // lista de inscritos por atividade (0048)
 _iniciando.then((ctx) => { if (ctx) carregar(ctx); });
 el("btn-atualizar").onclick = () => carregar();
 el("nova-atividade").onclick = () => editar(null);
+// o app de check-in também mexe nas atividades: relê sozinho a cada 30 s (com a aba aberta)
+setInterval(() => { if (!document.hidden) carregar(); }, 30000);
 
 async function carregar() {
   try {
@@ -34,6 +36,8 @@ async function carregar() {
     el("carregando").hidden = true;
     el("painel").hidden = false;
     render();
+    // gaveta aberta: atualiza também (alguém pode ter removido/adicionado pelo app)
+    if (gavetaAtv && document.getElementById("ga-corpo")) { gavetaAtv = atividades.find((a) => a.id === gavetaAtv.id) || gavetaAtv; renderGavetaCorpo(); }
   } catch (e) {
     const falta = /atividades|atividade_id|schema cache|does not exist/.test(e.message || "");
     el("carregando").innerHTML = falta
@@ -92,7 +96,8 @@ function inscritosDe(atvId) {
   let ultimaSaida = new Map();
   for (const c of checkins) {   // vem em ordem decrescente de data
     if (c.atividade_id !== atvId) continue;
-    ids.add(c.participante_id);
+    // quem entrou pelo APP sem estar inscrito não vira inscrito; quem a plataforma adicionou/importou, sim
+    if (c.origem === "atividades" || c.origem === "atividades-import") ids.add(c.participante_id);
     if (c.acao === "entrada") teveEntrada.add(c.participante_id);
     else if (!ultimaSaida.has(c.participante_id)) ultimaSaida.set(c.participante_id, c.at);
   }

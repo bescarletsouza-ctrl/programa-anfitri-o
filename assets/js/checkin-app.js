@@ -8,7 +8,7 @@ import {
   supabase, listEventos, listParticipantes, listCheckins, listAtividades,
   buscarParticipantePorQR, registrarCheckin, getEvento, salvarEventoPorId,
   meusAcessosEventos, eventosDoNivel, listPontos, listAcessosPontos, registrarAcessoPonto, salvar, remover,
-  listInscritosAtividades, inscreverNaAtividade, inscricaoDaAtividade,
+  listInscritosAtividades, inscreverNaAtividade, inscricaoDaAtividade, removerInscritosAtividade, removerCheckinsAtividade,
 } from "./supabase.js";
 import { eventoId, definirEvento } from "./evento.js";
 import {
@@ -40,6 +40,7 @@ let pontoModo = null;       // {id, nome, acao} enquanto o scanner lê pra um po
 let atvAcao = null;         // "entrada" | "saida" | "inscrever" | "inscrever_entrada" quando o scanner age direto numa atividade
 let inscritos = [];         // inscritos por atividade (0048)
 let inscritosIndisponivel = false;
+const ORIGEM_APP = "checkin-mobile";   // entradas/saídas feitas no app; a plataforma grava "atividades" / "atividades-import"
 const limparModo = () => { modo = ""; pontoModo = null; atvAcao = null; };
 let aba = "part";
 
@@ -116,7 +117,7 @@ window.addEventListener("popstate", () => {
   el("cfg-atv-add").onchange = (e) => { guardar("ck_atv_add", e.target.checked ? "1" : "0"); toast(e.target.checked ? "Este aparelho pode adicionar pessoas às atividades." : "Este aparelho não adiciona pessoas às atividades.", "ok"); };
   el("atv-dia").onchange = () => { guardar("ck_atv_dia", el("atv-dia").value); guardar("ck_atv", ""); renderAtividades(); };
   el("atv-sel").onchange = () => { guardar("ck_atv", el("atv-sel").value); renderAtividades(); };
-  document.querySelectorAll(".ck-subtabs [data-sub]").forEach((b) => { b.onclick = () => { atvSub = b.dataset.sub; renderAtividades(); }; });
+  document.querySelectorAll(".ck-subtabs [data-sub]").forEach((b) => { b.onclick = () => { atvSub = b.dataset.sub; renderAtividades(); atualizarAtividadesDoBanco(); }; });
   el("atv-entrada").onclick = () => iniciarScanAtividade("entrada");
   el("atv-saida").onclick = () => iniciarScanAtividade("saida");
   el("atv-add-qr").onclick = () => iniciarScanAtividade("inscrever");
@@ -259,7 +260,7 @@ function irParaAba(tab) {
   el("shell-titulo").textContent = TITULOS_ABA[tab];
   if (tab === "part") renderParticipantes();
   if (tab === "acesso") renderAcesso();
-  if (tab === "atv") renderAtividades();
+  if (tab === "atv") { renderAtividades(); atualizarAtividadesDoBanco(); }
   if (tab === "cfg") renderConfig();
 }
 
@@ -424,6 +425,19 @@ const podeAdicionarAtv = () => lembrado("ck_atv_add") !== "0";
 let atvSub = "cred";           // "cred" | "insc"
 let inscritoRemovendo = null;  // id da linha pedindo confirmação de remoção
 
+// A plataforma (ou outro aparelho) pode ter inscrito/removido gente: ao abrir a aba Atividades, relê do banco
+let atualizandoAtv = false;
+async function atualizarAtividadesDoBanco() {
+  if (atualizandoAtv) return;
+  atualizandoAtv = true;
+  try {
+    const [ins, chk] = await Promise.all([listInscritosAtividades().catch(() => null), listCheckins().catch(() => null)]);
+    if (ins) { inscritos = ins; inscritosIndisponivel = false; }
+    if (chk) checkins = chk;
+    if (aba === "atv") renderAtividades();
+  } finally { atualizandoAtv = false; }
+}
+
 async function carregarInscritos() {
   try { inscritos = await listInscritosAtividades(); inscritosIndisponivel = false; }
   catch (e) {
@@ -441,13 +455,14 @@ function atvSelecionada() {
   const lista = atividadesDoDia(lembrado("ck_atv_dia"));
   return lista.find((a) => a.id === id) || lista[0] || null;
 }
-// Inscritos de uma atividade = a lista de inscritos + quem já tem entrada/saída registrada nela (adicionado pela
-// plataforma ou antes de existir a lista). SAIR da atividade não tira ninguém da lista: saída é só saída do espaço.
+// Inscritos de uma atividade = a lista de inscritos + quem a PLATAFORMA adicionou/importou (que antes não tinha lista).
+// Quem entrou pelo app sem estar inscrito NÃO vira inscrito. SAIR não tira ninguém da lista: saída é só saída do espaço.
+const veioDaPlataforma = (c) => c.origem === "atividades" || c.origem === "atividades-import";
 function inscritosDe(atvId) {
   const linhas = inscritos.filter((i) => i.atividade_id === atvId);
   const ids = new Set(linhas.map((i) => i.participante_id));
   checkins.forEach((c) => {
-    if (c.atividade_id !== atvId || ids.has(c.participante_id)) return;
+    if (c.atividade_id !== atvId || !veioDaPlataforma(c) || ids.has(c.participante_id)) return;
     ids.add(c.participante_id);
     linhas.push({ id: null, atividade_id: atvId, participante_id: c.participante_id, implicita: true });
   });
@@ -455,9 +470,8 @@ function inscritosDe(atvId) {
 }
 const estaInscrito = (pid, atvId) =>
   inscritos.some((i) => i.participante_id === pid && i.atividade_id === atvId)
-  || checkins.some((c) => c.participante_id === pid && c.atividade_id === atvId);
-const atividadesDe = (pid) => atividades.filter((a) => estaInscrito(pid, a.id)).map((a) => a.nome);
-// última saída da pessoa na atividade (pra mostrar "Saiu às 14:10" sem tirá-la da lista)
+  || checkins.some((c) => c.participante_id === pid && c.atividade_id === atvId && veioDaPlataforma(c));
+const atividadesDe = (pid) => atividades.filter((a) => estaInscrito(pid, a.id)).map((a) => a.nome);// última saída da pessoa na atividade (pra mostrar "Saiu às 14:10" sem tirá-la da lista)
 const ultimaSaidaAtv = (pid, atvId) =>
   checkins.filter((c) => c.participante_id === pid && c.atividade_id === atvId && c.acao === "saida")
     .sort((a, b) => new Date(b.at) - new Date(a.at))[0] || null;
@@ -558,24 +572,27 @@ function renderInscritos(atv) {
     ? lista.map(({ i, p }) => {
         const dentro = !!saldoAtividade(p.id, atv.id);
         const saiu = !dentro ? ultimaSaidaAtv(p.id, atv.id) : null;
-        return `<div class="ck-insc-item" data-iid="${i.id || ""}"><div>
+        return `<div class="ck-insc-item" data-pid="${p.id}"><div>
             <strong>${esc(p.nome)}</strong>
             <span>${esc(p.telefone || "sem telefone")} · ${esc((p.ingresso || p.tipo || "sem categoria"))}</span></div>
           ${dentro ? `<span class="ck-insc-ok">✓ No local</span>` : saiu ? `<span class="ck-insc-saiu">Saiu às ${esc(horaCurta(saiu.at))}</span>` : ""}
-          ${pode && i.id ? (inscritoRemovendo === i.id
+          ${pode ? (inscritoRemovendo === p.id
             ? `<button class="ck-mini perigo" data-remover-ok>Remover</button><button class="ck-mini" data-remover-nao>Não</button>`
             : `<button class="ck-mini" data-remover>Remover</button>`) : ""}</div>`;
       }).join("")
     : `<p class="ck-busca-vazio">Ninguém inscrito ainda. Use os botões acima ou a pesquisa.</p>`;
-  el("atv-insc-lista").querySelectorAll("[data-iid]").forEach((row) => {
-    const iid = row.dataset.iid;
+  el("atv-insc-lista").querySelectorAll("[data-pid]").forEach((row) => {
+    const pid = row.dataset.pid;
     const on = (sel, fn) => { const b = row.querySelector(sel); if (b) b.onclick = fn; };
-    on("[data-remover]", () => { inscritoRemovendo = iid; renderAtividades(); });
+    on("[data-remover]", () => { inscritoRemovendo = pid; renderAtividades(); });
     on("[data-remover-nao]", () => { inscritoRemovendo = null; renderAtividades(); });
     on("[data-remover-ok]", async () => {
       try {
-        await remover("atividade_inscritos", iid);
-        inscritos = inscritos.filter((x) => x.id !== iid);
+        // igual à plataforma: sai da lista de inscritos e o histórico de entrada/saída dele nesta atividade é apagado
+        await removerInscritosAtividade(atv.id, [pid]);
+        await removerCheckinsAtividade(atv.id, [pid]).catch(() => {});
+        inscritos = inscritos.filter((x) => !(x.atividade_id === atv.id && x.participante_id === pid));
+        checkins = checkins.filter((c) => !(c.atividade_id === atv.id && c.participante_id === pid));
         toast("Removido da atividade.", "ok");
       } catch (e) { toast(e.message || "Não foi possível remover.", "erro"); }
       inscritoRemovendo = null;
@@ -583,7 +600,6 @@ function renderInscritos(atv) {
     });
   });
 }
-
 // inscreve alguém na atividade (devolve false se já estava)
 async function inscrever(p, atv) {
   if (!p || !atv) return false;
@@ -613,9 +629,20 @@ async function iniciarScanAtividade(acao) {
 }
 
 async function registrarAcessoAtv(p, atv, acao) {
-  await registrarCheckin(p.id, acao, "checkin-mobile", atv.id);
-  checkins.unshift({ participante_id: p.id, acao, at: new Date().toISOString(), atividade_id: atv.id,
+  await registrarCheckin(p.id, acao, ORIGEM_APP, atv.id);
+  checkins.unshift({ participante_id: p.id, acao, at: new Date().toISOString(), atividade_id: atv.id, origem: ORIGEM_APP,
     participante: { nome: p.nome, ingresso: p.ingresso, codigo: p.codigo } });
+}
+
+// Observações mostradas junto com a confirmação da entrada na atividade
+async function notasDaEntrada(p, atv) {
+  const cat = (p.ingresso || p.tipo || "").trim();
+  const notas = [];
+  const inscrito = await garantirInscricao(p, atv);
+  notas.push(inscrito ? { texto: "Inscrito na atividade", nivel: "ok" } : { texto: "NÃO inscrito na atividade", nivel: "alerta" });
+  if (atv.categorias?.length && !atv.categorias.includes(cat)) notas.push({ texto: "Categoria NÃO liberada nesta atividade", nivel: "alerta" });
+  if (atv.vagas && credenciadosNaAtv(atv.id).length >= atv.vagas) notas.push({ texto: "Atividade lotada", nivel: "alerta" });
+  return notas;
 }
 
 async function processarNaAtividade(p) {
@@ -623,39 +650,30 @@ async function processarNaAtividade(p) {
   const acao = atvAcao;
   if (!atv || !acao) return abrirSheet(p);
   const dentro = !!saldoAtividade(p.id, atv.id);
-  // amarelo = já está / não consta (atenção, nada gravado); vermelho = barrado (bloqueado, não inscrito)
+  // amarelo = já está / não consta (atenção, nada gravado); vermelho = acesso bloqueado
   const avisar = (texto, tom = "atencao") => { navigator.vibrate?.([80, 60, 80]); telaSucesso(p, null, { texto, tom }); setTimeout(retomar, 1500); };
   if (p.acesso_bloqueado) return avisar("Acesso bloqueado", "erro");
   try {
     if (acao === "inscrever") {
       if (estaInscrito(p.id, atv.id)) return avisar(`Já está inscrito(a) em ${atv.nome}`);
       if (!(await inscrever(p, atv))) return setTimeout(retomar, 800);
-      telaSucesso(p, null, { texto: `inscrito(a) em ${atv.nome}` });
-      return setTimeout(retomar, 1100);
-    }
-    if (acao === "inscrever_entrada") {
-      if (dentro) return avisar(`Já está na atividade ${atv.nome}`);
-      if (!estaInscrito(p.id, atv.id) && !(await inscrever(p, atv))) return setTimeout(retomar, 800);
-      await registrarAcessoAtv(p, atv, "entrada");
-      telaSucesso(p, null, { texto: `inscrito(a) e com entrada em ${atv.nome}` });
+      telaSucesso(p, null, { texto: `Inscrito(a) em ${atv.nome}` });
       return setTimeout(retomar, 1100);
     }
     if (acao === "saida") {
       if (!dentro) return avisar(`Não consta na atividade ${atv.nome}`);
       await registrarAcessoAtv(p, atv, "saida");
-      telaSucesso(p, null, { texto: `saída de ${atv.nome}` });
+      telaSucesso(p, null, { texto: `Saída de ${atv.nome}` });
       return setTimeout(retomar, 1100);
     }
-    // entrada: só entra quem está INSCRITO na atividade (vermelho, sem opção de credenciar); o inscrito é destacado
     if (dentro) return avisar(`Já está na atividade ${atv.nome}`);
-    if (!(await garantirInscricao(p, atv))) return avisar(`NÃO INSCRITO na atividade ${atv.nome}`, "erro");
-    const cat = (p.ingresso || p.tipo || "").trim();
-    const foraDaCategoria = atv.categorias?.length && !atv.categorias.includes(cat);
-    const lotada = atv.vagas && credenciadosNaAtv(atv.id).length >= atv.vagas;
-    if (foraDaCategoria || lotada) return abrirSheet(p);   // operador decide, com os alertas na tela
+    if (acao === "inscrever_entrada" && !estaInscrito(p.id, atv.id) && !(await inscrever(p, atv))) return setTimeout(retomar, 800);
+    // ENTRADA: sempre a mesma tela verde de confirmação — nome, categoria e as observações (inscrito ou não,
+    // categoria não liberada, lotada). Nada de folha de decisão.
+    const notas = await notasDaEntrada(p, atv);
     await registrarAcessoAtv(p, atv, "entrada");
-    telaSucesso(p, null, { texto: `INSCRITO ✓ · entrada em ${atv.nome}` });
-    setTimeout(retomar, 1100);
+    telaSucesso(p, null, { texto: `Entrada em ${atv.nome}`, notas, duracao: 2200 });
+    setTimeout(retomar, 1900);
   } catch (e) {
     toast(e.message || "Falha ao registrar.", "erro");
     setTimeout(retomar, 800);
@@ -1100,15 +1118,15 @@ async function acao(tipo, p, btn) {
   btn.disabled = true; btn.textContent = "Registrando…";
   try {
     if (tipo === "saida-atv") {
-      await registrarCheckin(p.id, "saida", "checkin-mobile", atv.id);
-      checkins.unshift({ participante_id: p.id, acao: "saida", at: new Date().toISOString(), atividade_id: atv.id });
+      await registrarCheckin(p.id, "saida", ORIGEM_APP, atv.id);
+      checkins.unshift({ participante_id: p.id, acao: "saida", at: new Date().toISOString(), atividade_id: atv.id, origem: ORIGEM_APP });
       fecharSheet();
       toast(`Saída de ${p.nome} registrada.`, "ok");
       return;
     }
     const atvId = tipo === "atv" ? atv.id : null;
-    await registrarCheckin(p.id, "entrada", "checkin-mobile", atvId);
-    checkins.unshift({ participante_id: p.id, acao: "entrada", at: new Date().toISOString(), atividade_id: atvId });
+    await registrarCheckin(p.id, "entrada", ORIGEM_APP, atvId);
+    checkins.unshift({ participante_id: p.id, acao: "entrada", at: new Date().toISOString(), atividade_id: atvId, origem: ORIGEM_APP });
     if (!atvId) p.presente = true;
     if (tipo === "credenciar") imprimirCracha(p, evento.nome || "");
     fecharSheet();
@@ -1128,13 +1146,14 @@ function telaSucesso(p, atvNome, opts = {}) {
   const texto = opts.texto || (atvNome ? "credenciado(a) em " + atvNome : "credenciado(a)");
   const cat = (p.ingresso || p.tipo || "").trim();
   const icone = tom === "ok" ? "✓" : tom === "erro" ? "✕" : "!";
-  d.innerHTML = `<div class="ck-sucesso-check">${icone}</div><strong>${esc(p.nome)}</strong>${cat ? `<em class="ck-sucesso-cat">${esc(cat)}</em>` : ""}<span>${esc(texto)}</span>`;
+  const notas = (opts.notas || []).map((n) => `<b class="ck-nota ${n.nivel === "ok" ? "ok" : "alerta"}">${n.nivel === "ok" ? "✓" : "⚠"} ${esc(n.texto)}</b>`).join("");
+  d.innerHTML = `<div class="ck-sucesso-check">${icone}</div><strong>${esc(p.nome)}</strong>${cat ? `<em class="ck-sucesso-cat">${esc(cat)}</em>` : ""}<span>${esc(texto)}</span>${notas ? `<div class="ck-notas">${notas}</div>` : ""}`;
   document.body.appendChild(d);
   void d.offsetHeight;
   setTimeout(() => d.classList.add("aberto"), 10);
   const sair = () => { d.classList.remove("aberto"); setTimeout(() => d.remove(), 250); };
   d.onclick = sair;
-  setTimeout(sair, 1600);
+  setTimeout(sair, opts.duracao || 1600);
 }
 
 /* ---- lista de participantes / busca manual ------------------------ */
