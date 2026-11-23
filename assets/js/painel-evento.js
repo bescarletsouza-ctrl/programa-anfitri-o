@@ -83,7 +83,6 @@ function render() {
   renderQuebra("rel-situacao", participantes, situ, SITUACOES);
   renderFaturamento(ativos);
   renderClusterTipoFaturamento(participantes);
-  renderQuebra("rel-faturamento-perfil", participantes, (p) => normalizarFaturamento(p.faturamento) || "Não informado");
   renderCamposPersonalizados(participantes);
 }
 
@@ -241,7 +240,9 @@ function valoresCampo(campo, p) {
 
 function renderCamposPersonalizados(dados) {
   const wrap = el("rel-campos");
-  const ativos = camposPersonalizados.filter((c) => c.ativo);
+  // o campo "Faturamento" já tem o gráfico próprio (Participantes por faturamento): não repete aqui
+  const semAcento = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+  const ativos = camposPersonalizados.filter((c) => c.ativo && semAcento(c.nome) !== "faturamento");
   if (!ativos.length) { wrap.innerHTML = ""; return; }
   wrap.innerHTML = ativos.map((c) => {
     const mapa = new Map();
