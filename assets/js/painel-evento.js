@@ -82,8 +82,90 @@ function render() {
   renderQuebraConfirmados("rel-tipo", participantes, (p) => p.tipo || "—");
   renderQuebra("rel-situacao", participantes, situ, SITUACOES);
   renderFaturamento(ativos);
+  renderClusterTipoFaturamento(participantes);
   renderQuebra("rel-faturamento-perfil", participantes, (p) => normalizarFaturamento(p.faturamento) || "Não informado");
   renderCamposPersonalizados(participantes);
+}
+
+/* ---- Gráfico agrupado: tipo de participante (grupos) × faixa de faturamento (barras) ---------------------- */
+// Filtro de situação: "Todas" ou uma das SITUACOES. Lembra a última escolha neste navegador.
+let filtroSituacaoCl = "Todas";
+try { const s = localStorage.getItem("painel_cl_situacao"); if (s) filtroSituacaoCl = s; } catch {}
+
+const SEM_FAT = "Não informado";
+// ordena as faixas pelo menor valor citado ("50 mil – 150 mil/mês" < "150 mil – 500 mil/mês" < "Acima de 1 milhão");
+// "Não informado" sempre por último
+function valorFaixa(txt) {
+  const s = String(txt).toLowerCase().replace(/\./g, "").replace(",", ".");
+  const m = s.match(/(\d+(?:\.\d+)?)\s*(milh[õo]es|milh[ãa]o|mi\b|mil|k\b)?/);
+  if (!m) return Infinity;
+  let n = parseFloat(m[1]);
+  const u = m[2] || "";
+  if (/^milh/.test(u) || u === "mi") n *= 1_000_000; else if (u === "mil" || u === "k") n *= 1000;
+  // "Até X" fica antes das faixas que começam em X; "Acima de X" depois
+  if (/^\s*(at[eé]|menos|abaixo)/.test(s)) n -= 0.5;
+  if (/^\s*(acima|mais|maior)/.test(s)) n += 0.5;
+  return n;
+}
+const ordenarFaixas = (a, b) =>
+  (a === SEM_FAT) - (b === SEM_FAT) || valorFaixa(a) - valorFaixa(b) || a.localeCompare(b, "pt-BR", { numeric: true });
+// rampa sequencial (claro → escuro) pelas faixas em ordem; "Não informado" em cinza
+const corFaixa = (i, n, faixa) =>
+  faixa === SEM_FAT ? "var(--cinza-400)" : `hsl(262 78% ${n <= 1 ? 52 : Math.round(76 - (i / (n - 1)) * 40)}%)`;
+
+function renderClusterTipoFaturamento(todos) {
+  const chips = el("cl-chips");
+  if (!chips) return;
+  const contagem = (s) => (s === "Todas" ? todos.length : todos.filter((p) => situ(p) === s).length);
+  if (filtroSituacaoCl !== "Todas" && !SITUACOES.includes(filtroSituacaoCl)) filtroSituacaoCl = "Todas";
+  chips.innerHTML = ["Todas", ...SITUACOES].map((s) =>
+    `<button type="button" class="cl-chip${s === filtroSituacaoCl ? " ativo" : ""}" data-sit="${esc(s)}" aria-pressed="${s === filtroSituacaoCl}">${esc(s)} <span class="cl-chip-n">${contagem(s)}</span></button>`).join("");
+  chips.querySelectorAll("[data-sit]").forEach((b) => {
+    b.onclick = () => {
+      filtroSituacaoCl = b.dataset.sit;
+      try { localStorage.setItem("painel_cl_situacao", filtroSituacaoCl); } catch {}
+      renderClusterTipoFaturamento(todos);
+    };
+  });
+
+  const dados = filtroSituacaoCl === "Todas" ? todos : todos.filter((p) => situ(p) === filtroSituacaoCl);
+  const plot = el("cl-plot"), leg = el("cl-legenda");
+  if (!dados.length) {
+    leg.innerHTML = "";
+    plot.innerHTML = `<p class="pagina-sub" style="margin:0">Nenhum participante com a situação <b>${esc(filtroSituacaoCl)}</b>.</p>`;
+    return;
+  }
+  const tiposDe = new Map();      // tipo → Map(faixa → n)
+  const faixasSet = new Set();
+  dados.forEach((p) => {
+    const t = (p.tipo || "").trim() || "—";
+    const f = normalizarFaturamento(p.faturamento) || SEM_FAT;
+    faixasSet.add(f);
+    const m = tiposDe.get(t) || new Map();
+    m.set(f, (m.get(f) || 0) + 1);
+    tiposDe.set(t, m);
+  });
+  const faixas = [...faixasSet].sort(ordenarFaixas);
+  const cor = new Map(faixas.map((f, i) => [f, corFaixa(i, faixas.length, f)]));
+  const grupos = [...tiposDe.entries()]
+    .map(([t, m]) => ({ t, m, tot: [...m.values()].reduce((a, b) => a + b, 0) }))
+    .sort((a, b) => b.tot - a.tot);
+  const maior = Math.max(1, ...grupos.flatMap((g) => [...g.m.values()]));
+
+  const totalPorFaixa = (f) => grupos.reduce((s, g) => s + (g.m.get(f) || 0), 0);
+  leg.innerHTML = faixas.map((f) =>
+    `<span class="cl-leg"><i style="background:${cor.get(f)}"></i>${esc(f)} <b>${totalPorFaixa(f)}</b></span>`).join("");
+
+  plot.innerHTML = grupos.map((g) => `<div class="cl-grupo">
+      <div class="cl-barras">${faixas.map((f) => {
+        const n = g.m.get(f) || 0;
+        return `<div class="cl-col" title="${esc(g.t)} · ${esc(f)}: ${n} participante${n === 1 ? "" : "s"}">
+          <span class="cl-val">${n || ""}</span>
+          <div class="cl-barra" style="height:${n ? Math.max(3, Math.round((n / maior) * 88)) : 0}%;background:${cor.get(f)}"></div>
+        </div>`;
+      }).join("")}</div>
+      <div class="cl-rotulo" title="${esc(g.t)}">${esc(g.t)}<span class="cl-rotulo-n">${g.tot}</span></div>
+    </div>`).join("");
 }
 
 function renderDias(dados) {
