@@ -525,6 +525,9 @@ table.tabela tbody tr:last-child td { border-bottom: none; }
 .vazio { text-align: center; padding: 52px 20px; color: var(--texto-suave); font-size: .9rem; }
 .vazio svg { width: 32px; height: 32px; opacity: .35; margin: 0 auto 10px; display: block; }
 .linha-acoes { display: flex; gap: 4px; }
+/* quando a classe está num <td>, mantém ele como CÉLULA da tabela (flex deixava a altura/borda desalinhada das outras células) */
+td.linha-acoes { display: table-cell; white-space: nowrap; }
+td.linha-acoes .icone-btn { vertical-align: middle; }
 .icone-btn {
   border: none; background: transparent; cursor: pointer; padding: 6px; border-radius: 7px;
   color: var(--texto-tenue); display: inline-flex; align-items: center; transition: background .12s, color .12s;
