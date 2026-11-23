@@ -166,7 +166,7 @@ class CheckinActivity : Activity() {
             val erro = try {
                 val crachas = BadgeRenderer.parseJson(json)
                 val etiqueta = Etiquetas.porSdk(prefs.etiqueta)
-                val bitmaps = crachas.map { BadgeRenderer.desenhar(it, Etiquetas.LARGURA_PX, etiqueta.alturaPx) }
+                val bitmaps = crachas.map { BadgeRenderer.desenhar(it, Etiquetas.LARGURA_PX, etiqueta.alturaPx, prefs.orientacao) }
                 BrotherPrinter(applicationContext).imprimir(bitmaps, prefs.ip, etiqueta.sdk, prefs.cortar)
             } catch (e: Throwable) {
                 "Não consegui imprimir: ${e.message ?: e.javaClass.simpleName}"

@@ -24,6 +24,7 @@ class ConfigActivity : Activity() {
     private lateinit var prefs: Prefs
     private lateinit var campoIp: EditText
     private lateinit var seletor: Spinner
+    private lateinit var orientacao: Spinner
     private lateinit var cortar: CheckBox
     private lateinit var resultado: TextView
 
@@ -70,6 +71,12 @@ class ConfigActivity : Activity() {
             override fun onNothingSelected(p: AdapterView<*>?) {}
         }
         coluna.addView(seletor)
+
+        coluna.addView(titulo("Orientação da etiqueta"))
+        orientacao = Spinner(this)
+        orientacao.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, Orientacao.OPCOES.map { it.second })
+        orientacao.setSelection(Orientacao.OPCOES.indexOfFirst { it.first == prefs.orientacao }.coerceAtLeast(0))
+        coluna.addView(orientacao)
 
         cortar = CheckBox(this).apply { text = "Cortar a etiqueta depois de cada impressão"; isChecked = prefs.cortar }
         coluna.addView(cortar)
@@ -126,6 +133,7 @@ class ConfigActivity : Activity() {
         prefs.ip = campoIp.text.toString()
         prefs.etiqueta = Etiquetas.TODAS[seletor.selectedItemPosition].sdk
         prefs.cortar = cortar.isChecked
+        prefs.orientacao = Orientacao.OPCOES[orientacao.selectedItemPosition].first
     }
 
     private fun imprimirTeste() {
@@ -134,9 +142,10 @@ class ConfigActivity : Activity() {
         val etiqueta = Etiquetas.porSdk(prefs.etiqueta)
         val ip = prefs.ip
         val corta = prefs.cortar
+        val orient = prefs.orientacao
         thread {
             val msg = try {
-                val bmp = BadgeRenderer.desenhar(BadgeRenderer.exemplo(), Etiquetas.LARGURA_PX, etiqueta.alturaPx)
+                val bmp = BadgeRenderer.desenhar(BadgeRenderer.exemplo(), Etiquetas.LARGURA_PX, etiqueta.alturaPx, orient)
                 BrotherPrinter(applicationContext).imprimir(listOf(bmp), ip, etiqueta.sdk, corta) ?: "Teste enviado. Se a etiqueta saiu, está tudo certo."
             } catch (e: Throwable) {
                 "Falhou: ${e.message ?: e.javaClass.simpleName}"

@@ -3,6 +3,7 @@ package br.com.mirapontocom.events.we.print
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
@@ -16,6 +17,7 @@ import com.google.zxing.qrcode.QRCodeWriter
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 import org.json.JSONObject
 import kotlin.math.floor
+import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -73,7 +75,8 @@ object BadgeRenderer {
      * @param larguraPx largura útil da fita (696 pts na de 62 mm)
      * @param alturaFixaPx altura da etiqueta pré-cortada, ou null no rolo contínuo (altura segue o crachá)
      */
-    fun desenhar(c: Cracha, larguraPx: Int, alturaFixaPx: Int?): Bitmap {
+    fun desenhar(c: Cracha, larguraPx: Int, alturaFixaPx: Int?, orientacao: String = Orientacao.VERTICAL): Bitmap {
+        if (orientacao != Orientacao.VERTICAL) return desenharHorizontal(c, larguraPx, alturaFixaPx, orientacao == Orientacao.HORIZONTAL_INV)
         // pontos por mm: no rolo o crachá ocupa a largura toda; na pré-cortada, cabe inteiro
         val dpm = if (alturaFixaPx == null) larguraPx / c.wMm
                   else min(larguraPx / c.wMm, alturaFixaPx / c.hMm)
@@ -84,8 +87,34 @@ object BadgeRenderer {
         val canvas = Canvas(bmp)
         canvas.drawColor(Color.WHITE)
 
-        val offX = (larguraPx - cardW) / 2f
-        val offY = 0f
+        pintar(canvas, c, dpm, (larguraPx - cardW) / 2f, 0f)
+        return bmp
+    }
+
+    /**
+     * Horizontal: o crachá fica "deitado" (lado maior ao longo da etiqueta que sai da impressora, lado menor na
+     * largura da fita) — desenha em paisagem e gira 90° antes de mandar, porque a impressora só imprime de cima pra baixo.
+     */
+    private fun desenharHorizontal(c: Cracha, larguraPx: Int, alturaFixaPx: Int?, invertido: Boolean): Bitmap {
+        val comp = max(c.wMm, c.hMm)
+        val larg = min(c.wMm, c.hMm)
+        val cartao = c.copy(wMm = comp, hMm = larg)
+        val dpm = if (alturaFixaPx == null) larguraPx / larg else min(larguraPx / larg, alturaFixaPx / comp)
+        val cardW = comp * dpm
+        val cardH = larg * dpm
+        val comprimento = alturaFixaPx ?: cardW.roundToInt()
+        val paisagem = Bitmap.createBitmap(comprimento, larguraPx, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(paisagem)
+        canvas.drawColor(Color.WHITE)
+        pintar(canvas, cartao, dpm, (comprimento - cardW) / 2f, (larguraPx - cardH) / 2f)
+        val giro = Matrix().apply { postRotate(if (invertido) 270f else 90f) }
+        return Bitmap.createBitmap(paisagem, 0, 0, paisagem.width, paisagem.height, giro, true)
+    }
+
+    /** Desenha o crachá (texto + QR) com o canto superior esquerdo em (offX, offY). */
+    private fun pintar(canvas: Canvas, c: Cracha, dpm: Float, offX: Float, offY: Float) {
+        val cardW = c.wMm * dpm
+        val cardH = c.hMm * dpm
         val pad = 6f * dpm
         val maxW = (cardW - 2 * pad).toInt().coerceAtLeast(40)
 
@@ -120,7 +149,6 @@ object BadgeRenderer {
         if (c.qr.isNotBlank()) desenharQr(canvas, c.qr, offX + cardW - pad, offY + cardH - pad, dpm, c)
 
         canvas.restore()
-        return bmp
     }
 
     private fun desenharQr(canvas: Canvas, texto: String, direita: Float, baixo: Float, dpm: Float, c: Cracha) {

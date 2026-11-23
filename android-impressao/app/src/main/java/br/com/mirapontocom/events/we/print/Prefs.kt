@@ -20,8 +20,24 @@ object Etiquetas {
     fun porSdk(nome: String?) = TODAS.firstOrNull { it.sdk == nome } ?: TODAS.first()
 }
 
+/** Como o crachá sai na etiqueta. Horizontal = deitado (lado maior no sentido em que a etiqueta sai). */
+object Orientacao {
+    const val VERTICAL = "vertical"
+    const val HORIZONTAL = "horizontal"
+    const val HORIZONTAL_INV = "horizontal_inv"   // mesmo, girado 180° (se sair de cabeça pra baixo)
+    val OPCOES = listOf(
+        HORIZONTAL to "Horizontal (deitada)",
+        HORIZONTAL_INV to "Horizontal, girada 180° (se sair de cabeça pra baixo)",
+        VERTICAL to "Vertical (em pé)",
+    )
+}
+
 class Prefs(context: Context) {
     private val sp = context.getSharedPreferences("impressora", Context.MODE_PRIVATE)
+
+    var orientacao: String
+        get() = sp.getString("orientacao", Orientacao.HORIZONTAL) ?: Orientacao.HORIZONTAL
+        set(v) = sp.edit().putString("orientacao", v).apply()
 
     var ip: String
         get() = sp.getString("ip", "") ?: ""
