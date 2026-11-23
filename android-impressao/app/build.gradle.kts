@@ -33,5 +33,8 @@ dependencies {
     // QR Code desenhado direto no bitmap da etiqueta
     implementation("com.google.zxing:core:3.5.3")
     // SDK da Brother: baixe o BrotherPrintLibrary.aar e coloque em app/libs (veja ../README.md)
+    // O SDK da Brother usa estas bibliotecas por dentro (sem elas dá "Failed resolution of androidx/arch/core/util/Function")
+    implementation("androidx.arch.core:core-common:2.2.0")
+    implementation("androidx.core:core-ktx:1.13.1")
     implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.aar", "*.jar"))))
 }
