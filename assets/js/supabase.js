@@ -773,8 +773,8 @@ export const salvarAcessosDoMembro = (orgId, membroId, restringir, acessos) =>
 // Sem a migração 0046 (ou sem restrição) devolve restringir=false → vê tudo, como sempre foi.
 export async function meusAcessosEventos() {
   try {
-    const { data: u } = await supabase.auth.getUser();
-    const uid = u?.user?.id;
+    const { data: s } = await supabase.auth.getSession();   // local (não faz ida ao servidor, ao contrário de getUser)
+    const uid = s?.session?.user?.id;
     if (!uid) return { restringir: false, porEvento: {} };
     const [{ data: m }, { data: acs }] = await Promise.all([
       supabase.from("org_membros").select("papel, restringir_eventos").eq("user_id", uid).limit(1),
