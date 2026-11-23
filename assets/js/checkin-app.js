@@ -1363,7 +1363,10 @@ function abrirFicha(p, abaFicha = "acoes") {
 // prévia da etiqueta no mesmo layout que sai impresso (largura × altura configuradas), reduzida pra caber na tela
 async function desenharPreviaEtiqueta(p, caixa) {
   try {
-    const config = evento?.cracha_config || CRACHA_PADRAO;
+    const base = evento?.cracha_config || CRACHA_PADRAO;
+    // a etiqueta sai DEITADA (horizontal): o lado maior fica na horizontal, qualquer que seja a ordem largura × altura salva
+    const l = Number(base.largura_mm) || 90, a = Number(base.altura_mm) || 55;
+    const config = { ...base, largura_mm: Math.max(l, a), altura_mm: Math.min(l, a) };
     const qr = config.qr !== false ? await qrDataURL(p.codigo || p.id || "") : null;
     caixa.innerHTML = montarCrachaHtml(p, evento?.nome || "", config, qr);
     const cartao = caixa.firstElementChild;
