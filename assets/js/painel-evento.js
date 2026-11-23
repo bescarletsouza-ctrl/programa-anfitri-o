@@ -87,10 +87,13 @@ function render() {
   renderCamposPersonalizados(participantes);
 }
 
-/* ---- Gráfico agrupado: tipo de participante (grupos) × faixa de faturamento (barras) ---------------------- */
-// Filtro de situação: "Todas" ou uma das SITUACOES. Lembra a última escolha neste navegador.
-let filtroSituacaoCl = "Todas";
-try { const s = localStorage.getItem("painel_cl_situacao"); if (s) filtroSituacaoCl = s; } catch {}
+/* ---- Gráfico: participantes por faixa de faturamento (base), com filtros de situação e de tipo ------------- */
+// Os dois filtros lembram a última escolha neste navegador.
+let filtroSituacaoCl = "Todas", filtroTipoCl = "Todos";
+try {
+  filtroSituacaoCl = localStorage.getItem("painel_fx_situacao") || filtroSituacaoCl;
+  filtroTipoCl = localStorage.getItem("painel_fx_tipo") || filtroTipoCl;
+} catch {}
 
 const SEM_FAT = "Não informado";
 // ordena as faixas pelo menor valor citado ("50 mil – 150 mil/mês" < "150 mil – 500 mil/mês" < "Acima de 1 milhão");
@@ -109,63 +112,56 @@ function valorFaixa(txt) {
 }
 const ordenarFaixas = (a, b) =>
   (a === SEM_FAT) - (b === SEM_FAT) || valorFaixa(a) - valorFaixa(b) || a.localeCompare(b, "pt-BR", { numeric: true });
-// rampa sequencial (claro → escuro) pelas faixas em ordem; "Não informado" em cinza
-const corFaixa = (i, n, faixa) =>
-  faixa === SEM_FAT ? "var(--cinza-400)" : `hsl(262 78% ${n <= 1 ? 52 : Math.round(76 - (i / (n - 1)) * 40)}%)`;
+const tipoDe = (p) => (p.tipo || "").trim() || "—";
+const faixaDe = (p) => normalizarFaturamento(p.faturamento) || SEM_FAT;
 
 function renderClusterTipoFaturamento(todos) {
-  const chips = el("cl-chips");
-  if (!chips) return;
-  const contagem = (s) => (s === "Todas" ? todos.length : todos.filter((p) => situ(p) === s).length);
+  const chipsSit = el("cl-chips"), chipsTipo = el("cl-chips-tipo");
+  if (!chipsSit || !chipsTipo) return;
+  const tiposLista = [...new Set(todos.map(tipoDe))].sort((a, b) => a.localeCompare(b, "pt-BR"));
   if (filtroSituacaoCl !== "Todas" && !SITUACOES.includes(filtroSituacaoCl)) filtroSituacaoCl = "Todas";
-  chips.innerHTML = ["Todas", ...SITUACOES].map((s) =>
-    `<button type="button" class="cl-chip${s === filtroSituacaoCl ? " ativo" : ""}" data-sit="${esc(s)}" aria-pressed="${s === filtroSituacaoCl}">${esc(s)} <span class="cl-chip-n">${contagem(s)}</span></button>`).join("");
-  chips.querySelectorAll("[data-sit]").forEach((b) => {
-    b.onclick = () => {
-      filtroSituacaoCl = b.dataset.sit;
-      try { localStorage.setItem("painel_cl_situacao", filtroSituacaoCl); } catch {}
-      renderClusterTipoFaturamento(todos);
-    };
+  if (filtroTipoCl !== "Todos" && !tiposLista.includes(filtroTipoCl)) filtroTipoCl = "Todos";
+  const okSit = (p) => filtroSituacaoCl === "Todas" || situ(p) === filtroSituacaoCl;
+  const okTipo = (p) => filtroTipoCl === "Todos" || tipoDe(p) === filtroTipoCl;
+
+  // cada filtro mostra a contagem já respeitando o OUTRO filtro
+  const chip = (valor, rotulo, n, ativo, attr) =>
+    `<button type="button" class="cl-chip${ativo ? " ativo" : ""}" ${attr}="${esc(valor)}" aria-pressed="${ativo}">${esc(rotulo)} <span class="cl-chip-n">${n}</span></button>`;
+  chipsSit.innerHTML = ["Todas", ...SITUACOES].map((s) =>
+    chip(s, s, todos.filter((p) => okTipo(p) && (s === "Todas" || situ(p) === s)).length, s === filtroSituacaoCl, "data-sit")).join("");
+  chipsTipo.innerHTML = ["Todos", ...tiposLista].map((t) =>
+    chip(t, t, todos.filter((p) => okSit(p) && (t === "Todos" || tipoDe(p) === t)).length, t === filtroTipoCl, "data-tipo")).join("");
+
+  const salvar = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+  chipsSit.querySelectorAll("[data-sit]").forEach((b) => {
+    b.onclick = () => { filtroSituacaoCl = b.dataset.sit; salvar("painel_fx_situacao", filtroSituacaoCl); renderClusterTipoFaturamento(todos); };
+  });
+  chipsTipo.querySelectorAll("[data-tipo]").forEach((b) => {
+    b.onclick = () => { filtroTipoCl = b.dataset.tipo; salvar("painel_fx_tipo", filtroTipoCl); renderClusterTipoFaturamento(todos); };
   });
 
-  const dados = filtroSituacaoCl === "Todas" ? todos : todos.filter((p) => situ(p) === filtroSituacaoCl);
-  const plot = el("cl-plot"), leg = el("cl-legenda");
+  const dados = todos.filter((p) => okSit(p) && okTipo(p));
+  const plot = el("cl-plot");
   if (!dados.length) {
-    leg.innerHTML = "";
-    plot.innerHTML = `<p class="pagina-sub" style="margin:0">Nenhum participante com a situação <b>${esc(filtroSituacaoCl)}</b>.</p>`;
+    plot.innerHTML = `<p class="pagina-sub" style="margin:0">Nenhum participante com esse filtro.</p>`;
     return;
   }
-  const tiposDe = new Map();      // tipo → Map(faixa → n)
-  const faixasSet = new Set();
-  dados.forEach((p) => {
-    const t = (p.tipo || "").trim() || "—";
-    const f = normalizarFaturamento(p.faturamento) || SEM_FAT;
-    faixasSet.add(f);
-    const m = tiposDe.get(t) || new Map();
-    m.set(f, (m.get(f) || 0) + 1);
-    tiposDe.set(t, m);
-  });
-  const faixas = [...faixasSet].sort(ordenarFaixas);
-  const cor = new Map(faixas.map((f, i) => [f, corFaixa(i, faixas.length, f)]));
-  const grupos = [...tiposDe.entries()]
-    .map(([t, m]) => ({ t, m, tot: [...m.values()].reduce((a, b) => a + b, 0) }))
-    .sort((a, b) => b.tot - a.tot);
-  const maior = Math.max(1, ...grupos.flatMap((g) => [...g.m.values()]));
+  const mapa = new Map();
+  dados.forEach((p) => { const f = faixaDe(p); mapa.set(f, (mapa.get(f) || 0) + 1); });
+  const faixas = [...mapa.keys()].sort(ordenarFaixas);
+  const maior = Math.max(...mapa.values());
+  const pct = (n) => `${(Math.round((n / dados.length) * 1000) / 10).toLocaleString("pt-BR")}%`;
 
-  const totalPorFaixa = (f) => grupos.reduce((s, g) => s + (g.m.get(f) || 0), 0);
-  leg.innerHTML = faixas.map((f) =>
-    `<span class="cl-leg"><i style="background:${cor.get(f)}"></i>${esc(f)} <b>${totalPorFaixa(f)}</b></span>`).join("");
-
-  plot.innerHTML = grupos.map((g) => `<div class="cl-grupo">
-      <div class="cl-barras">${faixas.map((f) => {
-        const n = g.m.get(f) || 0;
-        return `<div class="cl-col" title="${esc(g.t)} · ${esc(f)}: ${n} participante${n === 1 ? "" : "s"}">
-          <span class="cl-val">${n || ""}</span>
-          <div class="cl-barra" style="height:${n ? Math.max(3, Math.round((n / maior) * 88)) : 0}%;background:${cor.get(f)}"></div>
-        </div>`;
-      }).join("")}</div>
-      <div class="cl-rotulo" title="${esc(g.t)}">${esc(g.t)}<span class="cl-rotulo-n">${g.tot}</span></div>
-    </div>`).join("");
+  plot.innerHTML = faixas.map((f) => {
+    const n = mapa.get(f);
+    return `<div class="fx-col" title="${esc(f)}: ${n} participante${n === 1 ? "" : "s"} (${pct(n)})">
+      <div class="fx-area">
+        <span class="fx-val">${n}</span><span class="fx-pct">${pct(n)}</span>
+        <div class="fx-barra${f === SEM_FAT ? " sem" : ""}" style="height:${Math.max(3, Math.round((n / maior) * 82))}%"></div>
+      </div>
+      <div class="fx-rotulo">${esc(f)}</div>
+    </div>`;
+  }).join("");
 }
 
 function renderDias(dados) {
