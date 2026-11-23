@@ -590,6 +590,8 @@ table.tabela tbody tr:last-child td { border-bottom: none; }
 .tabela-part tbody tr.sel { background: var(--cor-laranja-suave); }
 .cel-sub { display: block; color: var(--texto-tenue); font-size: .76rem; margin-top: 2px; }
 .cel-tenue { color: var(--texto-tenue); }
+/* origem do lead: uma linha só (o nome inteiro aparece ao passar o mouse), pra não desalinhar a tabela */
+.cel-origem { display: block; max-width: 190px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .chip-codigo {
   display: inline-flex; align-items: center; height: 20px; padding: 0 8px;
   border-radius: 6px; background: var(--cinza-100); color: var(--texto-suave);

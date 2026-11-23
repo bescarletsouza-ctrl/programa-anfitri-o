@@ -587,7 +587,8 @@ function celulaHtml(p, c) {
     case "origemLead": {
       const o = origemDoLead(p);
       if (!o) return `<td><span class="cel-tenue">—</span></td>`;
-      return `<td title="${p.convidado?.anfitriao?.nome ? "Convidado por este anfitrião" : "Origem informada pela integração"}">${esc(o)}</td>`;
+      const tip = p.convidado?.anfitriao?.nome ? "Convidado por" : "Origem informada pela integração";
+      return `<td><span class="cel-origem" title="${esc(tip)}: ${esc(o)}">${esc(o)}</span></td>`;
     }
     case "origem":
       return p.evento_origem_id || p.evento_origem_nome
