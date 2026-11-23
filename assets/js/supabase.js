@@ -457,7 +457,7 @@ export const listConvidadosDoAnfitriao = (anfitriaoId) =>
 export const listParticipantes = (eid) =>
   supabase
     .from("participantes")
-    .select("*, convidado:convidados(status)")
+    .select("*, convidado:convidados(status, anfitriao:anfitrioes(nome))")
     .eq("evento_id", ev(eid))
     .order("created_at", { ascending: false })
     .then(ok);

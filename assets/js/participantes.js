@@ -69,6 +69,7 @@ const COLUNAS_BASE = {
   presenca:   "Presença",
   cadastro:   "Cadastro",
   origem:     "Origem (transferência)",
+  origemLead: "Origem do lead",
 };
 let COLUNAS = { ...COLUNAS_BASE };
 const COLUNAS_PADRAO = ["codigo", "tipo", "categoria", "responsavel", "situacao", "statusConvite", "pagamento", "etapa", "presenca", "cadastro"];
@@ -354,6 +355,10 @@ try {
 } catch {}
 const salvarOrdemLista = () => { try { localStorage.setItem("part_ordem", JSON.stringify(ordemLista)); } catch {} };
 
+// Origem do lead: quem veio por convite de anfitrião mostra o NOME DO ANFITRIÃO; quem entrou por integração,
+// a origem (source/utm) que ela mandou; senão fica em branco
+const origemDoLead = (p) => (p.convidado?.anfitriao?.nome || p.origem_lead || "").trim();
+
 // valor usado pra ordenar cada coluna; null/"" vão sempre pro fim
 function chaveOrdem(p, c) {
   if (c.startsWith("campo_")) {
@@ -380,6 +385,7 @@ function chaveOrdem(p, c) {
     case "presenca": return p.presente ? 1 : 0;
     case "cadastro": return p.created_at ? new Date(p.created_at).getTime() : null;
     case "origem": return p.evento_origem_nome || "";
+    case "origemLead": return origemDoLead(p);
     default: return "";
   }
 }
@@ -578,6 +584,11 @@ function celulaHtml(p, c) {
         : `<span class="cel-tenue">—</span>`}</td>`;
     case "cadastro":
       return `<td>${formatarData(p.created_at)}</td>`;
+    case "origemLead": {
+      const o = origemDoLead(p);
+      if (!o) return `<td><span class="cel-tenue">—</span></td>`;
+      return `<td title="${p.convidado?.anfitriao?.nome ? "Convidado por este anfitrião" : "Origem informada pela integração"}">${esc(o)}</td>`;
+    }
     case "origem":
       return p.evento_origem_id || p.evento_origem_nome
         ? `<td title="Transferido em ${esc(formatarData(p.transferido_em))}">${esc(p.evento_origem_nome || "—")}${p.codigo_origem ? ` <span class="chip-codigo">${esc(p.codigo_origem)}</span>` : ""}</td>`
@@ -1790,6 +1801,7 @@ async function exportar(dados) {
     { rotulo: "Presente", valor: (p) => (p.presente ? "Sim" : "Não") },
     { rotulo: "Check-in", valor: (p) => formatarData(p.checkin_at, true) },
     { rotulo: "Data de cadastro", valor: (p) => formatarData(p.created_at) },
+    { rotulo: "Origem do lead", valor: (p) => origemDoLead(p) },
     { chave: "evento_origem_nome", rotulo: "Evento de origem" },
     { chave: "codigo_origem", rotulo: "Código de origem" },
   ];

@@ -46,6 +46,46 @@ function acha(body: Record<string, unknown>, chaves: string[]): string {
   return "";
 }
 
+// Origem do lead (de onde a pessoa veio): "origem"/"source"/"utm_source"… no corpo. Aceita texto ou um objeto
+// tipo { utm_source, utm_medium } (vira "google / cpc"). Procura no topo e nos objetos comuns; se não achar,
+// olha mais fundo (até 4 níveis) só por utm_source / lead_source / origem.
+const CHAVES_ORIGEM = ["origem", "origem_do_lead", "lead_source", "source", "utm_source", "fonte", "origin"];
+function acharOrigem(body: Record<string, unknown>): string {
+  const texto = (v: unknown): string => {
+    if (typeof v === "string" || typeof v === "number") return String(v).trim();
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      const o = v as Record<string, unknown>;
+      return [o.utm_source ?? o.source ?? o.name ?? o.nome, o.utm_medium ?? o.medium]
+        .filter((x) => (typeof x === "string" || typeof x === "number") && String(x).trim() !== "")
+        .map((x) => String(x).trim()).join(" / ");
+    }
+    return "";
+  };
+  const escopos = [body, body.data, body.buyer, body.customer, body.contact, body.order, body.comprador, body.participante, body.tracking, body.utm]
+    .filter((x) => x && typeof x === "object") as Record<string, unknown>[];
+  for (const esc of escopos) {
+    for (const k of CHAVES_ORIGEM) {
+      const t = texto(esc[k]);
+      if (t) return t;
+    }
+  }
+  const fundo = (o: unknown, nivel: number): string => {
+    if (!o || typeof o !== "object" || nivel > 4) return "";
+    for (const [k, v] of Object.entries(o as Record<string, unknown>)) {
+      if (["utm_source", "lead_source", "origem"].includes(k.toLowerCase())) {
+        const t = texto(v);
+        if (t) return t;
+      }
+    }
+    for (const v of Object.values(o as Record<string, unknown>)) {
+      const t = fundo(v, nivel + 1);
+      if (t) return t;
+    }
+    return "";
+  };
+  return fundo(body, 0);
+}
+
 const norm = (s: unknown) =>
   String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 
@@ -334,6 +374,9 @@ Deno.serve(async (req) => {
       situacao: situacaoNova, quantidade: qtd,
     };
     if (valorPago != null) reg.valor_pago = valorPago;
+    // origem do lead: o que a integração mandou (ou o caminho em mapa.origem); sem nada, o nome da integração
+    const origemLead = ((mapa.origem ? String(path(body, mapa.origem) ?? "") : "").trim() || acharOrigem(body) || String(intg.nome || "")).slice(0, 200);
+    if (origemLead) reg.origem_lead = origemLead;
     if (email) reg.email = email;
     if (telefone) reg.telefone = telefone;
     if (empresa) reg.empresa = empresa;
@@ -416,6 +459,11 @@ Deno.serve(async (req) => {
       if (r.error && /valor_pago/.test(r.error.message)) {
         // migração 0042 ainda não rodou: cria sem o valor (não perde a venda)
         delete reg.valor_pago;
+        r = await sb.from("participantes").insert(reg).select("id, codigo").single();
+      }
+      if (r.error && /origem_lead/.test(r.error.message)) {
+        // migração 0052 ainda não rodou: cria sem a origem (não perde a inscrição)
+        delete reg.origem_lead;
         r = await sb.from("participantes").insert(reg).select("id, codigo").single();
       }
       if (r.error) { await logar(500, false, r.error.message); return json({ erro: r.error.message }, 500); }
