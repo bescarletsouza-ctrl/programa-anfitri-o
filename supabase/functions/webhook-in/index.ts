@@ -190,6 +190,39 @@ export function mesmoNome(a: string, b: string): boolean {
   return !!x && x === y;
 }
 
+// "atualizar_origem" (planilha → plataforma): decide quem muda. Casa por e-mail; se o mesmo e-mail é de mais de
+// uma pessoa, só atualiza quem tem o mesmo NOME (sem isso fica de fora, pra não carimbar a pessoa errada).
+// Linha sem e-mail ou sem origem é ignorada (nunca apaga uma origem que já existe).
+export type PartOrigem = { id: string; email: string | null; nome: string | null; origem_lead: string | null };
+export function planejarOrigem(parts: PartOrigem[], itens: { email?: unknown; nome?: unknown; origem?: unknown }[]) {
+  const porEmail = new Map<string, PartOrigem[]>();
+  for (const p of parts) {
+    const e = String(p.email || "").trim().toLowerCase();
+    if (!e) continue;
+    const lista = porEmail.get(e) || [];
+    lista.push(p);
+    porEmail.set(e, lista);
+  }
+  const mudancas = new Map<string, string>();   // id do participante → origem nova
+  let ignoradas = 0, naoEncontradas = 0, ambiguas = 0, jaCertas = 0;
+  for (const it of itens) {
+    const email = String(it?.email ?? "").trim().toLowerCase();
+    const origem = String(it?.origem ?? "").trim().slice(0, 200);
+    if (!email || !origem) { ignoradas++; continue; }
+    let alvos = porEmail.get(email) || [];
+    if (!alvos.length) { naoEncontradas++; continue; }
+    if (alvos.length > 1) {
+      alvos = alvos.filter((p) => mesmoNome(p.nome || "", String(it?.nome ?? "")));
+      if (!alvos.length) { ambiguas++; continue; }
+    }
+    for (const p of alvos) {
+      if ((p.origem_lead || "") === origem) { jaCertas++; mudancas.delete(p.id); }
+      else mudancas.set(p.id, origem);
+    }
+  }
+  return { mudancas, ignoradas, naoEncontradas, ambiguas, jaCertas };
+}
+
 // Etapa do pipeline de Participantes por id, nome exato ou (se ninguém bater) nome
 // que contém o texto — sem diferenciar maiúscula/acento. Devolve null se não achar.
 export type EtapaPart = { id: string; nome: string; situacao_alvo?: string | null };
@@ -242,6 +275,52 @@ Deno.serve(async (req) => {
     if (!intg) return json({ erro: "Integração de entrada não encontrada ou inativa." }, 401);
 
     const body = await req.json().catch(() => ({})) as Record<string, unknown>;
+
+    // ---- Modo "atualizar_origem": SÓ grava a Origem do lead de quem JÁ é participante do evento.
+    // Não cria ninguém e não mexe em situação, categoria, etapa nem em nenhum outro campo.
+    //   { "acao": "atualizar_origem", "itens": [ { "email": "...", "nome": "...", "origem": "..." } ] }
+    if (body.acao === "atualizar_origem") {
+      const itens = Array.isArray(body.itens) ? body.itens as Record<string, unknown>[] : [];
+      if (!itens.length || itens.length > 1000) return json({ erro: "Envie de 1 a 1000 itens." }, 400);
+
+      const parts: PartOrigem[] = [];
+      for (let de = 0; ; de += 1000) {
+        const { data, error } = await sb.from("participantes").select("id, email, nome, origem_lead")
+          .eq("evento_id", eventoId).order("id").range(de, de + 999);
+        if (error) {
+          const falta = /origem_lead/.test(error.message);
+          return json({ erro: falta ? "Rode a migração 0052_origem_do_lead.sql no SQL Editor." : error.message }, falta ? 400 : 500);
+        }
+        parts.push(...(data || []) as PartOrigem[]);
+        if (!data || data.length < 1000) break;
+      }
+
+      const plano = planejarOrigem(parts, itens);
+      const porOrigem = new Map<string, string[]>();
+      for (const [id, origem] of plano.mudancas) porOrigem.set(origem, [...(porOrigem.get(origem) || []), id]);
+      let atualizados = 0;
+      for (const [origem, ids] of porOrigem) {
+        for (let i = 0; i < ids.length; i += 100) {
+          const lote = ids.slice(i, i + 100);
+          const { error } = await sb.from("participantes").update({ origem_lead: origem }).eq("evento_id", eventoId).in("id", lote);
+          if (error) return json({ erro: error.message, atualizados }, 500);
+          atualizados += lote.length;
+        }
+      }
+      const resumo = {
+        acao: "origem_atualizada", recebidas: itens.length, atualizados, ja_estavam_certos: plano.jaCertas,
+        nao_sao_participantes: plano.naoEncontradas, email_de_mais_de_uma_pessoa: plano.ambiguas, sem_email_ou_origem: plano.ignoradas,
+      };
+      // no histórico vai só o resumo (sem e-mails), e só quando algo mudou — a planilha chama de tempos em tempos
+      if (atualizados > 0) {
+        await sb.from("webhook_entregas").insert({
+          integracao_id: intg.id, evento_id: eventoId, gatilho: "entrada", status: 200, ok: true, erro: null,
+          payload: { recebido: { acao: "atualizar_origem", itens: itens.length }, resultado: resumo },
+        }).then(() => {}, () => {});
+      }
+      return json({ ok: true, ...resumo });
+    }
+
     const hubla = extrairHubla(body);
     if (hubla) body._hubla = hubla;
     const guru = extrairGuru(body, (intg.provedor as string) || "");
