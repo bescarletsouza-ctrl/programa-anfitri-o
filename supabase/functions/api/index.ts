@@ -135,6 +135,8 @@ export function formatarParticipante(r) {
     tipo_ingresso: r.ingresso ?? null,
     valor_pago: valorPagoFinal(r),
     pagamento: r.pagamento ?? null,
+    // situação como aparece na plataforma: Confirmado, Pendente, Fila de espera, Pré-inscrito ou Desativado
+    situacao: r.situacao || "Confirmado",
     status_inscricao: statusInscricao(r),
     checkin: !!r.presente,
     checkin_em: isoSP(r.checkin_at),

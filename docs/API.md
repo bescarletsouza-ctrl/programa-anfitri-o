@@ -94,6 +94,7 @@ curl -s "https://we.events.mirapontocom.com.br/api/v1/participantes?evento_id=3f
       "tipo_ingresso": "GOLD",
       "valor_pago": 500,
       "pagamento": "Pago",
+      "situacao": "Confirmado",
       "status_inscricao": "aprovado",
       "checkin": true,
       "checkin_em": "2026-11-20T19:10:00-03:00",
@@ -110,6 +111,7 @@ curl -s "https://we.events.mirapontocom.com.br/api/v1/participantes?evento_id=3f
 
 | Campo | Observação |
 |---|---|
+| `situacao` | Como na plataforma: `Confirmado` · `Pendente` · `Fila de espera` · `Pré-inscrito` · `Desativado` |
 | `status_inscricao` | `inscrito` · `aprovado` · `reprovado` · `cancelado` · `lista de espera` (regras abaixo) |
 | `valor_pago` | O **valor realmente pago**, quando gravado no participante (vendas da Guru e cadastro manual, migração 0042). Sem ele, cai no **preço de tabela** do tipo de ingresso × quantidade, só para quem pagou (`pagamento` = `Pago`, ou `Externo` já Confirmado). `null` se gratuito/convidado/sem preço |
 | `checkin` / `checkin_em` | presença no evento e quando |
