@@ -463,7 +463,7 @@ function modalImportarAtv() {
         <b>nome</b> (obrigatória), <b>email</b>, <b>codigo</b>, categoria, empresa, telefone.
         Cada linha é casada com um participante do evento por <b>e-mail</b>,
         <b>código</b> ou <b>nome</b>. Quem não existir é cadastrado como Convidado
-        e entra na atividade.
+        e fica inscrito na atividade (a presença só conta quando o QR é lido).
       </p>
       <label class="campo"><span>Colar tabela</span>
         <textarea class="input" name="texto" rows="7" placeholder="nome;email;codigo"></textarea></label>
@@ -478,7 +478,7 @@ function modalImportarAtv() {
       const porEmail = new Map(participantes.filter((p) => p.email).map((p) => [norm(p.email), p]));
       const porCodigo = new Map(participantes.filter((p) => p.codigo).map((p) => [norm(p.codigo), p]));
       const porNome = new Map(participantes.map((p) => [norm(p.nome), p]));
-      const dentro = new Set(credenciadosDe(gavetaAtv.id).map((l) => l.pid));
+      const dentro = new Set(inscritosDe(gavetaAtv.id).map((l) => l.pid));   // quem já está inscrito
 
       const paraEntrar = new Set();
       const novos = [];
@@ -507,13 +507,8 @@ function modalImportarAtv() {
 
       let criados = [];
       if (novos.length) criados = await inserirLote("participantes", novos);
-      const idsEntrada = [...paraEntrar, ...criados.map((p) => p.id)];
-      if (idsEntrada.length) {
-        await inserirLote("checkins", idsEntrada.map((id) => ({
-          participante_id: id, acao: "entrada", origem: "atividades-import", atividade_id: gavetaAtv.id,
-        })));
-        await inscreverNaPlataforma(gavetaAtv.id, idsEntrada);
-      }
+      const idsInscrever = [...paraEntrar, ...criados.map((p) => p.id)];
+      if (idsInscrever.length) await inscreverNaPlataforma(gavetaAtv.id, idsInscrever);
 
       [atividades, checkins, participantes, inscritos] = await Promise.all([
         listAtividades(), listCheckins().catch(() => checkins), listParticipantes().catch(() => participantes),
@@ -525,9 +520,9 @@ function modalImportarAtv() {
       renderGavetaCorpo();
       render();
 
-      const partes = [`${idsEntrada.length} adicionado(s)`];
+      const partes = [`${idsInscrever.length} inscrito(s)`];
       if (criados.length) partes.push(`${criados.length} novo(s) cadastro(s)`);
-      if (jaEstavam) partes.push(`${jaEstavam} já estava(m)`);
+      if (jaEstavam) partes.push(`${jaEstavam} já estava(m) inscrito(s)`);
       toast(partes.join(" · "), "ok");
     },
   });
@@ -541,14 +536,13 @@ function atualizarBotaoAdd() {
   btn.disabled = !n;
 }
 
-// Quem entra na atividade pela plataforma também vira INSCRITO (o app só deixa credenciar quem está inscrito).
-// Sem a migração 0048, ou se já estiver inscrito, segue sem erro.
+// Adicionar pela plataforma = só INSCREVER. NÃO registra entrada: presença só existe depois que o QR é lido
+// (no app ou na tela de Check-in). Devolve quantos foram inscritos agora (quem já estava não conta).
 async function inscreverNaPlataforma(atvId, ids) {
-  try {
-    const ja = new Set((await listInscritosAtividades()).filter((i) => i.atividade_id === atvId).map((i) => i.participante_id));
-    const novos = [...new Set(ids)].filter((id) => !ja.has(id));
-    if (novos.length) await inserirLote("atividade_inscritos", novos.map((id) => ({ atividade_id: atvId, participante_id: id, operador: "plataforma" })));
-  } catch { /* migração 0048 ainda não rodou: ignora */ }
+  const ja = new Set((await listInscritosAtividades()).filter((i) => i.atividade_id === atvId).map((i) => i.participante_id));
+  const novos = [...new Set(ids)].filter((id) => !ja.has(id));
+  if (novos.length) await inserirLote("atividade_inscritos", novos.map((id) => ({ atividade_id: atvId, participante_id: id, operador: "plataforma" })));
+  return novos.length;
 }
 
 async function adicionarSelecionados() {
@@ -557,19 +551,15 @@ async function adicionarSelecionados() {
   const btn = document.getElementById("ga-add-btn");
   btn.disabled = true;
   try {
-    await inserirLote("checkins", ids.map((id) => ({
-      participante_id: id, acao: "entrada", origem: "atividades", atividade_id: gavetaAtv.id,
-    })));
-    await inscreverNaPlataforma(gavetaAtv.id, ids);
+    const novos = await inscreverNaPlataforma(gavetaAtv.id, ids);
     selecionadosAdd.clear();
-    checkins = await listCheckins().catch(() => checkins);
     inscritos = await listInscritosAtividades().catch(() => inscritos);
     gavetaModo = "lista";
     const g = document.getElementById("gaveta");
     g?.querySelectorAll("[data-aba]").forEach((x) => x.classList.toggle("ativo", x.dataset.aba === "lista"));
     renderGavetaCorpo();
     render();
-    toast(`${ids.length} participante(s) adicionado(s).`, "ok");
+    toast(`${novos} participante(s) inscrito(s). Eles só contam como presentes depois da leitura do QR.`, "ok");
   } catch (e) {
     btn.disabled = false;
     toast(e.message, "erro");
