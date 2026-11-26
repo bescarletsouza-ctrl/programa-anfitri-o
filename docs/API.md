@@ -92,6 +92,7 @@ curl -s "https://we.events.mirapontocom.com.br/api/v1/participantes?evento_id=3f
       "email": "beatrizgomesstudio@gmail.com",
       "telefone": "(19) 99715-1417",
       "empresa": "Studio Exemplo",
+      "faturamento": "50 mil – 150 mil/mês",
       "tipo_ingresso": "GOLD",
       "valor_pago": 500,
       "pagamento": "Pago",

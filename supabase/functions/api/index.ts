@@ -133,6 +133,8 @@ export function formatarParticipante(r) {
     email: r.email ?? null,
     telefone: r.telefone ?? null,
     empresa: r.empresa || null,
+    // faixa informada pelo participante, escrita igual à plataforma ("50 mil – 150 mil/mês")
+    faturamento: String(r.faturamento || "").trim().replace(/\s*[-–—]\s*/g, " – ") || null,
     tipo_ingresso: r.ingresso ?? null,
     valor_pago: valorPagoFinal(r),
     pagamento: r.pagamento ?? null,
@@ -194,15 +196,15 @@ export function criarDados(sb) {
         p_org: a.org, p_evento: a.evento_id, p_desde: a.desde,
         p_after_ts: a.depois?.t ?? null, p_after_id: a.depois?.i ?? null, p_limit: a.limite,
       });
-      // a consulta não traz a empresa: busca em lotes, só dos participantes que ela já liberou pra este token
-      const empresas = new Map();
+      // a consulta não traz empresa nem faturamento: busca em lotes, só dos participantes que ela já liberou pra este token
+      const extras = new Map();
       for (let i = 0; i < linhas.length; i += 100) {
-        const { data, error } = await sb.from("participantes").select("id, empresa")
+        const { data, error } = await sb.from("participantes").select("id, empresa, faturamento")
           .in("id", linhas.slice(i, i + 100).map((l) => l.id));
         if (error) throw new Error(error.message);
-        (data || []).forEach((x) => empresas.set(x.id, x.empresa));
+        (data || []).forEach((x) => extras.set(x.id, x));
       }
-      return linhas.map((l) => ({ ...l, empresa: empresas.get(l.id) ?? null }));
+      return linhas.map((l) => ({ ...l, empresa: extras.get(l.id)?.empresa ?? null, faturamento: extras.get(l.id)?.faturamento ?? null }));
     },
   };
 }
