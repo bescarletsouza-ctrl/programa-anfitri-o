@@ -132,6 +132,7 @@ export function formatarParticipante(r) {
     nome: r.nome,
     email: r.email ?? null,
     telefone: r.telefone ?? null,
+    empresa: r.empresa || null,
     tipo_ingresso: r.ingresso ?? null,
     valor_pago: valorPagoFinal(r),
     pagamento: r.pagamento ?? null,
@@ -188,10 +189,21 @@ export function criarDados(sb) {
       p_org: a.org, p_desde: a.desde, p_status: a.status,
       p_after_ts: a.depois?.t ?? null, p_after_id: a.depois?.i ?? null, p_limit: a.limite,
     }),
-    participantes: (a) => rpc("api_participantes", {
-      p_org: a.org, p_evento: a.evento_id, p_desde: a.desde,
-      p_after_ts: a.depois?.t ?? null, p_after_id: a.depois?.i ?? null, p_limit: a.limite,
-    }),
+    async participantes(a) {
+      const linhas = await rpc("api_participantes", {
+        p_org: a.org, p_evento: a.evento_id, p_desde: a.desde,
+        p_after_ts: a.depois?.t ?? null, p_after_id: a.depois?.i ?? null, p_limit: a.limite,
+      });
+      // a consulta não traz a empresa: busca em lotes, só dos participantes que ela já liberou pra este token
+      const empresas = new Map();
+      for (let i = 0; i < linhas.length; i += 100) {
+        const { data, error } = await sb.from("participantes").select("id, empresa")
+          .in("id", linhas.slice(i, i + 100).map((l) => l.id));
+        if (error) throw new Error(error.message);
+        (data || []).forEach((x) => empresas.set(x.id, x.empresa));
+      }
+      return linhas.map((l) => ({ ...l, empresa: empresas.get(l.id) ?? null }));
+    },
   };
 }
 

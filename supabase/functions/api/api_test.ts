@@ -246,13 +246,13 @@ const linhaParticipante = (n, extra = {}) => ({
 teste("participantes: formato completo", async () => {
   const d = await fakeDados();
   d.participantesRows = [linhaParticipante(1, {
-    presente: true, checkin_at: "2026-11-20T22:10:00+00:00",
+    presente: true, checkin_at: "2026-11-20T22:10:00+00:00", empresa: "Empresa Exemplo",
     convidado_status: "Aprovado", utm_source: "instagram", utm_medium: "pyero", utm_campaign: "a-mesa",
   })];
   const j = await corpo(await api.tratar(req(`/api/v1/participantes?evento_id=${EV}`), d));
   igual(j.dados[0], {
     id: "00000000-0000-4000-8000-000000000001", evento_id: EV, evento_nome: "A Mesa ed 006", tipo: "Convidado",
-    nome: "Pessoa 1", email: "p1@x.com", telefone: "(11) 99999-0000",
+    nome: "Pessoa 1", email: "p1@x.com", telefone: "(11) 99999-0000", empresa: "Empresa Exemplo",
     tipo_ingresso: "GOLD", valor_pago: 500, pagamento: "Pago", situacao: "Confirmado", status_inscricao: "aprovado",
     checkin: true, checkin_em: "2026-11-20T19:10:00-03:00",
     utm_source: "instagram", utm_medium: "pyero", utm_campaign: "a-mesa",

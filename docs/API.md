@@ -91,6 +91,7 @@ curl -s "https://we.events.mirapontocom.com.br/api/v1/participantes?evento_id=3f
       "nome": "Beatriz Gomes",
       "email": "beatrizgomesstudio@gmail.com",
       "telefone": "(19) 99715-1417",
+      "empresa": "Studio Exemplo",
       "tipo_ingresso": "GOLD",
       "valor_pago": 500,
       "pagamento": "Pago",
