@@ -92,43 +92,107 @@ export const dataBR = (d: unknown) => {
   return m ? `${m[3]}/${m[2]}/${m[1]}` : "";
 };
 
+/* ---- Identidade visual (escolhida na tela; aqui tudo é conferido antes de entrar no e-mail) ------------- */
+export const FONTES: Record<string, string> = {
+  arial: "Arial,Helvetica,sans-serif",
+  verdana: "Verdana,Geneva,sans-serif",
+  tahoma: "Tahoma,Geneva,sans-serif",
+  trebuchet: "'Trebuchet MS',Tahoma,sans-serif",
+  georgia: "Georgia,'Times New Roman',serif",
+};
+export const VISUAL_PADRAO = { cabecalho: "#14141a", destaque: "#7c5cff", fundo: "#f2f2f5", cartao: "#ffffff", fonte: "arial" };
+const IMAGEM_MAX = 450000;   // caracteres do data URL (a tela já reduz a imagem antes)
+
+export type Imagem = { dados: string; largura: number; altura: number };
+export type Visual = {
+  cabecalho: string; destaque: string; fundo: string; cartao: string; fonte: string;
+  logo: Imagem | null; topo: Imagem | null;
+};
+
+export function visualSeguro(v: any): Visual {
+  const cor = (c: unknown, padrao: string) => (/^#[0-9a-f]{6}$/i.test(String(c || "")) ? String(c).toLowerCase() : padrao);
+  const imagem = (i: any): Imagem | null => {
+    const dados = String(i?.dados || "");
+    const largura = Math.round(Number(i?.largura)), altura = Math.round(Number(i?.altura));
+    return dados.length <= IMAGEM_MAX && /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/]+={0,2}$/.test(dados) && largura > 0 && altura > 0
+      ? { dados, largura, altura } : null;
+  };
+  return {
+    cabecalho: cor(v?.cabecalho, VISUAL_PADRAO.cabecalho),
+    destaque: cor(v?.destaque, VISUAL_PADRAO.destaque),
+    fundo: cor(v?.fundo, VISUAL_PADRAO.fundo),
+    cartao: cor(v?.cartao, VISUAL_PADRAO.cartao),
+    fonte: Object.hasOwn(FONTES, String(v?.fonte)) ? String(v.fonte) : VISUAL_PADRAO.fonte,
+    logo: imagem(v?.logo),
+    topo: imagem(v?.topo),
+  };
+}
+
+// contas de cor pra o texto continuar legível em cima de qualquer cor escolhida
+const rgb = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+const luz = (h: string) => {
+  const [r, g, b] = rgb(h).map((c) => { const s = c / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+export const contraste = (a: string, b: string) => (Math.max(luz(a), luz(b)) + 0.05) / (Math.min(luz(a), luz(b)) + 0.05);
+const sobre = (fundo: string) => (contraste(fundo, "#ffffff") >= contraste(fundo, "#14141a") ? "#ffffff" : "#14141a");
+// mistura a com b (t = quanto de b)
+const misturar = (a: string, b: string, t: number) =>
+  "#" + rgb(a).map((c, i) => Math.round(c * (1 - t) + rgb(b)[i] * t).toString(16).padStart(2, "0")).join("");
+
 // HTML de e-mail: tabelas e estilos na própria tag, que é o que os programas de e-mail respeitam
 export function htmlComprovante(d: {
   evento: string; nome: string; categoria: string; codigo: string; data: string; local: string;
-  mensagem: string; info: string; imagem: string; qrSrc: string;
+  mensagem: string; info: string; imagem: string; qrSrc: string; logoSrc?: string; visual?: Visual;
 }) {
+  const v = d.visual || visualSeguro(null);
+  const texto = sobre(v.cartao);
+  const suave = misturar(texto, v.cartao, 0.3);
+  const risco = misturar(texto, v.cartao, 0.9);
+  const rotuloCor = contraste(v.destaque, v.cartao) >= 3 ? v.destaque : suave;
+  const topoTexto = sobre(v.cabecalho);
+  const topoRotulo = contraste(v.destaque, v.cabecalho) >= 3 ? v.destaque : misturar(topoTexto, v.cabecalho, 0.2);
+  const caixa = misturar(v.cartao, v.destaque, 0.1);
   const linha = (rotulo: string, valor: string) => valor
-    ? `<tr><td style="padding:8px 0;border-bottom:1px solid #ececf0;font-size:12px;color:#6b6b76;text-transform:uppercase;letter-spacing:.06em;vertical-align:top;width:34%">${rotulo}</td>`
-      + `<td style="padding:8px 0;border-bottom:1px solid #ececf0;font-size:15px;color:#14141a;font-weight:600">${paragrafos(valor)}</td></tr>`
+    ? `<tr><td style="padding:8px 0;border-bottom:1px solid ${risco};font-size:12px;color:${rotuloCor};text-transform:uppercase;letter-spacing:.06em;vertical-align:top;width:34%">${rotulo}</td>`
+      + `<td style="padding:8px 0;border-bottom:1px solid ${risco};font-size:15px;color:${texto};font-weight:600">${paragrafos(valor)}</td></tr>`
     : "";
-  const topo = /^https:\/\/\S+$/i.test(d.imagem || "")
+  const topo = /^(https:\/\/\S+|cid:topo|data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+)$/i.test(d.imagem || "")
     ? `<tr><td><img src="${escHtml(d.imagem)}" alt="${escHtml(d.evento)}" width="560" style="display:block;width:100%;height:auto;border:0"></td></tr>`
     : "";
+  let logo = "";
+  if (d.logoSrc && v.logo) {   // logo com no máximo 64 de altura e 240 de largura, na proporção certa
+    let altura = Math.min(64, v.logo.altura), largura = v.logo.largura * altura / v.logo.altura;
+    if (largura > 240) { largura = 240; altura = v.logo.altura * 240 / v.logo.largura; }
+    logo = `<img src="${escHtml(d.logoSrc)}" alt="Logo" width="${Math.round(largura)}" height="${Math.round(altura)}" style="display:block;border:0;width:${Math.round(largura)}px;height:${Math.round(altura)}px;margin-bottom:14px">`;
+  }
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#f2f2f5;font-family:Arial,Helvetica,sans-serif">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f2f2f5"><tr><td align="center" style="padding:24px 12px">
-<table role="presentation" width="560" cellpadding="0" cellspacing="0" style="width:100%;max-width:560px;background:#ffffff;border-radius:14px;overflow:hidden">
+<body style="margin:0;padding:0;background:${v.fundo};font-family:${FONTES[v.fonte]}">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${v.fundo};font-family:${FONTES[v.fonte]}"><tr><td align="center" style="padding:24px 12px">
+<table role="presentation" width="560" cellpadding="0" cellspacing="0" style="width:100%;max-width:560px;background:${v.cartao};border-radius:14px;overflow:hidden">
 ${topo}
-<tr><td style="background:#14141a;padding:22px 28px">
-<div style="font-size:12px;color:#b9b4ff;letter-spacing:.1em;text-transform:uppercase">Comprovante de inscrição</div>
-<div style="font-size:22px;color:#ffffff;font-weight:bold;margin-top:4px">${escHtml(d.evento)}</div></td></tr>
-<tr><td style="padding:24px 28px 6px">
-<div style="font-size:17px;color:#14141a;font-weight:bold">Olá, ${escHtml(d.nome)}!</div>
-${d.mensagem ? `<div style="font-size:15px;line-height:1.6;color:#3b3b45;margin-top:8px">${paragrafos(d.mensagem)}</div>` : ""}</td></tr>
+<tr><td style="background:${v.cabecalho};padding:22px 28px">
+${logo}<div style="font-size:12px;color:${topoRotulo};letter-spacing:.1em;text-transform:uppercase">Comprovante de inscrição</div>
+<div style="font-size:22px;color:${topoTexto};font-weight:bold;margin-top:4px">${escHtml(d.evento)}</div></td></tr>
+<tr><td style="height:4px;background:${v.destaque};font-size:0;line-height:0">&nbsp;</td></tr>
+<tr><td style="padding:22px 28px 6px">
+<div style="font-size:17px;color:${texto};font-weight:bold">Olá, ${escHtml(d.nome)}!</div>
+${d.mensagem ? `<div style="font-size:15px;line-height:1.6;color:${suave};margin-top:8px">${paragrafos(d.mensagem)}</div>` : ""}</td></tr>
 <tr><td style="padding:10px 28px 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">
 ${linha("Participante", d.nome)}${linha("Categoria", d.categoria)}${linha("Código", d.codigo)}${linha("Data", d.data)}${linha("Local", d.local)}
 </table></td></tr>
 <tr><td align="center" style="padding:22px 28px 6px">
-<img src="${d.qrSrc}" alt="QR Code da inscrição ${escHtml(d.codigo)}" width="220" height="220" style="display:block;width:220px;height:220px;border:1px solid #ececf0;border-radius:10px">
-<div style="font-size:13px;color:#6b6b76;margin-top:10px">Apresente este QR Code no credenciamento.</div>
-${d.codigo ? `<div style="font-size:14px;color:#14141a;font-weight:bold;letter-spacing:.08em;margin-top:4px">${escHtml(d.codigo)}</div>` : ""}</td></tr>
-${d.info ? `<tr><td style="padding:18px 28px 0"><div style="background:#f6f5ff;border-radius:10px;padding:14px 16px;font-size:14px;line-height:1.6;color:#2b2b36">${paragrafos(d.info)}</div></td></tr>` : ""}
-<tr><td style="padding:20px 28px 26px;font-size:12px;line-height:1.5;color:#8a8a94">Este comprovante é pessoal. Se a imagem do QR Code não aparecer, toque em "exibir imagens" no seu e-mail ou informe o código no credenciamento.</td></tr>
+<img src="${d.qrSrc}" alt="QR Code da inscrição ${escHtml(d.codigo)}" width="220" height="220" style="display:block;width:220px;height:220px;background:#ffffff;border:6px solid #ffffff;border-radius:10px">
+<div style="font-size:13px;color:${suave};margin-top:10px">Apresente este QR Code no credenciamento.</div>
+${d.codigo ? `<div style="font-size:14px;color:${texto};font-weight:bold;letter-spacing:.08em;margin-top:4px">${escHtml(d.codigo)}</div>` : ""}</td></tr>
+${d.info ? `<tr><td style="padding:18px 28px 0"><div style="background:${caixa};border-left:4px solid ${v.destaque};border-radius:8px;padding:14px 16px;font-size:14px;line-height:1.6;color:${sobre(caixa)}">${paragrafos(d.info)}</div></td></tr>` : ""}
+<tr><td style="padding:20px 28px 26px;font-size:12px;line-height:1.5;color:${suave}">Este comprovante é pessoal. Se a imagem do QR Code não aparecer, toque em "exibir imagens" no seu e-mail ou informe o código no credenciamento.</td></tr>
 </table></td></tr></table></body></html>`;
 }
 
 const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export const POR_CHAMADA = 50;   // comprovantes por chamada (a tela divide em blocos)
+export const VERSAO_COMPROVANTE = 2;   // 2 = com identidade visual (a tela confere antes de enviar)
 
 // quem recebe o comprovante: nunca Desativado; não confirmados só se pedido
 export function quemRecebeComprovante<T extends { situacao?: string | null }>(parts: T[], incluirNaoConfirmados: boolean) {
@@ -140,15 +204,28 @@ export function quemRecebeComprovante<T extends { situacao?: string | null }>(pa
 
 type Pessoa = { id: string; nome: string; email: string; codigo: string | null; situacao: string | null; ingresso: string | null; tipo: string | null };
 
-// monta o comprovante de UMA pessoa: { assunto, html, qr (PNG em base64) }
+// monta o comprovante de UMA pessoa: { assunto, html, anexos }
+// paraEnvio: as imagens vão como anexos "cid:" dentro do e-mail; na prévia vão embutidas no próprio HTML
 export async function montarComprovante(
   p: Pessoa, evento: { nome?: string | null; data_evento?: string | null; local?: string | null },
-  pedido: { assunto: string; mensagem?: string; data?: string; local?: string; info?: string; imagem?: string }, qrSrc?: string,
+  pedido: { assunto: string; mensagem?: string; data?: string; local?: string; info?: string; imagem?: string; visual?: unknown },
+  paraEnvio = false,
 ) {
   const nomeEvento = evento?.nome || "";
   const vars = { nome: p.nome || "", codigo: p.codigo || "", email: p.email || "" };
   const qr = await qrPngBase64(String(p.codigo || p.id));
+  const visual = visualSeguro(pedido.visual);
+  const anexos = [{ content: qr, filename: "qrcode.png", content_type: "image/png", content_id: "qrcode" }];
+  const fonteDe = (img: Imagem | null, cid: string) => {
+    if (!img) return "";
+    if (!paraEnvio) return img.dados;
+    const tipo = img.dados.slice(5, img.dados.indexOf(";"));
+    anexos.push({ content: img.dados.slice(img.dados.indexOf(",") + 1), filename: `${cid}.${tipo === "image/png" ? "png" : "jpg"}`, content_type: tipo, content_id: cid });
+    return `cid:${cid}`;
+  };
   const html = htmlComprovante({
+    visual,
+    logoSrc: fonteDe(visual.logo, "logo"),
     evento: nomeEvento,
     nome: p.nome || "",
     categoria: p.ingresso || p.tipo || "",
@@ -157,10 +234,10 @@ export async function montarComprovante(
     local: pedido.local ?? (evento?.local || ""),
     mensagem: preencher(pedido.mensagem || "", vars, nomeEvento),
     info: preencher(pedido.info || "", vars, nomeEvento),
-    imagem: pedido.imagem || "",
-    qrSrc: qrSrc || `data:image/png;base64,${qr}`,
+    imagem: fonteDe(visual.topo, "topo") || (/^https:\/\//i.test(pedido.imagem || "") ? pedido.imagem! : ""),
+    qrSrc: paraEnvio ? "cid:qrcode" : `data:image/png;base64,${qr}`,
   });
-  return { assunto: preencher(pedido.assunto, vars, nomeEvento), html, qr };
+  return { assunto: preencher(pedido.assunto, vars, nomeEvento), html, anexos };
 }
 
 // envia um a um; no "muitas requisições" espera e repete; na cota estourada para e avisa
@@ -173,11 +250,11 @@ export async function enviarComprovantes(
   for (const p of alvos) {
     if (limite) { falhas.push({ email: p.email, erro: "Não enviado: limite de envios do Resend atingido." }); continue; }
     try {
-      const m = await montarComprovante(p, evento, pedido, "cid:qrcode");
+      const m = await montarComprovante(p, evento, pedido, true);
       const corpo = JSON.stringify({
         from: cfg.de, to: [p.email], subject: m.assunto, html: m.html,
         ...(cfg.responder ? { reply_to: cfg.responder } : {}),
-        attachments: [{ content: m.qr, filename: "qrcode.png", content_type: "image/png", content_id: "qrcode" }],
+        attachments: m.anexos,
       });
       for (let tentativa = 0; ; tentativa++) {
         const r = await buscar("https://api.resend.com/emails", {
@@ -278,11 +355,11 @@ Deno.serve(async (req) => {
         const p = alvos[0] || (parts || [])[0];
         if (!p) return json({ erro: "Participante não encontrado neste evento." }, 404);
         const m = await montarComprovante(p, ev || {}, pedido);
-        return json({ previa: true, assunto: m.assunto, para: p.email || "", html: m.html });
+        return json({ previa: true, versao: VERSAO_COMPROVANTE, assunto: m.assunto, para: p.email || "", html: m.html });
       }
       const recebem = quemRecebeComprovante(alvos, pedido.incluir_nao_confirmados === true);
       const r = await enviarComprovantes(recebem, ev || {}, pedido, { chave: RESEND!, de: FROM!, responder: RESPONDER });
-      return json({ ...r, total: recebem.length, ignorados: alvos.length - recebem.length });
+      return json({ ...r, versao: VERSAO_COMPROVANTE, total: recebem.length, ignorados: alvos.length - recebem.length });
     }
 
     if (!alvos.length) return json({ enviados: 0, falhas: [], total: 0 });

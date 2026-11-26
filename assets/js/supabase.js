@@ -769,6 +769,17 @@ export async function enviarEmail({ participanteIds, assunto, corpo, de }) {
   return data; // { enviados, falhas, total }
 }
 
+// Identidade visual + textos do comprovante, um por evento (0056). indisponivel = a migração ainda não rodou.
+export async function lerComprovanteConfig() {
+  const { data, error } = await supabase.from("evento_comprovante").select("config").eq("evento_id", eventoId()).maybeSingle();
+  if (error) return { indisponivel: true, config: null };
+  return { indisponivel: false, config: data?.config || null };
+}
+export const salvarComprovanteConfig = (config) =>
+  supabase.from("evento_comprovante")
+    .upsert({ evento_id: eventoId(), config, atualizado_em: new Date().toISOString() }, { onConflict: "evento_id" })
+    .select("evento_id").single().then(ok);
+
 // Modelo "comprovante de inscrição" (com QR Code). previa:true só monta o e-mail, sem enviar.
 // Vai em "mensagem" (e não "corpo") de propósito: a versão antiga da função recusa, em vez de mandar texto sem QR.
 export async function pedirComprovante({ participanteIds, previa = false, incluirNaoConfirmados = false, ...campos }) {

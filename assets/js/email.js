@@ -6,13 +6,16 @@
 // Placeholders: {nome} {codigo} {email} {evento}
 // =============================================================================
 import { esc, abrirModal, toast, confirmar } from "./ui.js";
-import { enviarEmail, pedirComprovante, getEvento } from "./supabase.js";
+import { enviarEmail, pedirComprovante, getEvento, lerComprovanteConfig, salvarComprovanteConfig } from "./supabase.js";
+import { painelVisualHtml, montarPainelVisual } from "./comprovante-visual.js";
 import { eventoId } from "./evento.js";
 
 const CHAVE_MODELOS = "email_modelos";
 const chaveComprovante = () => `email_comprovante_${eventoId() || ""}`;
 const BLOCO_COMPROVANTE = 50;        // a função aceita até 50 por chamada
 const LIMITE_DIA_GRATIS = 100;       // plano grátis do Resend
+const VERSAO_COMPROVANTE = 2;        // a mesma da função: 2 = com identidade visual
+const FUNCAO_ANTIGA = "A função de e-mail publicada é antiga e não aplica a identidade visual. Publique de novo supabase/functions/enviar-email.";
 
 function lerModelos() {
   try { return JSON.parse(localStorage.getItem(CHAVE_MODELOS) || "[]"); } catch { return []; }
@@ -47,16 +50,19 @@ export function abrirEnvioEmail(participantes, nomeEvento = "") {
   const c = {
     assunto: "Seu comprovante de inscrição: {evento}",
     mensagem: "Sua inscrição está confirmada! Guarde este e-mail: ele é o seu comprovante.",
-    data: "", local: "", info: "", imagem: "",
+    data: "", local: "", info: "",
     ...(salvo || {}),
   };
 
   let tipo = "personalizada";
+  let painel = null;               // identidade visual
+  let bancoDisponivel = false;     // false até saber se a 0056 já rodou
+  let conferiuVersao = false;
   // quem vai receber o comprovante, conforme a caixinha "não confirmados" (desativado nunca)
   const recebemComprovante = (incluir) => alvos.filter((p) => situacaoDe(p) !== "Desativado" && (incluir || situacaoDe(p) === "Confirmado"));
   const camposComprovante = (form) => {
     const v = (n) => (form.querySelector(`[name="${n}"]`)?.value || "").trim();
-    return { assunto: v("c_assunto"), mensagem: v("c_mensagem"), data: v("c_data"), local: v("c_local"), info: v("c_info"), imagem: v("c_imagem") };
+    return { assunto: v("c_assunto"), mensagem: v("c_mensagem"), data: v("c_data"), local: v("c_local"), info: v("c_info"), visual: painel?.ler() };
   };
 
   abrirModal({
@@ -88,6 +94,7 @@ export function abrirEnvioEmail(participantes, nomeEvento = "") {
         <p class="pagina-sub" style="margin:0 0 8px" id="c-resumo"></p>
         ${outros ? `<label class="campo" style="display:flex;gap:8px;align-items:center">
           <input type="checkbox" name="c_incluir" /> <span style="margin:0">Enviar também para quem <b>não está Confirmado</b> (${outros})</span></label>` : ""}
+        ${painelVisualHtml()}
         <label class="campo"><span>Assunto *</span>
           <input class="input" name="c_assunto" required value="${esc(c.assunto)}" /></label>
         <label class="campo"><span>Mensagem de abertura</span>
@@ -100,10 +107,11 @@ export function abrirEnvioEmail(participantes, nomeEvento = "") {
         </div>
         <label class="campo"><span>Informações adicionais</span>
           <textarea class="input" name="c_info" rows="3" placeholder="Endereço completo, orientações, contato…">${esc(c.info)}</textarea></label>
-        <label class="campo"><span>Imagem do topo (link https, opcional)</span>
-          <input class="input" name="c_imagem" value="${esc(c.imagem)}" placeholder="https://…/banner.png" /></label>
-        <p class="pagina-sub" style="margin:0 0 10px">O comprovante já leva <b>nome, categoria, código e o QR Code</b> de cada pessoa (o mesmo que o app de check-in lê).</p>
-        <button type="button" class="btn btn-secundario btn-sm" id="c-previa">Ver prévia</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button type="button" class="btn btn-secundario btn-sm" id="c-previa">Ver prévia</button>
+          <button type="button" class="btn btn-secundario btn-sm" id="c-salvar">Salvar modelo do evento</button>
+        </div>
+        <p class="pagina-sub" style="margin:6px 0 0" id="c-salvo"></p>
         <div id="c-previa-area" style="margin-top:12px"></div>
       </fieldset>`,
     aoMontar: (root) => {
@@ -138,27 +146,52 @@ export function abrirEnvioEmail(participantes, nomeEvento = "") {
         });
       };
 
-      // primeira vez neste evento: data e local vêm do cadastro do evento
-      if (!salvo) {
-        getEvento(eventoId()).then((ev) => {
-          const data = root.querySelector('[name="c_data"]'), local = root.querySelector('[name="c_local"]');
-          if (data && !data.value) data.value = dataBR(ev?.data_evento);
-          if (local && !local.value) local.value = ev?.local || "";
-        }).catch(() => {});
-      }
+      painel = montarPainelVisual(root);
+      if (salvo?.visual) painel.aplicar(salvo.visual);
+
+      // o modelo salvo do evento (pra toda a equipe) vale mais que o rascunho deste navegador;
+      // só preenche o que a pessoa ainda não mexeu
+      lerComprovanteConfig().catch(() => ({ indisponivel: true, config: null })).then(({ indisponivel, config }) => {
+        bancoDisponivel = !indisponivel;
+        const aviso = root.querySelector("#c-salvo");
+        if (indisponivel) aviso.innerHTML = "Por enquanto o modelo fica salvo <b>só neste navegador</b>. Para salvar para a equipe, rode a migração <code>0056_identidade_do_comprovante.sql</code>.";
+        if (config) {
+          [["c_assunto", "assunto"], ["c_mensagem", "mensagem"], ["c_data", "data"], ["c_local", "local"], ["c_info", "info"]].forEach(([nome, chave]) => {
+            const campo = root.querySelector(`[name="${nome}"]`);
+            if (campo && campo.value === campo.defaultValue && typeof config[chave] === "string") campo.value = config[chave];
+          });
+          if (!painel.mexido()) painel.aplicar(config.visual);
+          return;
+        }
+        // primeira vez neste evento: data e local vêm do cadastro do evento
+        if (!salvo) {
+          getEvento(eventoId()).then((ev) => {
+            const data = root.querySelector('[name="c_data"]'), local = root.querySelector('[name="c_local"]');
+            if (data && !data.value) data.value = dataBR(ev?.data_evento);
+            if (local && !local.value) local.value = ev?.local || "";
+          }).catch(() => {});
+        }
+      });
+
+      const btnSalvar = root.querySelector("#c-salvar");
+      btnSalvar.onclick = async () => {
+        btnSalvar.disabled = true;
+        await guardarModelo(camposComprovante(root), root, true);
+        btnSalvar.disabled = false;
+      };
 
       const btnPrevia = root.querySelector("#c-previa");
       btnPrevia.onclick = async () => {
         const area = root.querySelector("#c-previa-area");
         const campos = camposComprovante(root);
         if (!campos.assunto) { toast("Preencha o assunto.", "erro"); return; }
-        salvarComprovante(campos);
         btnPrevia.disabled = true;
         area.innerHTML = `<p class="pagina-sub" style="margin:0">Montando a prévia…</p>`;
         try {
           const exemplo = recebemComprovante(!!incluir?.checked)[0] || alvos[0];
           const r = await pedirComprovante({ participanteIds: [exemplo.id], previa: true, ...campos });
-          area.innerHTML = `<p class="pagina-sub" style="margin:0 0 6px">Prévia com os dados de <b>${esc(exemplo.nome)}</b> · Assunto: ${esc(r.assunto)}</p>
+          if (r.versao !== VERSAO_COMPROVANTE) throw new Error(FUNCAO_ANTIGA);
+          area.innerHTML = `<p class="pagina-sub" style="margin:0 0 6px">Prévia com os dados de <b>${esc(exemplo.nome)}</b> · Assunto: ${esc(r.assunto)}. Mudou algo? Clique em <b>Ver prévia</b> de novo.</p>
             <iframe title="Prévia do comprovante" sandbox="" style="width:100%;height:520px;border:1px solid var(--borda);border-radius:10px;background:#fff"></iframe>`;
           area.querySelector("iframe").srcdoc = r.html;
         } catch (e) {
@@ -194,14 +227,39 @@ export function abrirEnvioEmail(participantes, nomeEvento = "") {
     },
   });
 
+  // guarda o modelo: sempre neste navegador e, com a 0056 rodada, para todos que usam o evento
+  async function guardarModelo(campos, root, avisar) {
+    salvarComprovante(campos);
+    if (!bancoDisponivel) { if (avisar) toast("Modelo salvo só neste navegador.", "ok"); return; }
+    try {
+      await salvarComprovanteConfig(campos);
+      if (avisar) toast("Modelo do evento salvo.", "ok");
+      const aviso = root?.querySelector("#c-salvo");
+      if (aviso) aviso.textContent = "Salvo para todos que usam este evento.";
+    } catch (e) {
+      toast(`Não consegui salvar para a equipe (${e.message || "erro"}). Ficou salvo neste navegador.`, "erro");
+    }
+  }
+
   async function enviarComprovantesEmBlocos(form) {
     const campos = camposComprovante(form);
     if (!campos.assunto) { toast("Preencha o assunto.", "erro"); return false; }
     const incluir = !!form.querySelector('[name="c_incluir"]')?.checked;
     const lista = recebemComprovante(incluir);
     if (!lista.length) { toast("Ninguém para receber: nenhum participante Confirmado na seleção.", "erro"); return false; }
+    // antes de disparar, confere se a função publicada é a que aplica a identidade visual (prévia não envia nada)
+    if (!conferiuVersao) {
+      try {
+        const r = await pedirComprovante({ participanteIds: [lista[0].id], previa: true, ...campos });
+        if (r.versao !== VERSAO_COMPROVANTE) throw new Error(FUNCAO_ANTIGA);
+        conferiuVersao = true;
+      } catch (e) {
+        toast(e.message || "Não foi possível conferir a função de e-mail.", "erro");
+        return false;
+      }
+    }
     if (!confirmar(`Enviar o comprovante de inscrição para ${lista.length} pessoa(s)?`)) return false;
-    salvarComprovante(campos);
+    await guardarModelo(campos, form, false);
 
     let enviados = 0, falhas = [], parou = "";
     for (let i = 0; i < lista.length; i += BLOCO_COMPROVANTE) {
