@@ -27,6 +27,18 @@ function ok(res) {
   return res.data;
 }
 
+// O Supabase devolve no máximo 1000 linhas por pedido e CORTA o resto sem avisar. Listas que crescem são buscadas
+// de 1000 em 1000 até acabar. `montar` cria a consulta já ORDENADA (com o id como desempate).
+const BLOCO = 1000;
+async function todasAsLinhas(montar) {
+  const porId = new Map();   // se entrar alguém no meio da paginação, a linha repetida não duplica
+  for (let de = 0; ; de += BLOCO) {
+    const lote = (await montar().range(de, de + BLOCO - 1).then(ok)) || [];
+    lote.forEach((l, i) => porId.set(l.id ?? `${de}:${i}`, l));
+    if (lote.length < BLOCO) return [...porId.values()];
+  }
+}
+
 // Tabelas escopadas por evento (usado na auto-injeção de evento_id nos inserts).
 const TABELAS_EVENTO = new Set([
   "grupos", "responsaveis", "estagios", "anfitrioes", "convidados",
@@ -63,12 +75,12 @@ export const excluirEvento = (id) =>
 
 /* ---- Visão geral (todos os eventos, SEM escopo) --------------------- */
 export const listParticipantesTodos = () =>
-  supabase.from("participantes")
+  todasAsLinhas(() => supabase.from("participantes")
     .select("id, evento_id, situacao, presente, tipo, ingresso, pagamento, quantidade, created_at, checkin_at")
-    .then(ok);
+    .order("id"));
 
 export const listCheckinsTodos = () =>
-  supabase.from("checkins").select("evento_id, participante_id, acao, at, atividade_id").then(ok);
+  todasAsLinhas(() => supabase.from("checkins").select("id, evento_id, participante_id, acao, at, atividade_id").order("id"));
 
 export const listAnfitrioesTodos = () =>
   supabase.from("anfitrioes_com_stats")
@@ -109,12 +121,12 @@ export const listSituacaoDosAnfitrioes = (eid) =>
     .then((rows) => Object.fromEntries(rows.map((r) => [r.anfitriao_id, r.situacao || "Confirmado"])));
 
 export const listConvidados = (eid) =>
-  supabase
+  todasAsLinhas(() => supabase
     .from("convidados")
     .select("*, anfitriao:anfitrioes(id, nome, slug, grupo_id, categoria_convidado, responsavel_user_id), participante:participantes(situacao)")
     .eq("evento_id", ev(eid))
     .order("created_at", { ascending: false })
-    .then(ok);
+    .order("id"));
 
 // Situação inicial de quem entra por um tipo de ingresso: respeita
 // situacao_padrao; se lista_espera está ligada e as vagas lotaram → "Fila de espera".
@@ -454,13 +466,44 @@ export const listConvidadosDoAnfitriao = (anfitriaoId) =>
     .order("created_at", { ascending: false })
     .then(ok);
 
+const COLUNAS_PARTICIPANTE = "*, convidado:convidados(status, anfitriao:anfitrioes(nome))";
 export const listParticipantes = (eid) =>
-  supabase
+  todasAsLinhas(() => supabase
     .from("participantes")
-    .select("*, convidado:convidados(status, anfitriao:anfitrioes(nome))")
+    .select(COLUNAS_PARTICIPANTE)
     .eq("evento_id", ev(eid))
     .order("created_at", { ascending: false })
-    .then(ok);
+    .order("id"));
+
+/* ---- Telas que se atualizam sozinhas: em vez de baixar TODOS os participantes a cada 30 s, só quem mudou ----
+   soMudancas = false (abrir a tela, botão Atualizar, depois de salvar) → lista completa.
+   soMudancas = true (atualização automática) → só os alterados desde a última vez; a lista completa volta a cada
+   5 min, que é quando somem os excluídos e entram mudanças que não mexem no participante (ex.: nome do anfitrião). */
+const COMPLETA_A_CADA = 5 * 60 * 1000;
+let _vivo = null;   // { evento, linhas: Map, marca, marcaMudouEm, completaEm }
+const maiorAtualizacao = (linhas, atual = "") =>
+  linhas.reduce((m, p) => (p.updated_at && (!m || Date.parse(p.updated_at) > Date.parse(m)) ? p.updated_at : m), atual);
+
+export async function listParticipantesAoVivo(soMudancas = false) {
+  const evento = ev();
+  if (!soMudancas || !_vivo || _vivo.evento !== evento || !_vivo.marca || Date.now() - _vivo.completaEm > COMPLETA_A_CADA) {
+    const linhas = await listParticipantes(evento);
+    _vivo = { evento, linhas: new Map(linhas.map((p) => [p.id, p])), marca: maiorAtualizacao(linhas), marcaMudouEm: Date.now(), completaEm: Date.now() };
+    return linhas;
+  }
+  // logo depois de uma mudança, relê 1 min pra trás (gravação que demorou a terminar não se perde); passado isso,
+  // só o que for realmente novo — senão uma alteração em massa seria baixada de novo a cada volta
+  const comFolga = Date.now() - _vivo.marcaMudouEm < 90000;
+  const mudaram = await todasAsLinhas(() => {
+    const q = supabase.from("participantes").select(COLUNAS_PARTICIPANTE).eq("evento_id", evento);
+    return (comFolga ? q.gte("updated_at", new Date(Date.parse(_vivo.marca) - 60000).toISOString()) : q.gt("updated_at", _vivo.marca))
+      .order("updated_at").order("id");
+  });
+  mudaram.forEach((p) => _vivo.linhas.set(p.id, p));
+  const marca = maiorAtualizacao(mudaram, _vivo.marca);
+  if (marca !== _vivo.marca) { _vivo.marca = marca; _vivo.marcaMudouEm = Date.now(); }
+  return [..._vivo.linhas.values()].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+}
 
 // Atualiza só o status do convidado ligado a este participante (campo
 // separado da Situação do participante — um é o status do convite/inscrição,
@@ -522,12 +565,12 @@ export async function removerCheckinsAtividade(atividadeId, participanteIds) {
 
 /* ---- Check-in (histórico entrada/saída) ---------------------------- */
 export const listCheckins = (eid) =>
-  supabase
+  todasAsLinhas(() => supabase
     .from("checkins")
     .select("*, participante:participantes(nome, tipo, ingresso, empresa, email, codigo)")
     .eq("evento_id", ev(eid))
     .order("at", { ascending: false })
-    .then(ok);
+    .order("id"));
 
 // Grava a linha no log. Modo evento (sem atividadeId): atualiza também o estado
 // atual do participante (presente / checkin_at). Modo atividade: só o log — a
@@ -570,7 +613,7 @@ export const registrarAcessoPonto = (pontoId, participanteId, acao, operador, ex
 
 /* ---- Inscritos por atividade (0048) -------------------------------------- */
 export const listInscritosAtividades = (eid) =>
-  supabase.from("atividade_inscritos").select("*").eq("evento_id", ev(eid)).limit(20000).then(ok);
+  todasAsLinhas(() => supabase.from("atividade_inscritos").select("*").eq("evento_id", ev(eid)).order("id"));
 
 // a inscrição de UMA pessoa numa atividade (consulta rápida na hora do check-in); null se não estiver inscrita
 export const inscricaoDaAtividade = (atividadeId, participanteId) =>

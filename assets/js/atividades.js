@@ -5,7 +5,7 @@
 // =============================================================================
 import { iniciarPagina, esc, icone, toast, confirmar, abrirModal, abrirGaveta, debounce, formatarData } from "./ui.js";
 import {
-  listAtividades, listCheckins, listParticipantes, salvar, remover,
+  listAtividades, listCheckins, listParticipantes, listParticipantesAoVivo, salvar, remover,
   registrarCheckin, inserirLote, removerCheckinsAtividade, listInscritosAtividades, removerInscritosAtividade,
   listCamposPersonalizados,
 } from "./supabase.js";
@@ -23,14 +23,21 @@ _iniciando.then((ctx) => { if (ctx) carregar(ctx); });
 el("btn-atualizar").onclick = () => carregar();
 el("nova-atividade").onclick = () => editar(null);
 // o app de check-in também mexe nas atividades: relê sozinho a cada 30 s (com a aba aberta)
-setInterval(() => { if (!document.hidden) carregar(); }, 30000);
+// atualização automática: nunca começa outra enquanto a anterior não terminou (com internet lenta elas se acumulavam)
+let atualizandoSozinho = false;
+setInterval(async () => {
+  if (document.hidden || atualizandoSozinho) return;
+  atualizandoSozinho = true;
+  try { await carregar(true); } finally { atualizandoSozinho = false; }
+}, 30000);
 
-async function carregar() {
+// soMudancas: só a atualização automática usa (baixa apenas os participantes alterados)
+async function carregar(soMudancas) {
   try {
     [atividades, checkins, participantes, inscritos] = await Promise.all([
       listAtividades(),
       listCheckins().catch(() => []),
-      listParticipantes().catch(() => []),
+      listParticipantesAoVivo(soMudancas === true).catch(() => participantes),
       listInscritosAtividades().catch(() => []),
     ]);
     el("carregando").hidden = true;

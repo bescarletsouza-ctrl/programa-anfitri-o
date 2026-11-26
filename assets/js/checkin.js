@@ -8,7 +8,7 @@
 // geral; categoria não liberada / atividade lotada = alerta, não bloqueia.
 // =============================================================================
 import { iniciarPagina, esc, debounce, toast, icone, abrirMenu } from "./ui.js";
-import { listParticipantes, listCheckins, listAtividades, registrarCheckin, salvar, remover } from "./supabase.js";
+import { listParticipantes, listParticipantesAoVivo, listCheckins, listAtividades, registrarCheckin, salvar, remover } from "./supabase.js";
 import { eventoNome } from "./evento.js";
 import { imprimirCracha } from "./cracha.js";
 
@@ -41,12 +41,19 @@ el("ck-detalhes").onchange = (e) => {
   try { localStorage.setItem("ck_detalhes", e.target.checked ? "1" : "0"); } catch {}
   aplicarDetalhes();
 };
-setInterval(() => { if (!document.hidden) carregar(); }, 30000);
+// atualização automática: nunca começa outra enquanto a anterior não terminou (com internet lenta elas se acumulavam)
+let atualizandoSozinho = false;
+setInterval(async () => {
+  if (document.hidden || atualizandoSozinho) return;
+  atualizandoSozinho = true;
+  try { await carregar(true); } finally { atualizandoSozinho = false; }
+}, 30000);
 
-async function carregar() {
+// soMudancas: só a atualização automática usa (baixa apenas os participantes alterados)
+async function carregar(soMudancas) {
   try {
     [participantes, checkins, atividades] = await Promise.all([
-      listParticipantes(),
+      listParticipantesAoVivo(soMudancas === true),
       listCheckins().catch(() => []),
       listAtividades().catch(() => []),
     ]);

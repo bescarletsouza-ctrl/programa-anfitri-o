@@ -1715,8 +1715,10 @@ async function salvarConfig() {
 }
 
 /* ---- atualização periódica dos check-ins ------------------------- */
+let buscandoCheckins = false;   // com internet lenta, não empilha uma busca em cima da outra
 setInterval(() => {
-  if (!document.hidden && evento && el("app").hidden === false && !estaOffline() && OFF.pendentes === 0) {
-    listCheckins().then((c) => { checkins = c; }).catch(() => {});
+  if (!buscandoCheckins && !document.hidden && evento && el("app").hidden === false && !estaOffline() && OFF.pendentes === 0) {
+    buscandoCheckins = true;
+    listCheckins().then((c) => { checkins = c; }).catch(() => {}).finally(() => { buscandoCheckins = false; });
   }
 }, 20000);

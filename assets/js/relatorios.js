@@ -3,7 +3,7 @@
 // por hora e lista dos últimos check-ins. Tudo client-side, sem lib de gráfico.
 // =============================================================================
 import { iniciarPagina, esc, debounce, formatarData, toast, normalizarFaturamento } from "./ui.js";
-import { listParticipantes, listCheckins, listAtividades, listTiposIngresso, listPontos, listAcessosPontos } from "./supabase.js";
+import { listParticipantes, listParticipantesAoVivo, listCheckins, listAtividades, listTiposIngresso, listPontos, listAcessosPontos } from "./supabase.js";
 import { baixarXLSX } from "./tabela.js";
 
 const _iniciando = iniciarPagina("relatorios");
@@ -45,12 +45,19 @@ el("toggle-faturamento-perfil").querySelectorAll("button").forEach((b) => {
     renderFaturamentoPerfil();
   };
 });
-setInterval(() => { if (!document.hidden) carregar(); }, 30000);
+// atualização automática: nunca começa outra enquanto a anterior não terminou (com internet lenta elas se acumulavam)
+let atualizandoSozinho = false;
+setInterval(async () => {
+  if (document.hidden || atualizandoSozinho) return;
+  atualizandoSozinho = true;
+  try { await carregar(true); } finally { atualizandoSozinho = false; }
+}, 30000);
 
-async function carregar() {
+// soMudancas: só a atualização automática usa (baixa apenas os participantes alterados)
+async function carregar(soMudancas) {
   try {
     [participantes, checkins, atividades, tipos, pontos, acessosPontos] = await Promise.all([
-      listParticipantes(), listCheckins(), listAtividades().catch(() => []), listTiposIngresso().catch(() => []),
+      listParticipantesAoVivo(soMudancas === true), listCheckins(), listAtividades().catch(() => []), listTiposIngresso().catch(() => []),
       listPontos().catch(() => []), listAcessosPontos().catch(() => []),   // sem a migração 0047 simplesmente não aparece
     ]);
     participantes = participantes.filter((p) => p.situacao !== "Desativado");
