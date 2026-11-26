@@ -33,7 +33,6 @@ async function carregar() {
       listParticipantes().catch(() => []),
       listInscritosAtividades().catch(() => []),
     ]);
-    participantes = participantes.filter((p) => p.situacao !== "Desativado");
     el("carregando").hidden = true;
     el("painel").hidden = false;
     render();
@@ -46,6 +45,13 @@ async function carregar() {
       : "Erro ao carregar: " + esc(e.message);
   }
 }
+
+// situação do participante (mesmas cores da lista de Participantes)
+const situacaoDe = (p) => p?.situacao || "Confirmado";
+const badgeSituacao = (s) =>
+  ({ Confirmado: "badge-ok", Pendente: "badge-alerta", "Fila de espera": "badge-info",
+     "Pré-inscrito": "badge-neutro", Desativado: "badge-erro" }[s] || "badge-neutro");
+const seloSituacao = (s) => (s ? `<span class="badge ${badgeSituacao(s)}" title="Situação do participante">${esc(s)}</span>` : "");
 
 const hora = (iso) => {
   try {
@@ -110,6 +116,7 @@ function inscritosDe(atvId) {
     const d = dentro.get(pid);
     return {
       pid, nome,
+      situacao: p ? situacaoDe(p) : "",
       categoria: p?.ingresso || p?.tipo || c.ingresso || c.tipo || "",
       email: p?.email || c.email || "", empresa: p?.empresa || c.empresa || "", codigo: p?.codigo || c.codigo || "",
       desde: d?.desde || null,
@@ -279,7 +286,7 @@ function renderLista() {
   if (!alvo || !gavetaAtv) return;
   const todos = inscritosDe(gavetaAtv.id);
   let linhas = todos;
-  if (gavetaBusca) linhas = linhas.filter((l) => `${l.nome} ${l.categoria} ${l.email} ${l.codigo}`.toLowerCase().includes(gavetaBusca));
+  if (gavetaBusca) linhas = linhas.filter((l) => `${l.nome} ${l.categoria} ${l.email} ${l.codigo} ${l.situacao}`.toLowerCase().includes(gavetaBusca));
   linhas.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
 
   if (!linhas.length) {
@@ -301,6 +308,7 @@ function renderLista() {
         <span>
           <strong>${esc(l.nome)}</strong>
           <span class="checkin-meta">
+            ${seloSituacao(l.situacao)}
             ${l.categoria ? `<span class="chip-cat">${esc(l.categoria)}</span>` : ""}
             <span class="chip-codigo">${esc(l.codigo || "—")}</span>
             ${situacao(l)}
@@ -358,7 +366,8 @@ async function exportarCredenciados(linhas) {
     { rotulo: "E-mail", valor: (l) => l.email },
     { rotulo: "Telefone", valor: (l) => partDe(l).telefone || "" },
     { rotulo: "Empresa", valor: (l) => l.empresa },
-    { rotulo: "Situação", valor: (l) => (l.estado === "dentro" ? "No local" : l.estado === "saiu" ? "Saiu" : "Ainda não entrou") },
+    { rotulo: "Situação", valor: (l) => l.situacao },
+    { rotulo: "Presença", valor: (l) => (l.estado === "dentro" ? "No local" : l.estado === "saiu" ? "Saiu" : "Ainda não entrou") },
     { rotulo: "Entrada em", valor: (l) => (l.desde ? `${formatarData(l.desde)} ${hora(l.desde)}` : "") },
   ];
   // campos adicionais do participante (mesmos do Excel de Participantes)
@@ -393,7 +402,7 @@ function renderAdd() {
   const cats = (gavetaAtv.categorias || []).filter(Boolean);
   let fora = participantes.filter((p) => !dentro.has(p.id));
   if (gavetaBusca) {
-    fora = fora.filter((p) => `${p.nome} ${p.email || ""} ${p.codigo || ""} ${p.ingresso || ""} ${p.tipo || ""}`.toLowerCase().includes(gavetaBusca));
+    fora = fora.filter((p) => `${p.nome} ${p.email || ""} ${p.codigo || ""} ${p.ingresso || ""} ${p.tipo || ""} ${situacaoDe(p)}`.toLowerCase().includes(gavetaBusca));
   }
   fora.sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR"));
   const lista = fora.slice(0, 80);
@@ -417,6 +426,7 @@ function renderAdd() {
           <span>
             <strong>${esc(p.nome)}</strong>
             <span class="checkin-meta">
+              ${seloSituacao(situacaoDe(p))}
               <span class="chip-cat">${esc(p.ingresso || p.tipo || "—")}</span>
               <span class="chip-codigo">${esc(p.codigo || "—")}</span>
             </span>
@@ -435,7 +445,8 @@ function renderAdd() {
   alvo.querySelectorAll("[data-cat]").forEach((b) => {
     b.onclick = () => {
       const c = b.dataset.cat;
-      participantes.forEach((p) => { if (!dentro.has(p.id) && (p.ingresso || p.tipo) === c) selecionadosAdd.add(p.id); });
+      // o atalho em lote deixa os Desativados de fora (dá pra marcar um a um, se quiser)
+      participantes.forEach((p) => { if (!dentro.has(p.id) && (p.ingresso || p.tipo) === c && situacaoDe(p) !== "Desativado") selecionadosAdd.add(p.id); });
       renderAdd();
     };
   });
