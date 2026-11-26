@@ -769,6 +769,23 @@ export async function enviarEmail({ participanteIds, assunto, corpo, de }) {
   return data; // { enviados, falhas, total }
 }
 
+// Modelo "comprovante de inscrição" (com QR Code). previa:true só monta o e-mail, sem enviar.
+// Vai em "mensagem" (e não "corpo") de propósito: a versão antiga da função recusa, em vez de mandar texto sem QR.
+export async function pedirComprovante({ participanteIds, previa = false, incluirNaoConfirmados = false, ...campos }) {
+  const antiga = "A função de e-mail publicada ainda não tem o comprovante. Publique de novo supabase/functions/enviar-email.";
+  const { data, error } = await supabase.functions.invoke("enviar-email", {
+    body: { evento_id: eventoId(), modelo: "comprovante", participante_ids: participanteIds, previa, incluir_nao_confirmados: incluirNaoConfirmados, ...campos },
+  });
+  if (error) {
+    const msg = await mensagemErroFuncao(
+      error, "Função de e-mail não encontrada. Faça o deploy de supabase/functions/enviar-email e configure os secrets."
+    );
+    throw new Error(/dados incompletos/i.test(msg) ? antiga : msg);
+  }
+  if (data?.erro) throw new Error(/dados incompletos/i.test(data.erro) ? antiga : data.erro);
+  return data;   // prévia: { assunto, para, html } · envio: { enviados, falhas, total, ignorados, limite_atingido }
+}
+
 /* ---- Integrações e Webhooks (Edge Functions "integracoes" / "webhook-in") -- */
 export const listIntegracoes = (eid) =>
   supabase.from("integracoes").select("*").eq("evento_id", ev(eid))
