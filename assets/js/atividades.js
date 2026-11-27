@@ -197,11 +197,21 @@ function cardHtml(atv) {
 // dá pra ajustar dia e horário antes de confirmar. Não copia inscritos nem credenciados.
 function editar(atv, duplicar = false) {
   const cats = (atv?.categorias || []).join(", ");
+  const nInscritos = duplicar && atv ? inscritosDe(atv.id).length : 0;
   abrirModal({
     titulo: duplicar ? "Duplicar atividade" : atv ? "Editar atividade" : "Nova atividade",
     textoConfirmar: duplicar ? "Criar cópia" : undefined,
     corpoHtml: `
-      ${duplicar ? `<p class="pagina-sub" style="margin:0 0 12px">Cria uma atividade nova com estes dados. Ajuste o que mudar (dia, horário…) e confirme. Inscritos e credenciados não são copiados.</p>` : ""}
+      ${duplicar ? `<p class="pagina-sub" style="margin:0 0 12px">Cria uma atividade nova com estes dados. Ajuste o que mudar (dia, horário…) e confirme.</p>
+      <div class="campo" role="radiogroup" aria-label="Inscritos"><span>Inscritos</span>
+        <label style="display:flex;gap:8px;align-items:center;margin:4px 0">
+          <input type="radio" name="inscritos" value="sem" checked /> <span style="margin:0">Duplicar <b>sem</b> os inscritos</span></label>
+        <label style="display:flex;gap:8px;align-items:center;margin:4px 0">
+          <input type="radio" name="inscritos" value="com" ${nInscritos ? "" : "disabled"} /> <span style="margin:0">${nInscritos
+            ? `Duplicar <b>com</b> os inscritos (${nInscritos})`
+            : "Duplicar com os inscritos (esta atividade ainda não tem inscritos)"}</span></label>
+        <small class="pagina-sub" style="margin:4px 0 0;display:block">Entradas, saídas e presença <b>não</b> são copiadas: na cópia ninguém aparece como presente.</small>
+      </div>` : ""}
       <label class="campo"><span>Nome *</span>
         <input class="input" name="nome" required value="${esc(duplicar && atv ? atv.nome + " (cópia)" : atv?.nome || "")}" /></label>
       <label class="campo"><span>Dia</span>
@@ -228,8 +238,24 @@ function editar(atv, duplicar = false) {
         categorias: f.categorias.split(",").map((s) => s.trim()).filter(Boolean),
       };
       if (atv && !duplicar) registro.id = atv.id;
-      await salvar("atividades", registro);
-      toast(duplicar ? "Atividade duplicada." : "Atividade salva.", "ok");
+      let copiar = [];
+      if (duplicar && f.inscritos === "com") {
+        // relê antes de copiar: o app pode ter inscrito ou removido alguém enquanto a janela estava aberta
+        [inscritos, checkins] = await Promise.all([listInscritosAtividades(), listCheckins()]);
+        copiar = inscritosDe(atv.id).map((l) => l.pid);
+      }
+      const salva = await salvar("atividades", registro);
+      if (copiar.length) {
+        try {
+          const n = await inscreverNaPlataforma(salva.id, copiar);   // só inscrição, sem entrada
+          toast(`Atividade duplicada com ${n} inscrito(s).`, "ok");
+        } catch (e) {
+          // a cópia já existe: avisa e fecha, pra um novo clique não criar outra atividade repetida
+          toast(`A atividade foi criada, mas não consegui copiar os inscritos (${e.message || "erro"}). Apague a cópia e tente de novo.`, "erro");
+        }
+      } else {
+        toast(duplicar ? "Atividade duplicada sem inscritos." : "Atividade salva.", "ok");
+      }
       carregar();
     },
   });
